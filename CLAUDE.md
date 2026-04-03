@@ -35,12 +35,11 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 | Datenbank | Supabase + pgvector | Single Source of Truth, alle Ventures |
 | Orchestrator | Supabase Edge Functions | Automationen, Workflows, Webhooks |
 | KI | Claude API | Sonnet (komplex), Haiku (Routinen) |
-| Founder-Interface | Supabase Dashboard / direkt | Kein Notification-Layer in Phase 1 |
+| Founder-Interface | Next.js Dashboard (Vercel) | Live unter Vercel-URL |
 | E-Commerce | WooCommerce REST API | Blazed Outfitters, Brandary Shop |
-| E-Mail | Resend.com | Transaktional + Campaigns |
+| E-Mail | Resend.com | Transaktional + Campaigns (Domain onlinefirst.eu verifiziert) |
 | Social Media | Buffer API | Content-Scheduling |
 | Dokumente | Google Drive | Reports, Vorlagen, Ablage |
-| Interface | TBD (React App oder bestehendes Tool) | Dashboard / UI |
 
 **KI-Modell-Regel:**
 - `claude-sonnet-4-6` — Lead-Analyse, Content-Generierung, komplexe Entscheidungen
@@ -48,21 +47,38 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 
 ---
 
-## Aktueller Stand: Phase 1 — Fundament
+## Repositories & Deployment
 
-**Gesamtfortschritt:** Schritt 2 von 4 — Dashboard live
+| | |
+|---|---|
+| **GitHub** | github.com/joserodri3006-creator/founder-os (privat) |
+| **Vercel** | Root Directory: `dashboard` — deployt bei jedem `git push main` |
+| **Supabase** | Projekt-ID: `bshuqljbanmphmjyicdc` |
 
-### Erledigte Schritte
-- [x] Supabase Schema für Online First Lead Pipeline entworfen (`supabase_schema.sql`)
-- [x] Supabase Projekt erstellt + Schema eingespielt
-- [x] DB-Verbindung verifiziert (Tabellen: leads, customers, lead_activities, mail_templates, orders, system_config + 4 Views)
+**Deployment-Workflow:** Änderungen lokal → `git add` → `git commit` → `git push` → Vercel deployt automatisch.
 
-### Supabase DB — Aktuelles Schema (Stand 2026-03-27)
+---
 
-**Tabellen:** `leads`, `customers`, `lead_activities`, `mail_templates`, `orders`, `order_activities`, `system_config`
+## Supabase DB — Aktuelles Schema (Stand 2026-04-03)
+
+**Tabellen:**
+- `leads` — Lead-Pipeline (alle Ventures)
+- `customers` — Kundenstamm (alle Ventures)
+- `lead_activities` — Aktivitäten pro Lead
+- `mail_templates` — E-Mail-Vorlagen
+- `orders` — Aufträge (alle Ventures)
+- `order_activities` — Aktivitäten/Audit Trail pro Auftrag
+- `payment_models` — Zahlungsmodelle pro Venture (flexibel, JSON-Steps)
+- `system_config` — Zentrale Konfiguration (KI-Suche, Venture-Infos, etc.)
+
+**orders-Spalten:**
+`invoice_number`, `invoice_generated_at`, `invoice_html`, `invoice_data` (JSONB),
+`payment_model_id`, `payment_steps` (JSONB), `invoice_sent`, `anzahlung_erhalten`, `restzahlung_erhalten`
+
 **Views:** `v_lead_pipeline`, `v_due_follow_ups`, `v_daily_new_leads`, `v_reactivation_today`
-**Enums:** `venture`, `lead_status`, `lead_source`, `order_status`
-**orders-Spalten (zuletzt ergänzt):** `invoice_number`, `invoice_generated_at`, `invoice_html`
+
+**Enums:** `venture` (online_first, blazed_outfitters, droplane, brandary — worknest noch nicht), `lead_status`, `lead_source`, `order_status`
+
 **Noch offen:** pgvector Embedding-Spalte in `leads` (für Phase 2 KI-Features)
 
 ### DB-Verbindung (für Claude Code)
@@ -72,90 +88,88 @@ Host:     aws-1-eu-west-1.pooler.supabase.com
 Port:     6543
 DB:       postgres
 User:     postgres.bshuqljbanmphmjyicdc
-Password: [im settings.json URL-encoded hinterlegt]
+Password: [in .env.local / Vercel env vars]
 ```
 
 MCP-Config: `~/.claude/settings.json` → `@modelcontextprotocol/server-postgres`
-Direktverbindung Node.js: password = `Jlraxx3006?!` (Klammern in URL-Connection weglassen)
-
-### Offene Schritte (in Reihenfolge)
-
-#### ~~Schritt 1 — Supabase Projekt anlegen~~ ✅
-- [x] Supabase Projekt erstellt
-- [x] Schema eingespielt und verifiziert
-- [ ] pgvector Extension aktivieren (Supabase Dashboard → Extensions → vector)
-- [ ] Anon Key + Service Role Key sichern (für n8n Credentials)
-
-#### Schritt 2 — Lead Pipeline bauen (Online First)
-- [x] Edge Function: Lead-Eingang (Webformular → Supabase `leads`) → deployed + getestet
-- [x] Edge Function: Lead-Qualifizierung mit Claude (Haiku: Klassifizierung, Sonnet: Analyse) → deployed + getestet
-
-#### Dashboard (Next.js) — live auf localhost:3000
-- [x] `/dashboard` — KPI Kacheln + neueste Leads
-- [x] `/leads` — Pipeline mit Status-Änderung inline, Neuer Lead Modal, CSV Import
-- [x] `/drafts` — KI-Drafts reviewen, editieren, freigeben & senden
-- [x] Alle DB-Reads über API Routes (Service Role Key, RLS umgangen)
-- [x] Status-Workflow Webhook (status-workflow Edge Function)
-- [x] E-Mail-Versand über Resend (Domain onlinefirst.eu verifiziert, echte Absenderadressen aktiv)
-- [x] Rechnungsgenerierung: HTML-Rechnung pro Venture, Download + E-Mail-Versand aus Auftragsdetail
-- [x] order-workflow Edge Function (Status-Webhooks + automatische Mails)
-- [x] daily-summary Edge Function (täglich 18:00 UTC via pg_cron)
-- [ ] Deployment (Vercel o.ä.)
-
-#### Schritt 3 — Operations Agent MVP (Brandary)
-- [ ] Brandary-spezifisches Schema entwerfen (Druckaufträge, Material, Status)
-- [ ] Edge Function: Bestelleingang → Supabase
-- [ ] Edge Function: Rechnungs-Generierung (→ Google Drive)
+Direktverbindung Node.js: password = `Jlraxx3006?!`
 
 ---
 
-## Dateistruktur
+## Edge Functions (alle deployed)
 
+| Function | Trigger | Zweck |
+|---|---|---|
+| `lead-intake` | HTTP POST | Lead-Eingang aus Webformular |
+| `lead-qualify` | HTTP POST | KI-Qualifizierung (Haiku + Sonnet), per-venture Kontext |
+| `status-workflow` | DB Webhook (leads UPDATE) | KI-Draft generieren bei Status-Änderung |
+| `order-workflow` | DB Webhook (orders INSERT/UPDATE) | Mails + Aktivitäten + Payment-Model auto-assign |
+| `ki-lead-search` | pg_cron 08:00 UTC | Täglich neue Leads via Claude suchen (4 Ventures) |
+| `daily-summary` | pg_cron 18:00 UTC | Tages-Zusammenfassung per Mail an Founder |
+
+---
+
+## Dashboard (Next.js) — Feature-Stand
+
+### Seiten
+- `/dashboard` — KPI-Kacheln pro Venture, neueste Leads
+- `/leads` — Pipeline, Status inline, Neuer Lead Modal, CSV Import, Duplikat-Markierung
+- `/leads/[id]` — Lead-Detail mit Aktivitäten
+- `/drafts` — KI-Drafts reviewen, editieren, senden (per Venture gefiltert)
+- `/kunden` — Kundenliste (per Venture gefiltert)
+- `/auftraege` — Auftragsliste mit Status + Wert
+- `/auftraege/[id]` — Auftragsdetail: Status-Timeline, Zahlungsschritte, Rechnung, Aktivitäten
+- `/einstellungen` — KI-Suche, Venture-Infos (Firmendaten für Rechnungen), allg. Config
+- `/einstellungen/zahlungsmodelle` — Zahlungsmodelle pro Venture verwalten
+
+### Globale Features
+- **Venture Switcher** in Sidebar — persistiert in localStorage, alle Seiten reagieren
+- **Resend E-Mail** — Domain onlinefirst.eu verifiziert, echte Absender aktiv
+- **Rechnungsgenerierung** — HTML-Rechnung, editierbar (Positionen, Empfänger, MwSt.), Download + E-Mail-Versand
+- **Zahlungsmodelle** — flexibel per Venture, Steps mit Trigger + Fälligkeit, Toggle pro Schritt
+- **system_config upsert** — neue Keys werden automatisch angelegt
+
+### Env Vars (Vercel + .env.local)
 ```
-founder-os/
-├── CLAUDE.md                    # Diese Datei — immer aktuell halten
-├── supabase_schema.sql          # Online First Lead Pipeline Schema
-├── schemas/                     # Weitere Supabase Schemas (pro Venture)
-│   ├── brandary_schema.sql
-│   └── ...
-├── n8n/                         # n8n Workflow Exports (.json)
-│   ├── lead_pipeline.json
-│   └── ...
-├── prompts/                     # Claude System Prompts (wiederverwendbar)
-│   ├── lead_qualifier.md
-│   └── ...
-└── docs/                        # Entscheidungen, Architektur-Notizen
-    └── architecture.md
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+RESEND_API_KEY
 ```
+
+---
+
+## Offene Punkte (Phase 1)
+
+- [ ] pgvector Extension aktivieren (Supabase Dashboard → Extensions → vector)
+- [ ] `worknest` zum `venture` Enum hinzufügen (aktuell nicht in DB)
+- [ ] Vercel-URL in dieses Dokument eintragen sobald bekannt
+
+## Nächste Phase (Phase 2 / Phase 3)
+
+- [ ] Schritt 3 — Operations Agent MVP (Brandary): Druckaufträge, Material, Rechnungs-Generierung → Google Drive
+- [ ] Telegram-Interface als Founder-Notification-Layer
+- [ ] pgvector: Leads semantisch suchen / matchen
 
 ---
 
 ## Architektur-Prinzipien
 
-1. **Supabase ist die einzige Wahrheit.** Alle Ventures schreiben in dieselbe DB.
-   Kein Daten-Silo pro Venture.
-
-2. **Supabase Edge Functions sind der Orchestrator.** Keine Business-Logik direkt in Claude-Prompts —
-   Claude analysiert und entscheidet, Edge Functions führen aus. Kein externer Service nötig.
-
-3. **Telegram ist das Founder-Interface.** Keine eigene App bauen, solange
-   Telegram alle Anforderungen erfüllt.
-
-4. **Haiku für Speed, Sonnet für Qualität.** Jede Automation hat eine klare
-   Modell-Zuweisung. Kosten im Blick behalten.
-
-5. **Phase 1 hat Priorität.** Neue Features für Phase 2/3 erst wenn Phase 1
-   stabil läuft und Cashflow gesichert ist.
+1. **Supabase ist die einzige Wahrheit.** Alle Ventures schreiben in dieselbe DB. Kein Daten-Silo pro Venture.
+2. **Supabase Edge Functions sind der Orchestrator.** Claude analysiert und entscheidet, Edge Functions führen aus.
+3. **Dashboard (Vercel) ist das Founder-Interface.** Next.js App, deployt via GitHub → Vercel.
+4. **Haiku für Speed, Sonnet für Qualität.** Jede Automation hat eine klare Modell-Zuweisung.
+5. **Phase 1 hat Priorität.** Neue Features für Phase 2/3 erst wenn Phase 1 stabil läuft.
 
 ---
 
 ## Wie diese Datei benutzen
 
-- **Session-Start:** Offene Schritte lesen, Status einschätzen
+- **Session-Start:** Offene Punkte lesen, Status einschätzen
 - **Nach jedem abgeschlossenen Schritt:** Checkbox abhaken, ggf. neue Unteraufgaben ergänzen
-- **Bei Architektur-Entscheidungen:** Prinzipien prüfen, Entscheidung in `docs/` dokumentieren
-- **Neue Ventures aktivieren:** Tabelle oben aktualisieren, neues Schema unter `schemas/` anlegen
+- **Bei Architektur-Entscheidungen:** Prinzipien prüfen
+- **Neue Ventures aktivieren:** Tabelle oben aktualisieren, `venture` Enum in DB erweitern
 
 ---
 
-*Zuletzt aktualisiert: 2026-03-26 — Architektur-Entscheidung: n8n → Supabase Edge Functions*
+*Zuletzt aktualisiert: 2026-04-03 — GitHub + Vercel Deployment, Zahlungsmodelle, Rechnungseditor*
