@@ -12,8 +12,13 @@ const navItems = [
   { href: "/kunden", label: "Kunden" },
   { href: "/auftraege", label: "Aufträge" },
   { href: "/drafts", label: "KI-Drafts" },
+  { label: "—", href: "", divider: true },
+  { href: "/produkte", label: "Produkte" },
+  { href: "/produkte/kategorien", label: "Kategorien" },
+  { label: "—", href: "", divider: true },
   { href: "/einstellungen", label: "Einstellungen" },
   { href: "/einstellungen/zahlungsmodelle", label: "Zahlungsmodelle" },
+  { href: "/einstellungen/produkttypen", label: "Produkttypen" },
 ];
 
 export default function Sidebar() {
@@ -73,8 +78,9 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+        {navItems.map((item, i) => {
+          if ((item as any).divider) return <div key={i} className="my-1 border-t border-gray-100" />;
+          const active = pathname === item.href || (item.href.length > 1 && pathname.startsWith(item.href + "/"));
           return (
             <Link
               key={item.href}
