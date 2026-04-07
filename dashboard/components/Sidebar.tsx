@@ -19,6 +19,7 @@ const navItems = [
   { href: "/einstellungen", label: "Einstellungen" },
   { href: "/einstellungen/zahlungsmodelle", label: "Zahlungsmodelle" },
   { href: "/einstellungen/produkttypen", label: "Produkttypen" },
+  { href: "/einstellungen/marken", label: "Marken" },
 ];
 
 export default function Sidebar() {
