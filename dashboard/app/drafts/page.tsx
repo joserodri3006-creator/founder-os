@@ -77,7 +77,7 @@ export default function DraftsPage() {
   if (loading) return <div className="p-8 text-sm text-gray-400">Laden...</div>;
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-semibold">KI-Drafts</h1>
         <span className="text-sm text-gray-400">{leads.length} offen</span>

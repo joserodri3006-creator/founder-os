@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { VentureProvider } from "@/context/VentureContext";
 import { AuthProvider } from "@/context/AuthContext";
-import Sidebar from "@/components/Sidebar";
+import AppShell from "@/components/AppShell";
 
 export const metadata: Metadata = {
   title: "Founder OS",
@@ -28,14 +28,5 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </AuthProvider>
       </body>
     </html>
-  );
-}
-
-function AppShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto" style={{ background: '#F7F8FC' }}>{children}</main>
-    </div>
   );
 }

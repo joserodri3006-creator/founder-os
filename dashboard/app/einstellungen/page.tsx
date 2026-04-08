@@ -119,7 +119,7 @@ export default function EinstellungenPage() {
   if (loading) return <div className="p-8 text-sm text-gray-400">Laden...</div>;
 
   return (
-    <div className="p-8 max-w-3xl mx-auto space-y-8">
+    <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto space-y-8">
       <h1 className="text-xl font-semibold">Einstellungen</h1>
 
       {/* KI-Lead-Suche pro Venture */}

@@ -117,7 +117,7 @@ export default function NeuesProduktPage() {
   }
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <Link href="/produkte" className="text-sm text-gray-400 hover:text-gray-600">← Produkte</Link>
         <span className="text-gray-200">/</span>

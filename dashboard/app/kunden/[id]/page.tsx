@@ -129,7 +129,7 @@ export default function KundeDetailPage() {
   if (!customer) return <div className="p-8 text-sm" style={{ color: '#EF4444' }}>Kunde nicht gefunden.</div>;
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-5xl mx-auto">
       {/* Breadcrumb */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
         <Link href="/kunden" style={{ fontSize: '13px', color: '#6B7280', textDecoration: 'none' }}>← Kunden</Link>
@@ -147,9 +147,9 @@ export default function KundeDetailPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column */}
-        <div className="col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="lg:col-span-2" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
           {/* Customer Info Card */}
           <div style={{ background: '#FFFFFF', border: '1px solid #D1D5E8', borderRadius: '16px', boxShadow: '0 2px 12px rgba(27,42,94,0.08)', padding: '20px' }}>

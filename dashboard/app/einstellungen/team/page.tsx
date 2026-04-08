@@ -137,7 +137,7 @@ export default function TeamPage() {
   if (!canEdit("settings")) return <div className="p-8 text-sm text-red-500">Kein Zugriff.</div>;
 
   return (
-    <div className="p-8 max-w-3xl mx-auto space-y-8">
+    <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Team</h1>

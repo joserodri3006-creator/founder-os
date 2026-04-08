@@ -264,7 +264,7 @@ export default function AuftragDetailPage() {
   const timelineIdx = STATUS_TIMELINE.indexOf(order.status);
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-4xl mx-auto">
       {/* Breadcrumb */}
       <div className="flex items-center gap-3 mb-6">
         <Link href="/auftraege" className="text-sm text-gray-400 hover:text-gray-600">← Aufträge</Link>
@@ -272,9 +272,9 @@ export default function AuftragDetailPage() {
         <span className="text-sm text-gray-700 font-medium">{order.title}</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Linke Spalte — Hauptinfo */}
-        <div className="col-span-2 space-y-5">
+        <div className="lg:col-span-2 space-y-5">
 
           {/* Header */}
           <div className="bg-white rounded-lg border border-gray-200">

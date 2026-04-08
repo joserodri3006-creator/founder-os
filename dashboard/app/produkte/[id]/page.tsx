@@ -215,7 +215,7 @@ export default function ProduktDetailPage() {
   const hasWeight = product.product_type?.has_weight;
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-4xl mx-auto">
       {/* Breadcrumb */}
       <div className="flex items-center gap-3 mb-6">
         <Link href="/produkte" className="text-sm text-gray-400 hover:text-gray-600">← Produkte</Link>
@@ -223,9 +223,9 @@ export default function ProduktDetailPage() {
         <span className="text-sm text-gray-700 font-medium">{product.name}</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Linke Spalte */}
-        <div className="col-span-2 space-y-5">
+        <div className="lg:col-span-2 space-y-5">
 
           {/* Basis-Infos */}
           <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-4">

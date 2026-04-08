@@ -51,7 +51,7 @@ export default function LeadDetailPage() {
   if (!lead) return <div className="p-8 text-sm text-red-500">Lead nicht gefunden.</div>;
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <Link href="/leads" className="text-sm text-gray-400 hover:text-gray-600">← Leads</Link>
         <span className="text-gray-200">/</span>

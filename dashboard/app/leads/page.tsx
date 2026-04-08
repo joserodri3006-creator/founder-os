@@ -107,7 +107,7 @@ export default function LeadsPage() {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-7xl mx-auto">
       {/* Page Header */}
       <div className="flex items-center justify-between mb-7">
         <div>
@@ -212,7 +212,8 @@ export default function LeadsPage() {
             boxShadow: '0 2px 12px rgba(27,42,94,0.08)',
           }}
         >
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full" style={{ minWidth: '700px' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #EEF0F7', background: '#F7F8FC' }}>
                 {["Name", "Unternehmen", "Status", "Branche", "Quelle", "Draft", "Erstellt", "Aktionen"].map(h => (
@@ -323,6 +324,7 @@ export default function LeadsPage() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

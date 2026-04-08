@@ -64,7 +64,7 @@ export default function KategorienPage() {
   if (loading) return <div className="p-8 text-sm text-gray-400">Laden...</div>;
 
   return (
-    <div className="p-8 max-w-2xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-2xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-semibold">Kategorien</h1>
         <p className="text-sm text-gray-500 mt-1">Hierarchische Produktkategorien pro Venture.</p>

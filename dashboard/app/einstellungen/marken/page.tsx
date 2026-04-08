@@ -87,7 +87,7 @@ export default function MarkenPage() {
   if (loading) return <div className="p-8 text-sm text-gray-400">Laden...</div>;
 
   return (
-    <div className="p-8 max-w-3xl mx-auto space-y-8">
+    <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto space-y-8">
       <div>
         <h1 className="text-xl font-semibold">Marken</h1>
         <p className="text-sm text-gray-500 mt-1">Produktmarken pro Venture verwalten.</p>

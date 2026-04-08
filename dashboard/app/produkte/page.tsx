@@ -84,7 +84,7 @@ export default function ProdukteListPage() {
   const meta = getVenture(venture);
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-5xl mx-auto">
       {/* Header */}
       <div
         className="flex items-center justify-between mb-7"
@@ -195,7 +195,8 @@ export default function ProdukteListPage() {
             boxShadow: "0 2px 12px rgba(27,42,94,0.08)",
           }}
         >
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ minWidth: '580px' }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EEF0F7", background: "#F7F8FC" }}>
                 {["Produkt", "Typ", "SKU", "Preis", "Status", "Aktionen"].map((h) => (
@@ -303,6 +304,7 @@ export default function ProdukteListPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

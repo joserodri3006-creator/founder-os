@@ -60,9 +60,9 @@ export default function DashboardPage() {
   const { ventureKpis, followUpsFaellig, recentLeads } = data;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-7xl mx-auto">
       {/* Page Header */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex items-start justify-between gap-3 mb-8 flex-wrap">
         <div>
           <h1
             className="mb-1"
@@ -99,7 +99,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Venture KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-5 gap-3 sm:gap-4 mb-8">
         {ventureKpis.map((kpi) => {
           const meta = getVenture(kpi.venture);
           return (
@@ -165,7 +165,7 @@ export default function DashboardPage() {
         }}
       >
         <div
-          className="px-6 py-4 flex items-center justify-between"
+          className="px-4 sm:px-6 py-4 flex items-center justify-between"
           style={{ borderBottom: '1px solid #EEF0F7' }}
         >
           <h2
@@ -187,13 +187,14 @@ export default function DashboardPage() {
             Alle anzeigen →
           </Link>
         </div>
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full" style={{ minWidth: '540px' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #EEF0F7', background: '#F7F8FC' }}>
               {["Name", "Unternehmen", "Venture", "Status", "Quelle", "Erstellt"].map(h => (
                 <th
                   key={h}
-                  className="px-6 py-3 text-left font-semibold uppercase"
+                  className="px-4 sm:px-6 py-3 text-left font-semibold uppercase"
                   style={{ fontSize: '11px', letterSpacing: '0.07em', color: '#6B7280' }}
                 >
                   {h}
@@ -252,6 +253,7 @@ export default function DashboardPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
