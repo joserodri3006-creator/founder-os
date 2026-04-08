@@ -130,7 +130,12 @@ export default function KundenPage() {
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
                 >
                   <td className="px-4 py-3.5 font-medium" style={{ color: '#14193A', fontSize: '14px' }}>
-                    {c.first_name} {c.last_name}
+                    <Link href={`/kunden/${c.id}`} style={{ color: '#14193A', textDecoration: 'none' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#1B2A5E'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#14193A'}
+                    >
+                      {c.first_name} {c.last_name}
+                    </Link>
                   </td>
                   <td className="px-4 py-3.5 text-sm" style={{ color: '#6B7280' }}>{c.company_name ?? "—"}</td>
                   <td className="px-4 py-3.5 text-sm" style={{ color: '#6B7280' }}>

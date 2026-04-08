@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { getVenture } from "@/lib/ventures";
+import AttachmentsPanel from "@/components/AttachmentsPanel";
+import NotesField from "@/components/NotesField";
 
 interface ProductImage { url: string; storage_path: string; alt: string; sort_order: number; }
 interface VariantOption { id?: string; name: string; values: string[]; sort_order: number; }
@@ -615,6 +617,21 @@ export default function ProduktDetailPage() {
               }}
               className="text-xs border border-gray-200 rounded-md px-2 py-1.5 w-full focus:outline-none focus:ring-1 focus:ring-blue-500" />
           </div>
+
+          {/* Notizen */}
+          <NotesField
+            value={product?.notes ?? null}
+            onSave={async (notes) => {
+              await fetch(`/api/produkte/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ notes }),
+              });
+            }}
+          />
+
+          {/* Anhänge */}
+          <AttachmentsPanel entityType="product" entityId={id} venture={product?.venture ?? undefined} />
 
           {/* Löschen */}
           <button onClick={async () => {

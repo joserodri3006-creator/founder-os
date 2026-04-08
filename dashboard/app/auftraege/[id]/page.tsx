@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { getVenture } from "@/lib/ventures";
+import AttachmentsPanel from "@/components/AttachmentsPanel";
+import NotesField from "@/components/NotesField";
 
 interface PaymentStep {
   step: number;
@@ -351,12 +353,7 @@ export default function AuftragDetailPage() {
                 <p className="text-gray-700 whitespace-pre-wrap">{order.description}</p>
               </div>
             )}
-            {order.notes && (
-              <div className="col-span-2">
-                <p className="text-xs text-gray-500 mb-1">Notizen</p>
-                <p className="text-gray-600 whitespace-pre-wrap text-xs">{order.notes}</p>
-              </div>
-            )}
+            {/* Notes moved to NotesField below */}
           </div>
 
           {/* Briefing-URL + Tracking */}
@@ -401,6 +398,21 @@ export default function AuftragDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* Notizen */}
+          <NotesField
+            value={order.notes}
+            onSave={async (notes) => {
+              await fetch(`/api/auftraege/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes }),
+              });
+            }}
+          />
+
+          {/* Anhänge */}
+          <AttachmentsPanel entityType="order" entityId={id} venture={order.venture} />
 
           {/* Activity Feed */}
           <div className="bg-white rounded-lg border border-gray-200">
