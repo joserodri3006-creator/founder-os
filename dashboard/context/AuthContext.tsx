@@ -89,9 +89,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    const isPublicRoute = ["/login", "/auth", "/invite"].some(p =>
+      window.location.pathname.startsWith(p)
+    );
+
     supabase.auth.getUser().then(({ data: { user: u } }) => {
-      if (u) loadUser(u).finally(() => setLoading(false));
-      else setLoading(false);
+      if (u) {
+        loadUser(u).finally(() => setLoading(false));
+      } else {
+        setLoading(false);
+        if (!isPublicRoute) {
+          window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+        }
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
