@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
 import "./globals.css";
 import { VentureProvider } from "@/context/VentureContext";
 import { AuthProvider } from "@/context/AuthContext";
 import Sidebar from "@/components/Sidebar";
-
-const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Founder OS",
@@ -15,7 +12,15 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="de">
-      <body className={`${geist.className} bg-gray-50 text-gray-900`} suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;1,9..144,300&family=Outfit:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body style={{ background: '#F7F8FC', color: '#14193A' }} suppressHydrationWarning>
         <AuthProvider>
           <VentureProvider>
             <AppShell>{children}</AppShell>
@@ -30,7 +35,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      <main className="flex-1 overflow-y-auto" style={{ background: '#F7F8FC' }}>{children}</main>
     </div>
   );
 }

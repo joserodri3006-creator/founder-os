@@ -32,13 +32,31 @@ const STATUS_LABELS: Record<string, string> = {
   pausiert: "Pausiert",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  neu: "bg-blue-100 text-blue-700",
-  in_bearbeitung: "bg-yellow-100 text-yellow-700",
-  review: "bg-purple-100 text-purple-700",
-  abgeschlossen: "bg-green-100 text-green-700",
-  storniert: "bg-red-100 text-red-700",
-  pausiert: "bg-gray-100 text-gray-600",
+const STATUS_DOT: Record<string, string> = {
+  neu: '#3A5BA0',
+  in_bearbeitung: '#C8A96E',
+  review: '#7C3AED',
+  abgeschlossen: '#16A34A',
+  storniert: '#DC2626',
+  pausiert: '#6B7280',
+};
+
+const STATUS_BG: Record<string, string> = {
+  neu: '#EEF0F7',
+  in_bearbeitung: 'rgba(200,169,110,0.12)',
+  review: 'rgba(124,58,237,0.08)',
+  abgeschlossen: 'rgba(22,163,74,0.1)',
+  storniert: 'rgba(220,38,38,0.08)',
+  pausiert: '#F3F4F6',
+};
+
+const STATUS_TEXT: Record<string, string> = {
+  neu: '#1B2A5E',
+  in_bearbeitung: '#A07840',
+  review: '#5B21B6',
+  abgeschlossen: '#15803D',
+  storniert: '#B91C1C',
+  pausiert: '#374151',
 };
 
 export default function AuftraegePage() {
@@ -72,32 +90,81 @@ export default function AuftraegePage() {
 
   const totalValue = filtered.reduce((sum, o) => sum + (o.value ?? 0), 0);
 
+  const inputStyle: React.CSSProperties = {
+    fontSize: '13px',
+    border: '1px solid #D1D5E8',
+    borderRadius: '8px',
+    padding: '7px 12px',
+    background: '#FFFFFF',
+    color: '#14193A',
+    outline: 'none',
+    fontFamily: 'var(--font-sans)',
+    width: '260px',
+  };
+
+  const selectStyle: React.CSSProperties = {
+    fontSize: '13px',
+    border: '1px solid #D1D5E8',
+    borderRadius: '8px',
+    padding: '7px 12px',
+    background: '#FFFFFF',
+    color: '#14193A',
+    outline: 'none',
+    fontFamily: 'var(--font-sans)',
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      {/* Page Header */}
+      <div className="flex items-start justify-between mb-7">
         <div>
-          <h1 className="text-xl font-semibold">Aufträge</h1>
-          {totalValue > 0 && (
-            <p className="text-sm text-gray-500 mt-0.5">
-              Gesamtwert: <span className="font-medium text-gray-700">{totalValue.toLocaleString("de-DE")} €</span>
-            </p>
-          )}
+          <h1
+            style={{
+              fontFamily: 'var(--font-serif)',
+              fontWeight: 300,
+              fontSize: '28px',
+              color: '#14193A',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.2,
+            }}
+          >
+            Aufträge
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: '#6B7280' }}>
+            {filtered.length} Aufträge
+            {totalValue > 0 && (
+              <span>
+                {" "}·{" "}
+                <span className="font-semibold" style={{ color: '#14193A' }}>
+                  {totalValue.toLocaleString("de-DE")} €
+                </span>{" "}
+                Gesamtwert
+              </span>
+            )}
+          </p>
         </div>
-        <span className="text-sm text-gray-400">{filtered.length} Aufträge</span>
       </div>
 
-      <div className="flex gap-3 mb-5">
+      {/* Filter Bar */}
+      <div
+        className="flex gap-2.5 mb-5 items-center p-3 rounded-xl"
+        style={{
+          background: '#FFFFFF',
+          border: '1px solid #D1D5E8',
+          boxShadow: '0 2px 12px rgba(27,42,94,0.08)',
+        }}
+      >
         <input
           type="text"
           placeholder="Suchen..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="text-sm border border-gray-200 rounded-md px-3 py-1.5 bg-white w-64 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          style={inputStyle}
         />
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="text-sm border border-gray-200 rounded-md px-3 py-1.5 bg-white"
+          style={selectStyle}
         >
           <option value="alle">Alle Status</option>
           {Object.entries(STATUS_LABELS).map(([v, l]) => (
@@ -107,59 +174,97 @@ export default function AuftraegePage() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-gray-400">Laden...</div>
+        <div className="flex items-center gap-2 py-8" style={{ color: '#6B7280' }}>
+          <div
+            className="w-4 h-4 rounded-full border-2 animate-spin"
+            style={{ borderColor: '#D1D5E8', borderTopColor: '#1B2A5E' }}
+          />
+          <span className="text-sm">Laden...</span>
+        </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200">
-          <table className="w-full text-sm">
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #D1D5E8',
+            boxShadow: '0 2px 12px rgba(27,42,94,0.08)',
+          }}
+        >
+          <table className="w-full">
             <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-100 bg-gray-50">
-                <th className="px-4 py-3 text-left font-medium">Titel</th>
-                <th className="px-4 py-3 text-left font-medium">Kunde</th>
-                <th className="px-4 py-3 text-left font-medium">Status</th>
-                <th className="px-4 py-3 text-left font-medium">Paket</th>
-                <th className="px-4 py-3 text-left font-medium">Wert</th>
-                <th className="px-4 py-3 text-left font-medium">Deadline</th>
-                <th className="px-4 py-3 text-left font-medium">Erstellt</th>
+              <tr style={{ borderBottom: '1px solid #EEF0F7', background: '#F7F8FC' }}>
+                {["Titel", "Kunde", "Status", "Paket", "Wert", "Deadline", "Erstellt"].map(h => (
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left font-semibold uppercase"
+                    style={{ fontSize: '11px', letterSpacing: '0.07em', color: '#6B7280' }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map((o) => (
-                <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <Link href={`/auftraege/${o.id}`} className="font-medium hover:text-blue-600 hover:underline">
+                <tr
+                  key={o.id}
+                  style={{ borderBottom: '1px solid #F7F8FC' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#F7F8FC'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                >
+                  <td className="px-4 py-3.5">
+                    <Link
+                      href={`/auftraege/${o.id}`}
+                      className="font-medium transition-colors"
+                      style={{ color: '#14193A', fontSize: '14px' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#1B2A5E'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#14193A'}
+                    >
                       {o.title}
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">
+                  <td className="px-4 py-3.5 text-sm" style={{ color: '#6B7280' }}>
                     {o.customer ? (
                       <div>
-                        <div>{o.customer.first_name} {o.customer.last_name}</div>
+                        <div style={{ color: '#14193A', fontWeight: 500 }}>
+                          {o.customer.first_name} {o.customer.last_name}
+                        </div>
                         {o.customer.company_name && (
-                          <div className="text-xs text-gray-400">{o.customer.company_name}</div>
+                          <div className="text-xs" style={{ color: '#6B7280' }}>{o.customer.company_name}</div>
                         )}
                       </div>
                     ) : "—"}
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[o.status] ?? "bg-gray-100 text-gray-600"}`}>
+                  <td className="px-4 py-3.5">
+                    <span
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+                      style={{
+                        background: STATUS_BG[o.status] ?? '#F3F4F6',
+                        color: STATUS_TEXT[o.status] ?? '#374151',
+                      }}
+                    >
+                      <span
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ background: STATUS_DOT[o.status] ?? '#6B7280' }}
+                      />
                       {STATUS_LABELS[o.status] ?? o.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-500">{o.package_type ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-700">
+                  <td className="px-4 py-3.5 text-sm" style={{ color: '#6B7280' }}>{o.package_type ?? "—"}</td>
+                  <td className="px-4 py-3.5 text-sm font-semibold" style={{ color: '#14193A' }}>
                     {o.value != null ? `${o.value.toLocaleString("de-DE")} €` : "—"}
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
+                  <td className="px-4 py-3.5 text-xs" style={{ color: '#6B7280' }}>
                     {o.deadline ? new Date(o.deadline).toLocaleDateString("de-DE") : "—"}
                   </td>
-                  <td className="px-4 py-3 text-gray-400 text-xs">
+                  <td className="px-4 py-3.5 text-xs" style={{ color: '#6B7280' }}>
                     {new Date(o.created_at).toLocaleDateString("de-DE")}
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={7} className="px-4 py-12 text-center text-sm" style={{ color: '#6B7280' }}>
                     Keine Aufträge gefunden
                   </td>
                 </tr>

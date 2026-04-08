@@ -43,60 +43,133 @@ export default function KundenPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold">Kunden</h1>
-        <span className="text-sm text-gray-400">{filtered.length} Kunden</span>
+      {/* Page Header */}
+      <div className="flex items-center justify-between mb-7">
+        <div>
+          <h1
+            style={{
+              fontFamily: 'var(--font-serif)',
+              fontWeight: 300,
+              fontSize: '28px',
+              color: '#14193A',
+              letterSpacing: '-0.02em',
+              lineHeight: 1.2,
+            }}
+          >
+            Kunden
+          </h1>
+          <p className="text-sm mt-0.5" style={{ color: '#6B7280' }}>{filtered.length} Kunden</p>
+        </div>
       </div>
 
-      <div className="mb-5">
+      {/* Filter Bar */}
+      <div
+        className="flex gap-2.5 mb-5 items-center p-3 rounded-xl"
+        style={{
+          background: '#FFFFFF',
+          border: '1px solid #D1D5E8',
+          boxShadow: '0 2px 12px rgba(27,42,94,0.08)',
+        }}
+      >
         <input
           type="text"
           placeholder="Suchen..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="text-sm border border-gray-200 rounded-md px-3 py-1.5 bg-white w-64 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          style={{
+            fontSize: '13px',
+            border: '1px solid #D1D5E8',
+            borderRadius: '8px',
+            padding: '7px 12px',
+            background: '#FFFFFF',
+            color: '#14193A',
+            outline: 'none',
+            fontFamily: 'var(--font-sans)',
+            width: '260px',
+          }}
         />
       </div>
 
       {loading ? (
-        <div className="text-sm text-gray-400">Laden...</div>
+        <div className="flex items-center gap-2 py-8" style={{ color: '#6B7280' }}>
+          <div
+            className="w-4 h-4 rounded-full border-2 animate-spin"
+            style={{ borderColor: '#D1D5E8', borderTopColor: '#1B2A5E' }}
+          />
+          <span className="text-sm">Laden...</span>
+        </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200">
-          <table className="w-full text-sm">
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #D1D5E8',
+            boxShadow: '0 2px 12px rgba(27,42,94,0.08)',
+          }}
+        >
+          <table className="w-full">
             <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-100 bg-gray-50">
-                <th className="px-4 py-3 text-left font-medium">Name</th>
-                <th className="px-4 py-3 text-left font-medium">Unternehmen</th>
-                <th className="px-4 py-3 text-left font-medium">E-Mail</th>
-                <th className="px-4 py-3 text-left font-medium">Telefon</th>
-                <th className="px-4 py-3 text-left font-medium">Stadt</th>
-                <th className="px-4 py-3 text-left font-medium">Venture</th>
-                <th className="px-4 py-3 text-left font-medium">Erstellt</th>
-                <th className="px-4 py-3 text-left font-medium">Aufträge</th>
+              <tr style={{ borderBottom: '1px solid #EEF0F7', background: '#F7F8FC' }}>
+                {["Name", "Unternehmen", "E-Mail", "Telefon", "Stadt", "Venture", "Erstellt", "Aufträge"].map(h => (
+                  <th
+                    key={h}
+                    className="px-4 py-3 text-left font-semibold uppercase"
+                    style={{ fontSize: '11px', letterSpacing: '0.07em', color: '#6B7280' }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr key={c.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">
+                <tr
+                  key={c.id}
+                  style={{ borderBottom: '1px solid #F7F8FC' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#F7F8FC'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                >
+                  <td className="px-4 py-3.5 font-medium" style={{ color: '#14193A', fontSize: '14px' }}>
                     {c.first_name} {c.last_name}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{c.company_name ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-500">
+                  <td className="px-4 py-3.5 text-sm" style={{ color: '#6B7280' }}>{c.company_name ?? "—"}</td>
+                  <td className="px-4 py-3.5 text-sm" style={{ color: '#6B7280' }}>
                     {c.email ? (
-                      <a href={`mailto:${c.email}`} className="hover:text-blue-600">{c.email}</a>
+                      <a
+                        href={`mailto:${c.email}`}
+                        className="transition-colors"
+                        style={{ color: '#3A5BA0' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#1B2A5E'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#3A5BA0'}
+                      >
+                        {c.email}
+                      </a>
                     ) : "—"}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">{c.phone ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-500">{c.city ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-500 capitalize">{c.venture ?? "—"}</td>
-                  <td className="px-4 py-3 text-gray-400 text-xs">
+                  <td className="px-4 py-3.5 text-sm" style={{ color: '#6B7280' }}>{c.phone ?? "—"}</td>
+                  <td className="px-4 py-3.5 text-sm" style={{ color: '#6B7280' }}>{c.city ?? "—"}</td>
+                  <td className="px-4 py-3.5">
+                    {c.venture ? (
+                      <span
+                        className="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
+                        style={{ background: '#EEF0F7', color: '#1B2A5E' }}
+                      >
+                        {c.venture}
+                      </span>
+                    ) : (
+                      <span className="text-sm" style={{ color: '#6B7280' }}>—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3.5 text-xs" style={{ color: '#6B7280' }}>
                     {new Date(c.created_at).toLocaleDateString("de-DE")}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3.5">
                     <Link
                       href={`/auftraege?customer=${c.id}`}
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-xs font-semibold transition-colors"
+                      style={{ color: '#3A5BA0' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#1B2A5E'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#3A5BA0'}
                     >
                       Aufträge →
                     </Link>
@@ -105,7 +178,7 @@ export default function KundenPage() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={8} className="px-4 py-12 text-center text-sm" style={{ color: '#6B7280' }}>
                     Keine Kunden gefunden
                   </td>
                 </tr>
