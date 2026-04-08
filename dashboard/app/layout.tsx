@@ -4,8 +4,6 @@ import { VentureProvider } from "@/context/VentureContext";
 import { AuthProvider } from "@/context/AuthContext";
 import Sidebar from "@/components/Sidebar";
 
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
   title: "Founder OS",
   description: "Multi-Venture Dashboard",
