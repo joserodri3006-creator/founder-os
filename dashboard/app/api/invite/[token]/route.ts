@@ -38,16 +38,27 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (invite.expires_at && new Date(invite.expires_at) < new Date())
     return NextResponse.json({ error: "Einladung abgelaufen" }, { status: 410 });
 
-  // Rolle zuweisen
+  // Bestehende Rolle löschen (NULL-sicherer delete+insert statt upsert)
+  const deleteQuery = supabaseAdmin
+    .from("user_venture_roles")
+    .delete()
+    .eq("user_id", user_id);
+  if (invite.venture) {
+    await deleteQuery.eq("venture", invite.venture);
+  } else {
+    await deleteQuery.is("venture", null);
+  }
+
+  // Neue Rolle einfügen
   const { error: roleError } = await supabaseAdmin
     .from("user_venture_roles")
-    .upsert({
+    .insert({
       user_id,
       venture: invite.venture ?? null,
       role: invite.role,
       permissions: invite.permissions,
       invited_by: invite.invited_by,
-    }, { onConflict: "user_id,venture" });
+    });
 
   if (roleError) return NextResponse.json({ error: roleError.message }, { status: 500 });
 

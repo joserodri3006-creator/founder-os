@@ -67,13 +67,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role = "founder";
         venture = null;
         permissions = FOUNDER_PERMISSIONS;
-        // Auto-insert founder role
-        await supabase.from("user_venture_roles").upsert({
+        // Auto-insert founder role (delete+insert wegen NULL venture)
+        await supabase.from("user_venture_roles")
+          .delete().eq("user_id", supabaseUser.id).is("venture", null);
+        await supabase.from("user_venture_roles").insert({
           user_id: supabaseUser.id,
           venture: null,
           role: "founder",
           permissions: FOUNDER_PERMISSIONS,
-        }, { onConflict: "user_id,venture" });
+        });
       }
     }
 
