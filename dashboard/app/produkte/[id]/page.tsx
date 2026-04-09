@@ -76,6 +76,11 @@ export default function ProduktDetailPage() {
   const [showAddMovement, setShowAddMovement] = useState(false);
   const [movForm, setMovForm] = useState({ type: "in", quantity: "", variant_id: "", note: "" });
 
+  // Sale price
+  const [editSalePrice, setEditSalePrice] = useState("");
+  const [editSaleFrom, setEditSaleFrom] = useState("");
+  const [editSaleUntil, setEditSaleUntil] = useState("");
+
   // Image upload
   const [uploading, setUploading] = useState(false);
 
@@ -96,6 +101,9 @@ export default function ProduktDetailPage() {
     setEditWeight(p.weight != null ? String(p.weight) : "");
     setEditFeatured(p.is_featured ?? false);
     setEditTrackInventory(p.track_inventory ?? false);
+    setEditSalePrice(p.sale_price != null ? String(p.sale_price) : "");
+    setEditSaleFrom(p.sale_from ? p.sale_from.slice(0, 16) : "");
+    setEditSaleUntil(p.sale_until ? p.sale_until.slice(0, 16) : "");
     setVariantOptions(p.variant_options ?? []);
     setVariants((p.variants ?? []).map((v: any) => ({
       ...v, price: v.price != null ? String(v.price) : "",
@@ -286,23 +294,97 @@ export default function ProduktDetailPage() {
           {/* Preise */}
           <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-4">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Preise</p>
-            <div className="grid grid-cols-3 gap-4">
+
+            {/* Basis-Preise */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
                 { label: "Verkaufspreis (€)", val: editPrice, set: setEditPrice },
-                { label: "Vergleichspreis (€)", val: editComparePrice, set: setEditComparePrice },
+                { label: "Vergleichspreis (€)", val: editComparePrice, set: setEditComparePrice, hint: "Ursprünglicher Preis, wird durchgestrichen" },
                 { label: "Einkaufspreis (€)", val: editCostPrice, set: setEditCostPrice },
-              ].map(({ label, val, set }) => (
+              ].map(({ label, val, set, hint }) => (
                 <div key={label}>
                   <label className="text-xs text-gray-500 block mb-1">{label}</label>
                   <input type="number" step="0.01" min="0" value={val} onChange={e => set(e.target.value)}
                     className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  {hint && <p className="text-xs text-gray-400 mt-0.5">{hint}</p>}
                 </div>
               ))}
             </div>
+
+            {/* Aktionspreis */}
+            <div className="border border-dashed border-gray-200 rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Aktionspreis</p>
+                {(() => {
+                  const now = new Date();
+                  const sp = product.sale_price;
+                  const sf = product.sale_from ? new Date(product.sale_from) : null;
+                  const su = product.sale_until ? new Date(product.sale_until) : null;
+                  const active = sp != null && (sf == null || sf <= now) && (su == null || su >= now);
+                  return active ? (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(22,163,74,0.1)", color: "#15803D" }}>
+                      ✓ Aktionspreis aktiv
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2 py-0.5 rounded-full"
+                      style={{ background: "#F3F4F6", color: "#6B7280" }}>
+                      Inaktiv
+                    </span>
+                  );
+                })()}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Aktionspreis (€)</label>
+                  <input type="number" step="0.01" min="0" value={editSalePrice}
+                    onChange={e => setEditSalePrice(e.target.value)}
+                    placeholder="z.B. 75.00"
+                    className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Aktiv von</label>
+                  <input type="datetime-local" value={editSaleFrom}
+                    onChange={e => setEditSaleFrom(e.target.value)}
+                    className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Aktiv bis</label>
+                  <input type="datetime-local" value={editSaleUntil}
+                    onChange={e => setEditSaleUntil(e.target.value)}
+                    className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-green-500" />
+                </div>
+              </div>
+
+              {/* Vorschau */}
+              {(editSalePrice || editPrice) && (
+                <div className="text-xs rounded-md px-3 py-2" style={{ background: "#F7F8FC", color: "#6B7280" }}>
+                  <span className="font-medium" style={{ color: "#14193A" }}>Vorschau im Shop: </span>
+                  {editSalePrice ? (
+                    <>
+                      <span className="font-bold text-green-700">{parseFloat(editSalePrice).toFixed(2)} €</span>
+                      {editComparePrice && (
+                        <span className="line-through ml-2 text-gray-400">{parseFloat(editComparePrice).toFixed(2)} €</span>
+                      )}
+                      {editPrice && !editComparePrice && (
+                        <span className="line-through ml-2 text-gray-400">{parseFloat(editPrice).toFixed(2)} €</span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="font-bold" style={{ color: "#14193A" }}>{editPrice ? parseFloat(editPrice).toFixed(2) + " €" : "—"}</span>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button onClick={() => patch({
               price: editPrice ? parseFloat(editPrice) : null,
               compare_at_price: editComparePrice ? parseFloat(editComparePrice) : null,
               cost_price: editCostPrice ? parseFloat(editCostPrice) : null,
+              sale_price: editSalePrice ? parseFloat(editSalePrice) : null,
+              sale_from: editSaleFrom ? new Date(editSaleFrom).toISOString() : null,
+              sale_until: editSaleUntil ? new Date(editSaleUntil).toISOString() : null,
             }, "prices")} disabled={saving === "prices"}
               className="text-sm px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors">
               {saving === "prices" ? "..." : "Preise speichern"}

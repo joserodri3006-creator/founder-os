@@ -10,3 +10,7 @@ verify_jwt = false
 
 [functions.ki-lead-search]
 verify_jwt = false
+
+[functions.sale-price-scheduler]
+verify_jwt = false
+schedule = "1 0 * * *"
