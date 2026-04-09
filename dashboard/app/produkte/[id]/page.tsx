@@ -90,6 +90,10 @@ export default function ProduktDetailPage() {
   const [editCanonical, setEditCanonical] = useState("");
   const [editNoIndex, setEditNoIndex] = useState(false);
 
+  // Tax
+  const [taxClasses, setTaxClasses] = useState<{ id: string; name: string; rates: { rate: number }[] }[]>([]);
+  const [editTaxClassId, setEditTaxClassId] = useState<string | null>(null);
+
   // Image upload
   const [uploading, setUploading] = useState(false);
 
@@ -98,6 +102,12 @@ export default function ProduktDetailPage() {
       fetch(`/api/produkte/${id}`).then(r => r.json()),
       fetch(`/api/produkte/${id}/lager`).then(r => r.json()),
     ]);
+    // Load tax classes for this venture
+    if (p.venture) {
+      fetch(`/api/steuerklassen?venture=${p.venture}`)
+        .then(r => r.json())
+        .then(data => setTaxClasses(Array.isArray(data) ? data : []));
+    }
     setProduct(p);
     setEditName(p.name ?? "");
     setEditStatus(p.status ?? "draft");
@@ -120,6 +130,7 @@ export default function ProduktDetailPage() {
     setEditOgDesc(p.og_description ?? "");
     setEditCanonical(p.canonical_url ?? "");
     setEditNoIndex(p.no_index ?? false);
+    setEditTaxClassId(p.tax_class_id ?? null);
     setVariantOptions(p.variant_options ?? []);
     setVariants((p.variants ?? []).map((v: any) => ({
       ...v, price: v.price != null ? String(v.price) : "",
@@ -811,6 +822,32 @@ export default function ProduktDetailPage() {
               <p className="text-gray-700">{new Date(product.created_at).toLocaleDateString("de-DE")}</p>
             </div>
           </div>
+
+          {/* Steuerklasse */}
+          {taxClasses.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-3">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Steuerklasse</p>
+              <select
+                value={editTaxClassId ?? ""}
+                onChange={async e => {
+                  const val = e.target.value || null;
+                  setEditTaxClassId(val);
+                  await patch({ tax_class_id: val }, "tax");
+                }}
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">— Keine —</option>
+                {taxClasses.map(tc => {
+                  const rate = tc.rates?.[0]?.rate;
+                  const rateLabel = rate != null ? ` (${(Number(rate) * 100).toFixed(0)}%)` : "";
+                  return (
+                    <option key={tc.id} value={tc.id}>{tc.name}{rateLabel}</option>
+                  );
+                })}
+              </select>
+              {saving === "tax" && <p className="text-xs text-gray-400">Gespeichert…</p>}
+            </div>
+          )}
 
           {/* Tags */}
           <div className="bg-white rounded-lg border border-gray-200 px-5 py-4">

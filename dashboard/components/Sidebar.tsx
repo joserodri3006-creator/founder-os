@@ -57,6 +57,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
         { href: "/einstellungen/zahlungsmodelle", label: "Zahlungsmodelle", show: canEdit("settings") },
         { href: "/einstellungen/produkttypen", label: "Produkttypen", show: canEdit("settings") },
         { href: "/einstellungen/marken", label: "Marken", show: canEdit("settings") },
+        { href: "/einstellungen/steuern", label: "Steuern", show: canEdit("settings") },
       ],
     },
   ];
