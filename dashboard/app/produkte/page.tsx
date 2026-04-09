@@ -14,11 +14,18 @@ interface Product {
   price: number | null;
   compare_at_price: number | null;
   status: string;
+  sync_status: string | null;
   is_featured: boolean;
   images: { url: string; alt: string }[];
   product_type: { id: string; name: string; has_variants: boolean; has_inventory: boolean } | null;
   brand: { id: string; name: string } | null;
 }
+
+const SYNC_DOT: Record<string, { color: string; title: string }> = {
+  synced: { color: "#15803D", title: "Synchronisiert" },
+  pending: { color: "#D97706", title: "Sync ausstehend" },
+  error: { color: "#DC2626", title: "Sync-Fehler" },
+};
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Entwurf",
@@ -165,7 +172,12 @@ export default function ProdukteListPage() {
           <option value="draft">Entwurf</option>
           <option value="archived">Archiviert</option>
         </select>
-        <span className="text-xs ml-auto" style={{ color: "#6B7280" }}>{products.length} Produkte</span>
+        <div className="ml-auto flex items-center gap-3">
+          <Link href="/produkte/sync-log" className="text-xs text-gray-500 hover:text-[#1B2A5E] flex items-center gap-1">
+            🔄 Sync-Log
+          </Link>
+          <span className="text-xs" style={{ color: "#6B7280" }}>{products.length} Produkte</span>
+        </div>
       </div>
 
       {loading ? (
@@ -236,14 +248,22 @@ export default function ProdukteListPage() {
                         </div>
                       )}
                       <div>
-                        <p
-                          className="font-medium"
-                          style={{ color: "#14193A" }}
-                          onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.color = "#1B2A5E"}
-                          onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.color = "#14193A"}
-                        >
-                          {p.name}
-                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <p
+                            className="font-medium"
+                            style={{ color: "#14193A" }}
+                            onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.color = "#1B2A5E"}
+                            onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.color = "#14193A"}
+                          >
+                            {p.name}
+                          </p>
+                          {p.sync_status && SYNC_DOT[p.sync_status] && (
+                            <span
+                              title={SYNC_DOT[p.sync_status].title}
+                              style={{ width: "6px", height: "6px", borderRadius: "50%", background: SYNC_DOT[p.sync_status].color, display: "inline-block", flexShrink: 0 }}
+                            />
+                          )}
+                        </div>
                         {p.brand && <p className="text-xs" style={{ color: "#6B7280" }}>{p.brand.name}</p>}
                       </div>
                     </Link>

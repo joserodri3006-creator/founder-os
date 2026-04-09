@@ -47,6 +47,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       items: [
         { href: "/produkte", label: "Produkte", show: canView("products") },
         { href: "/produkte/kategorien", label: "Kategorien", show: canView("products") },
+        { href: "/produkte/sync-log", label: "Sync-Log", show: canView("products") },
       ],
     },
     {

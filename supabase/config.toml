@@ -14,3 +14,6 @@ verify_jwt = false
 [functions.sale-price-scheduler]
 verify_jwt = false
 schedule = "1 0 * * *"
+
+[functions.product-sync]
+verify_jwt = false

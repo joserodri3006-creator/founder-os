@@ -32,6 +32,14 @@ interface VentureInfo {
   bic: string;
 }
 
+interface WCConfig {
+  shop_url: string;
+  wc_consumer_key: string;
+  wc_consumer_secret: string;
+}
+
+const EMPTY_WC_CONFIG: WCConfig = { shop_url: "", wc_consumer_key: "", wc_consumer_secret: "" };
+
 const VENTURE_IDS = ["online_first", "brandary", "droplane", "blazed_outfitters", "worknest"];
 
 const VENTURE_LABELS: Record<string, string> = {
@@ -56,6 +64,8 @@ export default function EinstellungenPage() {
   const [ventures, setVentures] = useState<VentureConfig[]>([]);
   const [ventureInfos, setVentureInfos] = useState<Record<string, VentureInfo>>({});
   const [ventureInfoDraft, setVentureInfoDraft] = useState<Record<string, VentureInfo>>({});
+  const [wcConfigs, setWcConfigs] = useState<Record<string, WCConfig>>({});
+  const [wcConfigDraft, setWcConfigDraft] = useState<Record<string, WCConfig>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -79,6 +89,18 @@ export default function EinstellungenPage() {
         }
         setVentureInfos(infos);
         setVentureInfoDraft(infos);
+
+        // Load WooCommerce configs
+        const wcData: Record<string, WCConfig> = {};
+        for (const id of VENTURE_IDS) {
+          const entry = data.find((d) => d.key === `${id}_wc_config`);
+          if (entry) {
+            try { wcData[id] = JSON.parse(entry.value); } catch { /* ignore */ }
+          }
+        }
+        setWcConfigs(wcData);
+        setWcConfigDraft(wcData);
+
         setLoading(false);
       });
   }, []);
@@ -105,6 +127,12 @@ export default function EinstellungenPage() {
     const info = ventureInfoDraft[id] ?? EMPTY_VENTURE_INFO;
     await saveKey(`${id}_venture_info`, JSON.stringify(info));
     setVentureInfos((prev) => ({ ...prev, [id]: info }));
+  }
+
+  async function saveWcConfig(id: string) {
+    const wc = wcConfigDraft[id] ?? EMPTY_WC_CONFIG;
+    await saveKey(`${id}_wc_config`, JSON.stringify(wc));
+    setWcConfigs((prev) => ({ ...prev, [id]: wc }));
   }
 
   function updateVenture(idx: number, patch: Partial<VentureConfig>) {
@@ -304,6 +332,70 @@ export default function EinstellungenPage() {
                     <input type="text" value={draft.iban} onChange={(e) => upd({ iban: e.target.value })}
                       className="w-full border border-gray-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
                   </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* WooCommerce Konfiguration */}
+      <section>
+        <div className="mb-4">
+          <h2 className="text-base font-semibold">WooCommerce Konfiguration</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Shop-URL und API-Zugangsdaten für den Storefront-Sync pro Venture.
+          </p>
+        </div>
+        <div className="space-y-3">
+          {["blazed_outfitters", "brandary"].map((id) => {
+            const draft = wcConfigDraft[id] ?? EMPTY_WC_CONFIG;
+            const saved_ = JSON.stringify(wcConfigs[id] ?? EMPTY_WC_CONFIG);
+            const isDirty = JSON.stringify(draft) !== saved_;
+            function updWc(patch: Partial<WCConfig>) {
+              setWcConfigDraft((prev) => ({ ...prev, [id]: { ...(prev[id] ?? EMPTY_WC_CONFIG), ...patch } }));
+            }
+            return (
+              <div key={id} className="bg-white rounded-lg border border-gray-200 px-5 py-4">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-semibold text-gray-800">{VENTURE_LABELS[id]}</p>
+                  <div className="flex items-center gap-2">
+                    {saved === `${id}_wc_config` && <span className="text-xs text-green-600">Gespeichert ✓</span>}
+                    {isDirty && (
+                      <button
+                        onClick={() => saveWcConfig(id)}
+                        disabled={saving === `${id}_wc_config`}
+                        className="text-sm px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      >
+                        {saving === `${id}_wc_config` ? "..." : "Speichern"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Shop-URL</label>
+                    <input type="url" value={draft.shop_url} onChange={(e) => updWc({ shop_url: e.target.value })}
+                      placeholder="https://blazed-outfitters.com"
+                      className="w-full border border-gray-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Consumer Key</label>
+                      <input type="password" value={draft.wc_consumer_key} onChange={(e) => updWc({ wc_consumer_key: e.target.value })}
+                        placeholder="ck_…"
+                        className="w-full border border-gray-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Consumer Secret</label>
+                      <input type="password" value={draft.wc_consumer_secret} onChange={(e) => updWc({ wc_consumer_secret: e.target.value })}
+                        placeholder="cs_…"
+                        className="w-full border border-gray-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    WooCommerce → Einstellungen → Erweitert → REST API → Schlüssel erstellen
+                  </p>
                 </div>
               </div>
             );

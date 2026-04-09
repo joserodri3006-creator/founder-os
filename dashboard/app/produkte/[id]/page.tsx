@@ -901,6 +901,42 @@ export default function ProduktDetailPage() {
           {/* Anhänge */}
           <AttachmentsPanel entityType="product" entityId={id} venture={product?.venture ?? undefined} />
 
+          {/* Sync Status */}
+          {product.sync_status && (
+            <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-2">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Storefront-Sync</p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span
+                    style={{ width: "8px", height: "8px", borderRadius: "50%", display: "inline-block", background: product.sync_status === "synced" ? "#15803D" : product.sync_status === "error" ? "#DC2626" : "#D97706" }}
+                  />
+                  <span className="text-sm text-gray-700 capitalize">{product.sync_status === "synced" ? "Synchronisiert" : product.sync_status === "error" ? "Sync-Fehler" : "Ausstehend"}</span>
+                </div>
+                <button
+                  onClick={async () => {
+                    await fetch(`/api/produkte/${id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ sync_status: "pending" }),
+                    });
+                    await load();
+                  }}
+                  className="text-xs text-blue-600 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50"
+                >
+                  ↺ Sync auslösen
+                </button>
+              </div>
+              {product.last_synced_at && (
+                <p className="text-xs text-gray-400">
+                  Zuletzt: {new Date(product.last_synced_at).toLocaleString("de-DE")}
+                </p>
+              )}
+              {product.wc_product_id && (
+                <p className="text-xs text-gray-400 font-mono">WC-ID: {product.wc_product_id}</p>
+              )}
+            </div>
+          )}
+
           {/* Löschen */}
           <button onClick={async () => {
             if (!confirm(`"${product.name}" wirklich löschen? Alle Bilder werden entfernt.`)) return;
