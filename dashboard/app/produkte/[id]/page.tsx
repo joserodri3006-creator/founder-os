@@ -81,6 +81,15 @@ export default function ProduktDetailPage() {
   const [editSaleFrom, setEditSaleFrom] = useState("");
   const [editSaleUntil, setEditSaleUntil] = useState("");
 
+  // SEO
+  const [editSlug, setEditSlug] = useState("");
+  const [editMetaTitle, setEditMetaTitle] = useState("");
+  const [editMetaDesc, setEditMetaDesc] = useState("");
+  const [editOgTitle, setEditOgTitle] = useState("");
+  const [editOgDesc, setEditOgDesc] = useState("");
+  const [editCanonical, setEditCanonical] = useState("");
+  const [editNoIndex, setEditNoIndex] = useState(false);
+
   // Image upload
   const [uploading, setUploading] = useState(false);
 
@@ -104,6 +113,13 @@ export default function ProduktDetailPage() {
     setEditSalePrice(p.sale_price != null ? String(p.sale_price) : "");
     setEditSaleFrom(p.sale_from ? p.sale_from.slice(0, 16) : "");
     setEditSaleUntil(p.sale_until ? p.sale_until.slice(0, 16) : "");
+    setEditSlug(p.slug ?? "");
+    setEditMetaTitle(p.meta_title ?? "");
+    setEditMetaDesc(p.meta_description ?? "");
+    setEditOgTitle(p.og_title ?? "");
+    setEditOgDesc(p.og_description ?? "");
+    setEditCanonical(p.canonical_url ?? "");
+    setEditNoIndex(p.no_index ?? false);
     setVariantOptions(p.variant_options ?? []);
     setVariants((p.variants ?? []).map((v: any) => ({
       ...v, price: v.price != null ? String(v.price) : "",
@@ -414,6 +430,139 @@ export default function ProduktDetailPage() {
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
               onChange={e => e.target.files?.[0] && uploadImage(e.target.files[0])} />
             <p className="text-xs text-gray-400">JPG, PNG, WebP — max. 10 MB</p>
+          </div>
+
+          {/* SEO */}
+          <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">SEO</p>
+              {editNoIndex && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-600 font-medium">noindex</span>
+              )}
+            </div>
+
+            {/* Slug */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-gray-500">URL-Slug</label>
+                <button
+                  type="button"
+                  onClick={() => setEditSlug(editName.toLowerCase().replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-"))}
+                  className="text-[11px] text-blue-500 hover:text-blue-700"
+                >
+                  Aus Name generieren
+                </button>
+              </div>
+              <div className="flex items-center border border-gray-200 rounded-md overflow-hidden focus-within:ring-1 focus-within:ring-blue-500">
+                <span className="px-3 py-2 text-xs text-gray-400 bg-gray-50 border-r border-gray-200 whitespace-nowrap">/produkte/</span>
+                <input
+                  type="text" value={editSlug}
+                  onChange={e => setEditSlug(e.target.value.toLowerCase().replace(/[^a-z0-9\-]/g, ""))}
+                  placeholder="mein-produkt"
+                  className="flex-1 text-sm px-3 py-2 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Meta Title */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-gray-500">Meta-Titel</label>
+                <span className={`text-[11px] ${editMetaTitle.length > 60 ? "text-red-500" : "text-gray-400"}`}>
+                  {editMetaTitle.length}/60
+                </span>
+              </div>
+              <input
+                type="text" value={editMetaTitle} onChange={e => setEditMetaTitle(e.target.value)}
+                placeholder={editName}
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Meta Description */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-gray-500">Meta-Beschreibung</label>
+                <span className={`text-[11px] ${editMetaDesc.length > 160 ? "text-red-500" : "text-gray-400"}`}>
+                  {editMetaDesc.length}/160
+                </span>
+              </div>
+              <textarea
+                rows={2} value={editMetaDesc} onChange={e => setEditMetaDesc(e.target.value)}
+                placeholder="Kurze Beschreibung für Suchmaschinenergebnisse…"
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+              />
+            </div>
+
+            {/* Google SERP Preview */}
+            {(editMetaTitle || editMetaDesc || editSlug) && (
+              <div className="border border-gray-100 rounded-lg p-3 bg-gray-50">
+                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">Google-Vorschau</p>
+                <div className="space-y-0.5">
+                  <p className="text-[13px] text-[#1a0dab] leading-snug truncate">
+                    {editMetaTitle || editName}
+                  </p>
+                  <p className="text-[11px] text-[#006621] truncate">
+                    example.com › produkte › {editSlug || "produkt"}
+                  </p>
+                  <p className="text-[12px] text-gray-600 leading-snug line-clamp-2">
+                    {editMetaDesc || editDescription || "Keine Beschreibung vorhanden."}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* OG Tags (collapsed section) */}
+            <details className="group">
+              <summary className="text-xs text-gray-500 cursor-pointer list-none flex items-center gap-1 hover:text-gray-700">
+                <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+                Open Graph (Social Media)
+              </summary>
+              <div className="mt-3 space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">OG-Titel</label>
+                  <input type="text" value={editOgTitle} onChange={e => setEditOgTitle(e.target.value)}
+                    placeholder={editMetaTitle || editName}
+                    className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">OG-Beschreibung</label>
+                  <textarea rows={2} value={editOgDesc} onChange={e => setEditOgDesc(e.target.value)}
+                    placeholder={editMetaDesc}
+                    className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none" />
+                </div>
+              </div>
+            </details>
+
+            {/* Canonical + noindex */}
+            <div className="space-y-3 pt-2 border-t border-gray-100">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Canonical URL <span className="text-gray-300">(optional)</span></label>
+                <input type="url" value={editCanonical} onChange={e => setEditCanonical(e.target.value)}
+                  placeholder="https://…"
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <input type="checkbox" checked={editNoIndex} onChange={e => setEditNoIndex(e.target.checked)} className="rounded" />
+                <span>Seite aus Suche ausschließen <span className="text-xs text-gray-400">(noindex)</span></span>
+              </label>
+            </div>
+
+            <button
+              onClick={() => patch({
+                slug: editSlug || null,
+                meta_title: editMetaTitle || null,
+                meta_description: editMetaDesc || null,
+                og_title: editOgTitle || null,
+                og_description: editOgDesc || null,
+                canonical_url: editCanonical || null,
+                no_index: editNoIndex,
+              }, "seo")}
+              disabled={saving === "seo"}
+              className="text-sm px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {saving === "seo" ? "..." : "SEO speichern"}
+            </button>
           </div>
 
           {/* Varianten */}
