@@ -75,15 +75,39 @@ function extractJsonArray(text: string): string {
   throw new Error("JSON-Array nicht vollständig (fehlende schließende Klammer)");
 }
 
-/**
- * Ruft Claude mit web_search Tool auf — agentic loop bis finale Antwort.
- * Claude sucht aktiv im Web nach echten Unternehmen.
- */
-async function callClaudeWithSearch(system: string, userPrompt: string): Promise<string> {
-  const messages: any[] = [{ role: "user", content: userPrompt }];
+/** Einfacher Claude-Call ohne Tools — nur Text rein, Text raus. */
+async function callClaude(system: string, userPrompt: string): Promise<string> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 6000,
+      system,
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+  });
+  if (!res.ok) throw new Error(`Claude API Fehler (${res.status}): ${await res.text()}`);
+  const data = await res.json();
+  return data.content.find((b: any) => b.type === "text")?.text ?? "";
+}
 
-  // Maximal 6 Runden (web_search kann mehrfach aufgerufen werden)
-  for (let round = 0; round < 6; round++) {
+/**
+ * Zweistufig:
+ * 1. Claude mit web_search recherchiert Unternehmen (gibt Fließtext zurück)
+ * 2. Zweiter Claude-Call formatiert die Recherche als reines JSON-Array
+ */
+async function callClaudeWithSearch(researchPrompt: string, jsonSchema: string): Promise<string> {
+  const messages: any[] = [{ role: "user", content: researchPrompt }];
+
+  // ── Schritt 1: Websuche ──────────────────────────────────────────────────
+  let researchText = "";
+
+  for (let round = 0; round < 8; round++) {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -95,61 +119,53 @@ async function callClaudeWithSearch(system: string, userPrompt: string): Promise
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 8000,
-        system,
-        tools: [
-          {
-            type: "web_search_20250305",
-            name: "web_search",
-            max_uses: 5,
-          },
-        ],
+        system: "Du bist ein professioneller B2B-Rechercheur. Nutze das Web-Suche-Tool um ECHTE Unternehmen zu finden. Beschreibe deine Ergebnisse detailliert mit Name, Adresse, Website, Telefon und Quelle.",
+        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }],
         messages,
       }),
     });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Claude API Fehler (${res.status}): ${errText}`);
-    }
-
+    if (!res.ok) throw new Error(`Claude API Fehler (${res.status}): ${await res.text()}`);
     const data = await res.json();
-
-    // Antwort zur Message-History hinzufügen
     messages.push({ role: "assistant", content: data.content });
 
-    // Prüfen ob Claude fertig ist (stop_reason = "end_turn")
     if (data.stop_reason === "end_turn") {
       const textBlock = data.content.find((b: any) => b.type === "text");
-      if (textBlock) {
-        // JSON-Array robust aus der Antwort extrahieren —
-        // Claude schreibt manchmal Text vor/nach dem Array
-        return extractJsonArray(textBlock.text);
-      }
-      throw new Error("Kein Text-Block in finaler Antwort");
+      researchText = textBlock?.text ?? "";
+      break;
     }
 
-    // tool_use Blöcke verarbeiten (web search Ergebnisse zurückgeben)
     if (data.stop_reason === "tool_use") {
       const toolUseBlocks = data.content.filter((b: any) => b.type === "tool_use");
-      const toolResults: any[] = [];
-
-      for (const toolUse of toolUseBlocks) {
-        toolResults.push({
-          type: "tool_result",
-          tool_use_id: toolUse.id,
-          content: toolUse.output ?? "Suchergebnisse wurden verarbeitet.",
-        });
-      }
-
+      const toolResults = toolUseBlocks.map((tu: any) => ({
+        type: "tool_result",
+        tool_use_id: tu.id,
+        content: tu.output ?? "Keine Ergebnisse.",
+      }));
       messages.push({ role: "user", content: toolResults });
       continue;
     }
 
-    // Unbekannter stop_reason
     break;
   }
 
-  throw new Error("Agentic loop: Maximale Runden erreicht ohne finale Antwort");
+  if (!researchText) throw new Error("Keine Recherche-Ergebnisse von Claude erhalten");
+
+  // ── Schritt 2: JSON-Formatierung ─────────────────────────────────────────
+  const jsonText = await callClaude(
+    "Du bist ein Daten-Extraktor. Deine einzige Aufgabe: strukturierte Daten aus einem Text als JSON-Array ausgeben. Antworte NUR mit dem JSON-Array, ohne jeden anderen Text.",
+    `Extrahiere alle Unternehmen aus dem folgenden Recherche-Text und gib sie als JSON-Array aus.
+
+Recherche-Text:
+${researchText}
+
+Gewünschtes JSON-Schema pro Eintrag:
+${jsonSchema}
+
+WICHTIG: Antworte ausschließlich mit dem JSON-Array. Kein Text davor, kein Text danach.`
+  );
+
+  return extractJsonArray(jsonText);
 }
 
 async function saveLead(
@@ -232,53 +248,35 @@ async function searchForVenture(
 ): Promise<VentureResult> {
   console.log(`[${cfg.venture}] Suche ${cfg.limit} echte Leads in ${cfg.region}...`);
 
-  const system = `Du bist ein professioneller B2B-Rechercheur.
-Deine Aufgabe: ECHTE, existierende Unternehmen und Ansprechpartner finden — keine erfundenen Namen.
-
-Nutze das Web-Suche-Tool um aktuelle, verifizierbare Ergebnisse zu liefern.
-
-Antworte am Ende AUSSCHLIESSLICH mit einem validen JSON-Array.
-Kein erklärender Text davor oder danach, keine Markdown-Codeblöcke.`;
-
-  const prompt = `Finde ${cfg.limit} ECHTE, existierende Unternehmen oder Personen in ${cfg.region}.
+  const researchPrompt = `Recherchiere ${cfg.limit} ECHTE, existierende Unternehmen in ${cfg.region}.
 
 Zielgruppe: ${cfg.focus}
 Branchen-Fokus: ${cfg.industry_hint}
 
-Suche aktiv mit dem Web-Suche-Tool nach realen Ergebnissen.
-Beispiel-Suchanfragen:
-- "${cfg.industry_hint} ${cfg.region} Kontakt Adresse"
-- "${cfg.focus.slice(0, 60)} ${cfg.region} website"
+Suche mit dem Web-Suche-Tool. Gute Suchanfragen:
+- "${cfg.industry_hint} ${cfg.region} Adresse Kontakt"
+- "${cfg.industry_hint} ${cfg.region} Impressum"
 
-Für jeden gefundenen Lead extrahiere folgende Daten aus den Suchergebnissen:
+Für jedes gefundene Unternehmen notiere: Firmenname, Ansprechpartner (falls bekannt), Adresse (Straße, PLZ, Stadt), Telefon, E-Mail, Website und die URL wo du es gefunden hast.`;
 
-[
-  {
-    "first_name": "Vorname des Ansprechpartners (oder leer)",
-    "last_name": "Nachname des Ansprechpartners (oder leer)",
-    "company_name": "Echter Firmenname",
-    "email": "E-Mail falls auf der Website sichtbar, sonst leer",
-    "phone": "Telefonnummer falls gefunden, sonst leer",
-    "website": "Offizielle Website-URL",
-    "city": "Stadt",
-    "postal_code": "Postleitzahl falls gefunden",
-    "street": "Straße + Hausnummer falls gefunden",
-    "industry": "Branche",
-    "notes": "${cfg.note_hint}",
-    "source_url": "Die genaue URL der Webseite wo du diesen Lead gefunden hast"
-  }
-]
-
-Wichtige Regeln:
-- NUR echte, verifizierbare Unternehmen — nichts erfinden
-- source_url MUSS die konkrete URL sein (Google Maps Link, Website-Impressum, LinkedIn etc.)
-- Wenn kein Ansprechpartner bekannt: first_name = "Inhaber", last_name leer lassen
-- Adresse (street, postal_code) so vollständig wie möglich aus den Suchergebnissen
-- Gib genau ${cfg.limit} Leads zurück`;
+  const jsonSchema = `{
+  "first_name": "Vorname Ansprechpartner oder 'Inhaber'",
+  "last_name": "Nachname oder leer",
+  "company_name": "Firmenname",
+  "email": "E-Mail oder leer",
+  "phone": "Telefon oder leer",
+  "website": "Website-URL oder leer",
+  "city": "Stadt",
+  "postal_code": "PLZ oder leer",
+  "street": "Straße + Hausnummer oder leer",
+  "industry": "Branche",
+  "notes": "${cfg.note_hint}",
+  "source_url": "Konkrete URL wo der Lead gefunden wurde"
+}`;
 
   let leads: KiLead[];
   try {
-    const raw = await callClaudeWithSearch(system, prompt);
+    const raw = await callClaudeWithSearch(researchPrompt, jsonSchema);
     leads = JSON.parse(raw);
     if (!Array.isArray(leads)) throw new Error("Kein Array");
   } catch (err) {
