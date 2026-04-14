@@ -100,60 +100,46 @@ async function callClaude(system: string, userPrompt: string): Promise<string> {
  * Zweistufig:
  * 1. Claude mit web_search recherchiert Unternehmen (gibt Fließtext zurück)
  * 2. Zweiter Claude-Call formatiert die Recherche als reines JSON-Array
+ *
+ * WICHTIG: web_search_20250305 ist ein server-seitiges Tool — Anthropics API
+ * führt die Suche intern aus. Kein manueller tool_result-Roundtrip nötig.
+ * Ein einziger API-Call reicht; stop_reason ist immer "end_turn".
  */
 async function callClaudeWithSearch(researchPrompt: string, jsonSchema: string): Promise<string> {
-  const messages: any[] = [{ role: "user", content: researchPrompt }];
+  // ── Schritt 1: Websuche (single call, server-side tool) ──────────────────
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "anthropic-beta": "web-search-2025-03-05",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 8000,
+      system:
+        "Du bist ein professioneller B2B-Rechercheur. Nutze das Web-Suche-Tool um ECHTE Unternehmen zu finden. Beschreibe deine Ergebnisse detailliert mit Name, Adresse, Website, Telefon und Quelle.",
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }],
+      messages: [{ role: "user", content: researchPrompt }],
+    }),
+  });
 
-  // ── Schritt 1: Websuche ──────────────────────────────────────────────────
-  let researchText = "";
+  if (!res.ok) throw new Error(`Claude API Fehler (${res.status}): ${await res.text()}`);
+  const data = await res.json();
 
-  for (let round = 0; round < 8; round++) {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "anthropic-beta": "web-search-2025-03-05",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 8000,
-        system: "Du bist ein professioneller B2B-Rechercheur. Nutze das Web-Suche-Tool um ECHTE Unternehmen zu finden. Beschreibe deine Ergebnisse detailliert mit Name, Adresse, Website, Telefon und Quelle.",
-        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }],
-        messages,
-      }),
-    });
+  // Text-Block aus der fertigen Antwort extrahieren
+  const textBlock = data.content.find((b: any) => b.type === "text");
+  const researchText = textBlock?.text ?? "";
 
-    if (!res.ok) throw new Error(`Claude API Fehler (${res.status}): ${await res.text()}`);
-    const data = await res.json();
-    messages.push({ role: "assistant", content: data.content });
-
-    if (data.stop_reason === "end_turn") {
-      const textBlock = data.content.find((b: any) => b.type === "text");
-      researchText = textBlock?.text ?? "";
-      break;
-    }
-
-    if (data.stop_reason === "tool_use") {
-      const toolUseBlocks = data.content.filter((b: any) => b.type === "tool_use");
-      const toolResults = toolUseBlocks.map((tu: any) => ({
-        type: "tool_result",
-        tool_use_id: tu.id,
-        content: tu.output ?? "Keine Ergebnisse.",
-      }));
-      messages.push({ role: "user", content: toolResults });
-      continue;
-    }
-
-    break;
+  if (!researchText) {
+    console.warn("Kein Text-Block in der Recherche-Antwort — überspringe");
+    return "[]";
   }
-
-  if (!researchText) throw new Error("Keine Recherche-Ergebnisse von Claude erhalten");
 
   // ── Schritt 2: JSON-Formatierung ─────────────────────────────────────────
   const jsonText = await callClaude(
-    "Du bist ein Daten-Extraktor. Deine einzige Aufgabe: strukturierte Daten aus einem Text als JSON-Array ausgeben. Antworte NUR mit dem JSON-Array, ohne jeden anderen Text.",
+    "Du bist ein Daten-Extraktor. Deine einzige Aufgabe: strukturierte Daten aus einem Text als JSON-Array ausgeben. Falls keine Unternehmen vorhanden sind, gib [] zurück. Antworte NUR mit dem JSON-Array, ohne jeden anderen Text.",
     `Extrahiere alle Unternehmen aus dem folgenden Recherche-Text und gib sie als JSON-Array aus.
 
 Recherche-Text:
@@ -162,10 +148,15 @@ ${researchText}
 Gewünschtes JSON-Schema pro Eintrag:
 ${jsonSchema}
 
-WICHTIG: Antworte ausschließlich mit dem JSON-Array. Kein Text davor, kein Text danach.`
+WICHTIG: Antworte ausschließlich mit dem JSON-Array. Kein Text davor, kein Text danach. Wenn keine Unternehmen gefunden wurden, antworte nur mit: []`
   );
 
-  return extractJsonArray(jsonText);
+  try {
+    return extractJsonArray(jsonText);
+  } catch {
+    console.warn("extractJsonArray fehlgeschlagen. Antwort war:", jsonText.slice(0, 300));
+    return "[]";
+  }
 }
 
 async function saveLead(
