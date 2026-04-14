@@ -50,6 +50,32 @@ async function getConfig(
 }
 
 /**
+ * Extrahiert das erste vollständige JSON-Array aus einem Text,
+ * auch wenn davor/danach erklärender Text steht.
+ */
+function extractJsonArray(text: string): string {
+  // Markdown-Codeblöcke entfernen
+  const stripped = text
+    .replace(/^```(?:json)?\s*/im, "")
+    .replace(/\s*```\s*$/m, "")
+    .trim();
+
+  // Erstes '[' bis zum zugehörigen ']' finden
+  const start = stripped.indexOf("[");
+  if (start === -1) throw new Error("Kein JSON-Array im Text gefunden");
+
+  let depth = 0;
+  for (let i = start; i < stripped.length; i++) {
+    if (stripped[i] === "[") depth++;
+    else if (stripped[i] === "]") {
+      depth--;
+      if (depth === 0) return stripped.slice(start, i + 1);
+    }
+  }
+  throw new Error("JSON-Array nicht vollständig (fehlende schließende Klammer)");
+}
+
+/**
  * Ruft Claude mit web_search Tool auf — agentic loop bis finale Antwort.
  * Claude sucht aktiv im Web nach echten Unternehmen.
  */
@@ -93,13 +119,11 @@ async function callClaudeWithSearch(system: string, userPrompt: string): Promise
 
     // Prüfen ob Claude fertig ist (stop_reason = "end_turn")
     if (data.stop_reason === "end_turn") {
-      // Letzten Text-Block aus der Antwort holen
       const textBlock = data.content.find((b: any) => b.type === "text");
       if (textBlock) {
-        return textBlock.text
-          .replace(/^```(?:json)?\s*/i, "")
-          .replace(/\s*```\s*$/, "")
-          .trim();
+        // JSON-Array robust aus der Antwort extrahieren —
+        // Claude schreibt manchmal Text vor/nach dem Array
+        return extractJsonArray(textBlock.text);
       }
       throw new Error("Kein Text-Block in finaler Antwort");
     }
@@ -110,8 +134,6 @@ async function callClaudeWithSearch(system: string, userPrompt: string): Promise
       const toolResults: any[] = [];
 
       for (const toolUse of toolUseBlocks) {
-        // web_search liefert Ergebnisse automatisch via API — wir geben das Ergebnis zurück
-        // Das Ergebnis ist bereits im tool_use Block enthalten (server-side execution)
         toolResults.push({
           type: "tool_result",
           tool_use_id: toolUse.id,
