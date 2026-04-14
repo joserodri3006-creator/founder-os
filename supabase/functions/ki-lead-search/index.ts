@@ -9,9 +9,9 @@ interface VentureConfig {
   enabled: boolean;
   limit: number;
   region: string;
-  focus: string;         // Beschreibung für Claude, was gesucht wird
-  industry_hint: string; // Branchen-Fokus
-  note_hint: string;     // Was in die notes soll
+  focus: string;
+  industry_hint: string;
+  note_hint: string;
 }
 
 interface KiLead {
@@ -19,9 +19,14 @@ interface KiLead {
   last_name: string;
   company_name: string;
   email: string;
+  phone: string;
+  website: string;
   city: string;
+  postal_code: string;
+  street: string;
   industry: string;
-  notes: string;
+  notes: string;       // Adresse + Quelle + Begründung
+  source_url: string;  // URL wo der Lead gefunden wurde
 }
 
 interface VentureResult {
@@ -44,29 +49,85 @@ async function getConfig(
   return data?.value ?? fallback;
 }
 
-async function callClaude(system: string, user: string): Promise<string> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
-      system,
-      messages: [{ role: "user", content: user }],
-    }),
-  });
+/**
+ * Ruft Claude mit web_search Tool auf — agentic loop bis finale Antwort.
+ * Claude sucht aktiv im Web nach echten Unternehmen.
+ */
+async function callClaudeWithSearch(system: string, userPrompt: string): Promise<string> {
+  const messages: any[] = [{ role: "user", content: userPrompt }];
 
-  if (!res.ok) {
-    throw new Error(`Claude API Fehler (${res.status}): ${await res.text()}`);
+  // Maximal 6 Runden (web_search kann mehrfach aufgerufen werden)
+  for (let round = 0; round < 6; round++) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "anthropic-beta": "web-search-2025-03-05",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 8000,
+        system,
+        tools: [
+          {
+            type: "web_search_20250305",
+            name: "web_search",
+            max_uses: 5,
+          },
+        ],
+        messages,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Claude API Fehler (${res.status}): ${errText}`);
+    }
+
+    const data = await res.json();
+
+    // Antwort zur Message-History hinzufügen
+    messages.push({ role: "assistant", content: data.content });
+
+    // Prüfen ob Claude fertig ist (stop_reason = "end_turn")
+    if (data.stop_reason === "end_turn") {
+      // Letzten Text-Block aus der Antwort holen
+      const textBlock = data.content.find((b: any) => b.type === "text");
+      if (textBlock) {
+        return textBlock.text
+          .replace(/^```(?:json)?\s*/i, "")
+          .replace(/\s*```\s*$/, "")
+          .trim();
+      }
+      throw new Error("Kein Text-Block in finaler Antwort");
+    }
+
+    // tool_use Blöcke verarbeiten (web search Ergebnisse zurückgeben)
+    if (data.stop_reason === "tool_use") {
+      const toolUseBlocks = data.content.filter((b: any) => b.type === "tool_use");
+      const toolResults: any[] = [];
+
+      for (const toolUse of toolUseBlocks) {
+        // web_search liefert Ergebnisse automatisch via API — wir geben das Ergebnis zurück
+        // Das Ergebnis ist bereits im tool_use Block enthalten (server-side execution)
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: toolUse.id,
+          content: toolUse.output ?? "Suchergebnisse wurden verarbeitet.",
+        });
+      }
+
+      messages.push({ role: "user", content: toolResults });
+      continue;
+    }
+
+    // Unbekannter stop_reason
+    break;
   }
 
-  const data = await res.json();
-  const text: string = data.content[0].text;
-  return text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+  throw new Error("Agentic loop: Maximale Runden erreicht ohne finale Antwort");
 }
 
 async function saveLead(
@@ -74,9 +135,9 @@ async function saveLead(
   lead: KiLead,
   venture: string
 ): Promise<{ saved?: true; id?: string; duplicate?: boolean; error?: string }> {
-  // Duplikat-Check: gleiche E-Mail oder gleicher Firmenname im selben Venture
   let isDuplicate = false;
 
+  // Duplikat-Check via E-Mail
   if (lead.email && !lead.email.includes("placeholder.invalid")) {
     const { data: existing } = await supabase
       .from("leads")
@@ -87,6 +148,7 @@ async function saveLead(
     if (existing) isDuplicate = true;
   }
 
+  // Duplikat-Check via Firmenname
   if (!isDuplicate && lead.company_name) {
     const { data: existing } = await supabase
       .from("leads")
@@ -97,6 +159,26 @@ async function saveLead(
     if (existing) isDuplicate = true;
   }
 
+  // Adresse + Quelle zusammenbauen für notes
+  const addressParts = [
+    lead.street?.trim(),
+    [lead.postal_code?.trim(), lead.city?.trim()].filter(Boolean).join(" "),
+  ].filter(Boolean);
+
+  const addressLine = addressParts.length > 0
+    ? `📍 ${addressParts.join(", ")}`
+    : "";
+
+  const sourceLine = lead.source_url
+    ? `🔗 Gefunden auf: ${lead.source_url}`
+    : "";
+
+  const reasonLine = lead.notes?.trim() || "";
+
+  const fullNotes = [addressLine, sourceLine, reasonLine]
+    .filter(Boolean)
+    .join("\n");
+
   const { data, error } = await supabase
     .from("leads")
     .insert({
@@ -105,9 +187,11 @@ async function saveLead(
       last_name: lead.last_name?.trim() || "",
       company_name: lead.company_name?.trim() || null,
       email: lead.email?.toLowerCase().trim() || `ki-suche-${Date.now()}@placeholder.invalid`,
+      phone: lead.phone?.trim() || null,
+      website: lead.website?.trim() || null,
       city: lead.city?.trim() || null,
       industry: lead.industry?.trim() || null,
-      notes: lead.notes?.trim() || null,
+      notes: fullNotes || null,
       source: "ki_suche",
       status: "neu",
       automation_enabled: false,
@@ -124,38 +208,59 @@ async function searchForVenture(
   supabase: ReturnType<typeof createClient>,
   cfg: VentureConfig
 ): Promise<VentureResult> {
-  console.log(`[${cfg.venture}] Suche ${cfg.limit} Leads in ${cfg.region}...`);
+  console.log(`[${cfg.venture}] Suche ${cfg.limit} echte Leads in ${cfg.region}...`);
 
-  const system = `Du bist ein Rechercheassistent. Deine Aufgabe: potenzielle Leads für ein Unternehmen finden.
-Antworte AUSSCHLIESSLICH mit einem validen JSON-Array. Kein erklärender Text, keine Markdown-Formatierung.`;
+  const system = `Du bist ein professioneller B2B-Rechercheur.
+Deine Aufgabe: ECHTE, existierende Unternehmen und Ansprechpartner finden — keine erfundenen Namen.
 
-  const prompt = `Erstelle eine Liste von ${cfg.limit} fiktiven aber realistischen Leads aus ${cfg.region}.
+Nutze das Web-Suche-Tool um aktuelle, verifizierbare Ergebnisse zu liefern.
+
+Antworte am Ende AUSSCHLIESSLICH mit einem validen JSON-Array.
+Kein erklärender Text davor oder danach, keine Markdown-Codeblöcke.`;
+
+  const prompt = `Finde ${cfg.limit} ECHTE, existierende Unternehmen oder Personen in ${cfg.region}.
 
 Zielgruppe: ${cfg.focus}
 Branchen-Fokus: ${cfg.industry_hint}
 
-Antworte NUR als JSON Array:
+Suche aktiv mit dem Web-Suche-Tool nach realen Ergebnissen.
+Beispiel-Suchanfragen:
+- "${cfg.industry_hint} ${cfg.region} Kontakt Adresse"
+- "${cfg.focus.slice(0, 60)} ${cfg.region} website"
+
+Für jeden gefundenen Lead extrahiere folgende Daten aus den Suchergebnissen:
+
 [
   {
-    "first_name": "Vorname",
-    "last_name": "Nachname",
-    "company_name": "Firmenname oder leer falls Privatperson",
-    "email": "plausible E-Mail-Adresse",
-    "city": "Stadt in ${cfg.region}",
+    "first_name": "Vorname des Ansprechpartners (oder leer)",
+    "last_name": "Nachname des Ansprechpartners (oder leer)",
+    "company_name": "Echter Firmenname",
+    "email": "E-Mail falls auf der Website sichtbar, sonst leer",
+    "phone": "Telefonnummer falls gefunden, sonst leer",
+    "website": "Offizielle Website-URL",
+    "city": "Stadt",
+    "postal_code": "Postleitzahl falls gefunden",
+    "street": "Straße + Hausnummer falls gefunden",
     "industry": "Branche",
-    "notes": "${cfg.note_hint}"
+    "notes": "${cfg.note_hint}",
+    "source_url": "Die genaue URL der Webseite wo du diesen Lead gefunden hast"
   }
 ]
 
-Wichtig: Plausible, realistische E-Mail-Adressen (basierend auf Name/Firma). Keine Platzhalter.`;
+Wichtige Regeln:
+- NUR echte, verifizierbare Unternehmen — nichts erfinden
+- source_url MUSS die konkrete URL sein (Google Maps Link, Website-Impressum, LinkedIn etc.)
+- Wenn kein Ansprechpartner bekannt: first_name = "Inhaber", last_name leer lassen
+- Adresse (street, postal_code) so vollständig wie möglich aus den Suchergebnissen
+- Gib genau ${cfg.limit} Leads zurück`;
 
   let leads: KiLead[];
   try {
-    const raw = await callClaude(system, prompt);
+    const raw = await callClaudeWithSearch(system, prompt);
     leads = JSON.parse(raw);
     if (!Array.isArray(leads)) throw new Error("Kein Array");
   } catch (err) {
-    console.error(`[${cfg.venture}] Claude-Parsing fehlgeschlagen:`, err);
+    console.error(`[${cfg.venture}] Fehler bei Claude-Suche:`, err);
     return { venture: cfg.venture, saved: 0, duplicates: 0, errors: 1 };
   }
 
@@ -165,6 +270,7 @@ Wichtig: Plausible, realistische E-Mail-Adressen (basierend auf Name/Firma). Kei
     if (result.saved) {
       saved++;
       if (result.duplicate) duplicates++;
+      console.log(`[${cfg.venture}] ✅ ${lead.company_name || lead.first_name} (${lead.city})`);
     } else {
       errors++;
       console.error(`[${cfg.venture}] Speicherfehler:`, result.error);
@@ -182,7 +288,7 @@ const DEFAULT_VENTURES: VentureConfig[] = [
     enabled: true,
     limit: 10,
     region: "Hessen",
-    focus: "Unternehmen die wahrscheinlich keine moderne Website oder keinen Onlineshop haben",
+    focus: "Lokale Unternehmen die keine moderne Website haben oder deren Website veraltet ist",
     industry_hint: "Einzelhandel, Handwerk, Gastronomie, Friseursalons, Reinigungen, lokale Dienstleister",
     note_hint: "Warum dieses Unternehmen eine professionelle Website braucht (1-2 Sätze)",
   },
@@ -191,27 +297,27 @@ const DEFAULT_VENTURES: VentureConfig[] = [
     enabled: false,
     limit: 5,
     region: "Hessen",
-    focus: "Unternehmen und Vereine die regelmäßig Druckprodukte benötigen (Visitenkarten, Flyer, Aufkleber, Merchandise, Eventmaterial, Schilder)",
-    industry_hint: "Gastronomiebetriebe, Eventveranstalter, Sportvereine, lokale Unternehmen, Handwerksbetriebe, NGOs",
-    note_hint: "Welche Druckprodukte dieses Unternehmen/Verein braucht und warum (1-2 Sätze)",
+    focus: "Unternehmen und Vereine die regelmäßig Druckprodukte benötigen",
+    industry_hint: "Gastronomiebetriebe, Eventveranstalter, Sportvereine, lokale Unternehmen, Handwerksbetriebe",
+    note_hint: "Welche Druckprodukte dieses Unternehmen braucht und warum (1-2 Sätze)",
   },
   {
     venture: "droplane",
     enabled: false,
     limit: 5,
     region: "Deutschland",
-    focus: "Content Creator, Fotografen, Videografen, YouTuber, Podcaster, Social-Media-Influencer oder Freelance-Kreative die eine Creator-Plattform nutzen würden",
-    industry_hint: "Fotografie, Videoproduktion, Social Media, Blogging, Podcasting, Gaming, Fitness & Lifestyle Creator",
-    note_hint: "Was dieser Creator macht und warum er eine Creator-Plattform wie Droplane braucht (1-2 Sätze)",
+    focus: "Content Creator, Fotografen, Videografen, YouTuber, Podcaster mit Reichweite",
+    industry_hint: "Fotografie, Videoproduktion, Social Media, Blogging, Podcasting",
+    note_hint: "Was dieser Creator macht und warum er Droplane braucht (1-2 Sätze)",
   },
   {
     venture: "blazed_outfitters",
     enabled: false,
     limit: 5,
     region: "Deutschland",
-    focus: "Potenzielle B2B-Partner oder Influencer für eine Streetwear/Fashion-Marke: Boutiquen, Concept Stores, Skateshops, Fashion-Blogger, Streetwear-Affine mit Reichweite",
-    industry_hint: "Fashion Boutiquen, Streetwear, Skateboarding, Sportswear, Mode-Blogging, Urban Fashion, Concept Stores",
-    note_hint: "Warum diese Person/dieses Unternehmen ein guter Partner für Blazed Outfitters wäre (1-2 Sätze)",
+    focus: "Fashion Boutiquen, Streetwear-Shops, Skateshops als B2B-Partner",
+    industry_hint: "Fashion Boutiquen, Streetwear, Skateboarding, Concept Stores",
+    note_hint: "Warum dieser Shop ein guter Partner für Blazed Outfitters wäre (1-2 Sätze)",
   },
 ];
 
@@ -231,7 +337,7 @@ Deno.serve(async (req) => {
     );
   }
 
-  // Venture-Configs aus DB lesen (überschreibt Defaults falls vorhanden)
+  // Venture-Configs aus DB lesen
   const configRaw = await getConfig(supabase, "ki_search_ventures", "");
   let ventureConfigs: VentureConfig[] = DEFAULT_VENTURES;
 
@@ -252,9 +358,8 @@ Deno.serve(async (req) => {
     );
   }
 
-  console.log(`KI-Lead-Suche: ${activeVentures.length} aktive Venture(s)`);
+  console.log(`KI-Lead-Suche (mit Websuche): ${activeVentures.length} aktive Venture(s)`);
 
-  // Alle Ventures sequenziell durchlaufen (Claude-Rate-Limits vermeiden)
   const results: VentureResult[] = [];
   for (const cfg of activeVentures) {
     const result = await searchForVenture(supabase, cfg);
