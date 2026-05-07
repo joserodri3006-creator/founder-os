@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     .from("products")
     .select(`
       id, name, slug, sku, price, compare_at_price, status, is_featured,
-      sync_status, last_synced_at, wc_product_id,
+      sync_status, last_synced_at, wc_product_id, channel,
       track_inventory, venture, created_at, updated_at, images,
       product_type:product_types(id, name, has_variants, has_inventory),
       brand:product_brands(id, name)

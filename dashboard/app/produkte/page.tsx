@@ -16,6 +16,7 @@ interface Product {
   status: string;
   sync_status: string | null;
   is_featured: boolean;
+  channel: string | null;
   images: { url: string; alt: string }[];
   product_type: { id: string; name: string; has_variants: boolean; has_inventory: boolean } | null;
   brand: { id: string; name: string } | null;
@@ -211,10 +212,10 @@ export default function ProdukteListPage() {
           <table className="w-full text-sm" style={{ minWidth: '580px' }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EEF0F7", background: "#F7F8FC" }}>
-                {["Produkt", "Typ", "SKU", "Preis", "Status", "Aktionen"].map((h) => (
+                {["Produkt", "Typ", "SKU", "Preis", "Channel", "Status", "Aktionen"].map((h) => (
                   <th
                     key={h}
-                    className={`px-4 py-3 font-semibold uppercase ${h === "Preis" ? "text-right" : h === "Status" ? "text-center" : "text-left"}`}
+                    className={`px-4 py-3 font-semibold uppercase ${h === "Preis" ? "text-right" : ["Status","Channel"].includes(h) ? "text-center" : "text-left"}`}
                     style={{ fontSize: "11px", letterSpacing: "0.07em", color: "#6B7280" }}
                   >
                     {h}
@@ -287,6 +288,23 @@ export default function ProdukteListPage() {
                         )}
                       </div>
                     ) : <span style={{ color: "#6B7280" }}>—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {(() => {
+                      const ch = p.channel ?? "b2c";
+                      const cfg: Record<string, { label: string; bg: string; color: string }> = {
+                        b2c:  { label: "B2C",      bg: "rgba(22,163,74,0.08)",   color: "#15803D" },
+                        b2b:  { label: "B2B",      bg: "rgba(27,42,94,0.1)",     color: "#1B2A5E" },
+                        both: { label: "B2C+B2B",  bg: "rgba(200,169,110,0.15)", color: "#92650A" },
+                      };
+                      const c = cfg[ch] ?? cfg.b2c;
+                      return (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                          style={{ background: c.bg, color: c.color }}>
+                          {c.label}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span

@@ -812,7 +812,7 @@ export default function ProduktDetailPage() {
             </div>
           </div>
 
-          {/* Typ + Marke */}
+          {/* Typ + Marke + Channel */}
           <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 text-sm space-y-2">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Details</p>
             {product.product_type && (
@@ -827,6 +827,21 @@ export default function ProduktDetailPage() {
                 <p className="text-gray-700">{product.brand.name}</p>
               </div>
             )}
+            <div>
+              <p className="text-xs text-gray-400 mb-1">Channel</p>
+              <select
+                value={product.channel ?? "b2c"}
+                onChange={async e => {
+                  await patch({ channel: e.target.value }, "channel");
+                }}
+                className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="b2c">B2C (Endkunde)</option>
+                <option value="b2b">B2B (Händler)</option>
+                <option value="both">B2C + B2B</option>
+              </select>
+              {saving === "channel" && <p className="text-xs text-gray-400 mt-1">Gespeichert…</p>}
+            </div>
             <div>
               <p className="text-xs text-gray-400">Erstellt</p>
               <p className="text-gray-700">{new Date(product.created_at).toLocaleDateString("de-DE")}</p>
