@@ -17,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const body = await req.json();
-  const allowed = ['first_name', 'last_name', 'company_name', 'email', 'phone', 'city', 'street', 'postal_code', 'country', 'notes', 'venture'];
+  const allowed = ['first_name', 'last_name', 'company_name', 'email', 'phone', 'city', 'street', 'postal_code', 'country', 'notes', 'venture', 'customer_type', 'status', 'discount_rate'];
   const updates: Record<string, unknown> = {};
   for (const key of allowed) if (key in body) updates[key] = body[key];
   const { data, error } = await supabaseAdmin

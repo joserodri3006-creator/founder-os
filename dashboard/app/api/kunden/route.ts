@@ -6,10 +6,16 @@ export async function GET(req: NextRequest) {
   const venture = searchParams.get("venture");
   const archived = searchParams.get("archived") === "true";
 
+  const typeFilter  = searchParams.get("type");   // b2b | b2c
+  const statusFilter = searchParams.get("status"); // active | pending | inactive
+
   let query = supabaseAdmin
     .from("customers")
-    .select("id,first_name,last_name,company_name,email,phone,city,venture,created_at,archived_at")
+    .select("id,first_name,last_name,company_name,email,phone,city,venture,created_at,archived_at,customer_type,status,discount_rate")
     .order("created_at", { ascending: false });
+
+  if (typeFilter)   query = query.eq("customer_type", typeFilter);
+  if (statusFilter) query = query.eq("status", statusFilter);
 
   if (venture && venture !== "alle") query = query.eq("venture", venture);
   if (archived) {

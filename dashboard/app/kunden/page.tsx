@@ -15,6 +15,9 @@ interface Customer {
   phone: string | null;
   city: string | null;
   venture: string | null;
+  customer_type: "b2c" | "b2b" | null;
+  status: "active" | "pending" | "inactive" | null;
+  discount_rate: number | null;
   created_at: string;
   archived_at: string | null;
 }
@@ -30,6 +33,8 @@ export default function KundenPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"" | "b2b" | "b2c">("");
+  const [statusFilter, setStatusFilter] = useState<"" | "active" | "pending" | "inactive">("");
   const [showArchived, setShowArchived] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
 
@@ -37,13 +42,15 @@ export default function KundenPage() {
     setLoading(true);
     const params = new URLSearchParams();
     params.set("venture", venture);
-    if (showArchived) params.set("archived", "true");
+    if (showArchived)  params.set("archived", "true");
+    if (typeFilter)    params.set("type", typeFilter);
+    if (statusFilter)  params.set("status", statusFilter);
     const data = await fetch(`/api/kunden?${params}`).then((r) => r.json());
     setCustomers(Array.isArray(data) ? data : []);
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [venture, showArchived]);
+  useEffect(() => { load(); }, [venture, showArchived, typeFilter, statusFilter]);
 
   async function handleArchive(id: string) {
     await fetch(`/api/kunden/${id}/archive`, { method: "POST" });
@@ -112,8 +119,29 @@ export default function KundenPage() {
           placeholder="Suchen..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ ...selectStyle, width: "260px" }}
+          style={{ ...selectStyle, width: "220px" }}
         />
+        {/* Kundentyp Filter */}
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as "" | "b2b" | "b2c")}
+          style={selectStyle}
+        >
+          <option value="">Alle Typen</option>
+          <option value="b2b">B2B</option>
+          <option value="b2c">B2C</option>
+        </select>
+        {/* Status Filter */}
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as "" | "active" | "pending" | "inactive")}
+          style={selectStyle}
+        >
+          <option value="">Alle Status</option>
+          <option value="active">Aktiv</option>
+          <option value="pending">Ausstehend</option>
+          <option value="inactive">Inaktiv</option>
+        </select>
         <button
           onClick={() => setShowArchived((v) => !v)}
           className="text-sm px-3 py-1.5 rounded-lg transition-colors font-medium"
@@ -149,7 +177,7 @@ export default function KundenPage() {
           <table className="w-full" style={{ minWidth: '680px' }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EEF0F7", background: "#F7F8FC" }}>
-                {["Name", "Unternehmen", "E-Mail", "Telefon", "Stadt", "Venture", "Erstellt", "Aktionen"].map((h) => (
+                {["Name", "Unternehmen", "Typ", "Status", "E-Mail", "Stadt", "Erstellt", "Aktionen"].map((h) => (
                   <th
                     key={h}
                     className="px-4 py-3 text-left font-semibold uppercase"
@@ -179,32 +207,20 @@ export default function KundenPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3.5 text-sm" style={{ color: "#6B7280" }}>{c.company_name ?? "—"}</td>
+                  {/* Kundentyp */}
+                  <td className="px-4 py-3.5">
+                    <CustomerTypeBadge type={c.customer_type} />
+                  </td>
+                  {/* Status */}
+                  <td className="px-4 py-3.5">
+                    <CustomerStatusBadge status={c.status} />
+                  </td>
                   <td className="px-4 py-3.5 text-sm" style={{ color: "#6B7280" }}>
                     {c.email ? (
-                      <a
-                        href={`mailto:${c.email}`}
-                        style={{ color: "#3A5BA0" }}
-                        onMouseEnter={(e) => (e.currentTarget as HTMLElement).style.color = "#1B2A5E"}
-                        onMouseLeave={(e) => (e.currentTarget as HTMLElement).style.color = "#3A5BA0"}
-                      >
-                        {c.email}
-                      </a>
+                      <a href={`mailto:${c.email}`} style={{ color: "#3A5BA0" }}>{c.email}</a>
                     ) : "—"}
                   </td>
-                  <td className="px-4 py-3.5 text-sm" style={{ color: "#6B7280" }}>{c.phone ?? "—"}</td>
                   <td className="px-4 py-3.5 text-sm" style={{ color: "#6B7280" }}>{c.city ?? "—"}</td>
-                  <td className="px-4 py-3.5">
-                    {c.venture ? (
-                      <span
-                        className="text-xs font-semibold px-2.5 py-1 rounded-full capitalize"
-                        style={{ background: "#EEF0F7", color: "#1B2A5E" }}
-                      >
-                        {c.venture}
-                      </span>
-                    ) : (
-                      <span className="text-sm" style={{ color: "#6B7280" }}>—</span>
-                    )}
-                  </td>
                   <td className="px-4 py-3.5 text-xs" style={{ color: "#6B7280" }}>
                     {new Date(c.created_at).toLocaleDateString("de-DE")}
                   </td>
@@ -307,6 +323,41 @@ export default function KundenPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export function CustomerTypeBadge({ type }: { type: string | null }) {
+  if (!type) return <span className="text-sm" style={{ color: "#9CA3AF" }}>—</span>;
+  const isB2B = type === "b2b";
+  return (
+    <span
+      className="text-xs font-bold px-2 py-0.5 rounded-full uppercase"
+      style={{
+        background: isB2B ? "rgba(27,42,94,0.1)" : "rgba(22,163,74,0.08)",
+        color: isB2B ? "#1B2A5E" : "#15803D",
+      }}
+    >
+      {type.toUpperCase()}
+    </span>
+  );
+}
+
+export function CustomerStatusBadge({ status, onClick }: { status: string | null; onClick?: () => void }) {
+  const map: Record<string, { label: string; bg: string; color: string; dot: string }> = {
+    active:   { label: "Aktiv",       bg: "rgba(22,163,74,0.08)",   color: "#15803D", dot: "#16A34A" },
+    pending:  { label: "Ausstehend",  bg: "rgba(234,88,12,0.08)",   color: "#C2410C", dot: "#EA580C" },
+    inactive: { label: "Inaktiv",     bg: "rgba(107,114,128,0.08)", color: "#4B5563", dot: "#9CA3AF" },
+  };
+  const s = map[status ?? ""] ?? { label: status ?? "—", bg: "#F3F4F6", color: "#6B7280", dot: "#9CA3AF" };
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full"
+      style={{ background: s.bg, color: s.color, cursor: onClick ? "pointer" : "default" }}
+      onClick={onClick}
+    >
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: s.dot }} />
+      {s.label}
+    </span>
   );
 }
 
