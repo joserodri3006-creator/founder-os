@@ -121,6 +121,22 @@ Deno.serve(async (req) => {
     }).catch((e) => console.error("lead-qualify trigger fehlgeschlagen:", e));
   }
 
+  // Notification: neuer Lead
+  fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-notification`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+    },
+    body: JSON.stringify({
+      venture:    payload.venture,
+      event_type: "new_lead",
+      title:      `Neuer Lead: ${lead.first_name} ${lead.last_name}`,
+      body:       lead.email ?? undefined,
+      link:       `/leads/${lead.id}`,
+    }),
+  }).catch((e) => console.error("send-notification fehlgeschlagen:", e));
+
   return new Response(
     JSON.stringify({ success: true, duplicate: isDuplicate, lead }),
     { status: 201, headers: CORS }

@@ -254,6 +254,24 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Notification: KI-Draft bereit
+    if (update.ai_draft_subject) {
+      fetch(`${SUPABASE_URL}/functions/v1/send-notification`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        },
+        body: JSON.stringify({
+          venture:    lead.venture,
+          event_type: "draft_ready",
+          title:      `KI-Draft bereit: ${lead.first_name} ${lead.last_name}`,
+          body:       update.ai_draft_subject,
+          link:       `/drafts`,
+        }),
+      }).catch((e) => console.error("send-notification fehlgeschlagen:", e));
+    }
+
     return new Response(
       JSON.stringify({ success: true, status: newStatus, updated_fields: Object.keys(update) }),
       { status: 200, headers: { "Content-Type": "application/json" } }

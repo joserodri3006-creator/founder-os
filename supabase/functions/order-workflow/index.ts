@@ -304,6 +304,23 @@ Deno.serve(async (req) => {
 
   try {
     await handleStatusChange(fullOrder as Order, old_record.status);
+
+    // Notification: Auftragsstatus geändert
+    fetch(`${SUPABASE_URL}/functions/v1/send-notification`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({
+        venture:    order.venture,
+        event_type: "order_status_changed",
+        title:      `Auftrag ${order.status}: ${(fullOrder as any).customers?.company_name ?? "Unbekannt"}`,
+        body:       `${old_record.status} → ${order.status}`,
+        link:       `/auftraege/${order.id}`,
+      }),
+    }).catch((e) => console.error("send-notification fehlgeschlagen:", e));
+
     return new Response(
       JSON.stringify({ success: true, order_id: order.id, new_status: order.status }),
       { status: 200, headers: { "Content-Type": "application/json" } }

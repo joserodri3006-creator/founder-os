@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useVenture } from "@/context/VentureContext";
 import { useAuth } from "@/context/AuthContext";
 import { VENTURES, VentureId } from "@/lib/ventures";
+import NotificationBell from "@/components/NotificationBell";
 
 interface SidebarProps {
   mobileOpen?: boolean;
@@ -59,6 +60,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
         { href: "/einstellungen/produkttypen", label: "Produkttypen", show: canEdit("settings") },
         { href: "/einstellungen/marken", label: "Marken", show: canEdit("settings") },
         { href: "/einstellungen/steuern", label: "Steuern", show: canEdit("settings") },
+        { href: "/einstellungen/benachrichtigungen", label: "Benachrichtigungen", show: true },
       ],
     },
   ];
@@ -245,6 +247,24 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
           );
         })}
       </nav>
+
+      {/* Glocke */}
+      <div
+        className="px-4 py-2 shrink-0 flex items-center justify-between"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+      >
+        <Link
+          href="/benachrichtigungen"
+          onClick={handleLinkClick}
+          className="text-xs transition-colors"
+          style={{ color: "rgba(255,255,255,0.35)" }}
+          onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
+          onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.35)")}
+        >
+          Benachrichtigungen
+        </Link>
+        <NotificationBell />
+      </div>
 
       {/* User */}
       <div

@@ -16,3 +16,9 @@ verify_jwt = false
 
 [functions.product-sync]
 verify_jwt = false
+
+[functions.send-notification]
+verify_jwt = false
+
+[functions.notification-digest]
+verify_jwt = false
