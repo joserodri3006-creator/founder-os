@@ -90,6 +90,10 @@ export default function ProduktDetailPage() {
   const [editCanonical, setEditCanonical] = useState("");
   const [editNoIndex, setEditNoIndex] = useState(false);
 
+  // Categories
+  const [allCategories, setAllCategories] = useState<{ id: string; name: string; level: number }[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+
   // Tax
   const [taxClasses, setTaxClasses] = useState<{ id: string; name: string; rates: { rate: number }[] }[]>([]);
   const [editTaxClassId, setEditTaxClassId] = useState<string | null>(null);
@@ -109,6 +113,12 @@ export default function ProduktDetailPage() {
         .then(data => setTaxClasses(Array.isArray(data) ? data : []));
     }
     setProduct(p);
+    setSelectedCategories((p.categories ?? []).map((c: any) => c.id));
+    if (p.venture) {
+      fetch(`/api/produkt-kategorien?venture=${p.venture}`)
+        .then(r => r.json())
+        .then(data => setAllCategories(Array.isArray(data) ? data : []));
+    }
     setEditName(p.name ?? "");
     setEditStatus(p.status ?? "draft");
     setEditPrice(p.price != null ? String(p.price) : "");
@@ -846,6 +856,41 @@ export default function ProduktDetailPage() {
                 })}
               </select>
               {saving === "tax" && <p className="text-xs text-gray-400">Gespeichert…</p>}
+            </div>
+          )}
+
+          {/* Kategorien */}
+          {allCategories.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 px-5 py-4">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Kategorien</p>
+              <div className="flex flex-wrap gap-1.5">
+                {allCategories.map(c => {
+                  const active = selectedCategories.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={async () => {
+                        const updated = active
+                          ? selectedCategories.filter(x => x !== c.id)
+                          : [...selectedCategories, c.id];
+                        setSelectedCategories(updated);
+                        await patch({ category_ids: updated }, "categories");
+                      }}
+                      className="text-xs px-2.5 py-1 rounded-full border transition-colors"
+                      style={{
+                        background: active ? "#1B2A5E" : "#FFFFFF",
+                        color: active ? "#FFFFFF" : "#6B7280",
+                        borderColor: active ? "#1B2A5E" : "#D1D5E8",
+                      }}
+                    >
+                      {c.level > 1 ? "↳ " : ""}{c.name}
+                    </button>
+                  );
+                })}
+              </div>
+              {saving === "categories" && (
+                <p className="text-xs text-gray-400 mt-2">Gespeichert…</p>
+              )}
             </div>
           )}
 
