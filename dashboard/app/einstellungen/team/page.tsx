@@ -327,7 +327,31 @@ export default function TeamPage() {
                     Läuft ab: {new Date(inv.expires_at).toLocaleDateString("de-DE")}
                   </p>
                 </div>
-                <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full font-medium">Ausstehend</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      setSaving(`resend_${inv.id}`);
+                      const res = await fetch("/api/team/resend-invite", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ invite_id: inv.id }),
+                      });
+                      const data = await res.json();
+                      if (res.ok) {
+                        alert(`✓ Einladung erneut gesendet an ${inv.email}`);
+                        await load();
+                      } else {
+                        alert(`Fehler: ${data.error}`);
+                      }
+                      setSaving(null);
+                    }}
+                    disabled={saving === `resend_${inv.id}`}
+                    className="text-xs px-2.5 py-1 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    {saving === `resend_${inv.id}` ? "Sendet..." : "Erneut senden"}
+                  </button>
+                  <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full font-medium">Ausstehend</span>
+                </div>
               </div>
             ))}
           </div>
