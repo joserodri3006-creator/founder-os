@@ -17,6 +17,7 @@ interface Order {
   created_at: string;
   notes: string | null;
   archived_at: string | null;
+  invoice_number: string | null;
   customer: {
     id: string;
     first_name: string;
@@ -245,7 +246,7 @@ export default function AuftraegePage() {
           <table className="w-full" style={{ minWidth: '720px' }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EEF0F7", background: "#F7F8FC" }}>
-                {["Titel", "Kunde", "Status", "Paket", "Wert", "Deadline", "Erstellt", "Aktionen"].map((h) => (
+                {["Titel", "Re.-Nr.", "Kunde", "Status", "Paket", "Wert", "Deadline", "Erstellt", "Aktionen"].map((h) => (
                   <th
                     key={h}
                     className="px-4 py-3 text-left font-semibold uppercase"
@@ -274,6 +275,9 @@ export default function AuftraegePage() {
                     >
                       {o.title}
                     </Link>
+                  </td>
+                  <td className="px-4 py-3.5 text-xs font-mono" style={{ color: o.invoice_number ? "#14193A" : "#D1D5E8" }}>
+                    {o.invoice_number ?? "—"}
                   </td>
                   <td className="px-4 py-3.5 text-sm" style={{ color: "#6B7280" }}>
                     {o.customer ? (

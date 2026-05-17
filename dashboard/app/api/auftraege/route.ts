@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   let query = supabaseAdmin
     .from("orders")
     .select(`
-      id, title, package_type, value, status, deadline, venture, created_at, notes, description, archived_at,
+      id, title, package_type, value, status, deadline, venture, created_at, notes, description, archived_at, invoice_number,
       customer:customers(id, first_name, last_name, company_name, email)
     `)
     .order("created_at", { ascending: false });
