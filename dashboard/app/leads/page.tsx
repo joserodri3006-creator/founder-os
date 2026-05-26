@@ -8,6 +8,7 @@ import NewLeadModal from "@/components/NewLeadModal";
 import CsvImportModal from "@/components/CsvImportModal";
 import EditLeadModal from "@/components/EditLeadModal";
 import CopyLeadModal from "@/components/CopyLeadModal";
+import GoogleLeadSearchModal from "@/components/GoogleLeadSearchModal";
 
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as LeadStatus[];
 
@@ -57,6 +58,7 @@ export default function LeadsPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [showNewLead, setShowNewLead] = useState(false);
   const [showCsvImport, setShowCsvImport] = useState(false);
+  const [showGoogleSearch, setShowGoogleSearch] = useState(false);
   const [modal, setModal] = useState<Modal>(null);
 
   async function load() {
@@ -126,6 +128,21 @@ export default function LeadsPage() {
           <p className="text-sm mt-0.5" style={{ color: '#6B7280' }}>{leads.length} Leads</p>
         </div>
         <div className="flex items-center gap-2.5">
+          {venture === "online_first" && (
+            <button
+              onClick={() => setShowGoogleSearch(true)}
+              className="text-sm px-4 py-2 rounded-lg transition-colors font-medium"
+              style={{
+                border: '1.5px solid #D1D5E8',
+                background: '#FFFFFF',
+                color: '#14193A',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#EEF0F7')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#FFFFFF')}
+            >
+              Google Leads suchen
+            </button>
+          )}
           <button
             onClick={() => setShowCsvImport(true)}
             className="text-sm px-4 py-2 rounded-lg transition-colors font-medium"
@@ -333,6 +350,9 @@ export default function LeadsPage() {
       )}
       {showCsvImport && (
         <CsvImportModal onClose={() => setShowCsvImport(false)} onImported={() => setTimeout(load, 500)} />
+      )}
+      {showGoogleSearch && (
+        <GoogleLeadSearchModal onClose={() => setShowGoogleSearch(false)} onImported={() => setTimeout(load, 500)} />
       )}
       {modal?.type === "edit" && (
         <EditLeadModal leadId={modal.id} onClose={() => setModal(null)} onSaved={() => { setModal(null); setTimeout(load, 300); }} />

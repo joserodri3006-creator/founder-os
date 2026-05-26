@@ -40,6 +40,7 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 | E-Mail | Resend.com | Transaktional + Campaigns (Domain onlinefirst.eu verifiziert) |
 | Payment | Stripe Checkout | Online-First B2B-Anzahlung im oeffentlichen Funnel |
 | Bot-Schutz | Cloudflare Turnstile | Oeffentliche Formular-Submissions |
+| Lead-Recherche | Google Custom Search JSON API | Manuelle regionale Kandidatensuche fuer Online First |
 | Social Media | Buffer API | Content-Scheduling |
 | Dokumente | Google Drive | Reports, Vorlagen, Ablage |
 
@@ -141,7 +142,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 
 ### Seiten
 - `/dashboard` — KPI-Kacheln pro Venture, neueste Leads
-- `/leads` — Pipeline, Status inline, Neuer Lead Modal, CSV Import, Duplikat-Markierung, Bearbeiten/Kopieren/Archivieren/Löschen
+- `/leads` — Pipeline, Status inline, Neuer Lead Modal, CSV Import, kontrollierte Google-Lead-Suche fuer Online First, Duplikat-Markierung, Bearbeiten/Kopieren/Archivieren/Löschen
 - `/leads/[id]` — Lead-Detail mit Aktivitäten
 - `/drafts` — KI-Drafts reviewen, editieren, senden (per Venture gefiltert)
 - `/kunden` — Kundenliste, Bearbeiten/Kopieren/Archivieren/Löschen, Archiv-Toggle
@@ -173,6 +174,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - **Notizen** — Freitextfeld mit Auto-Save (1s Debounce) auf Kunden, Aufträgen, Produkten
 - **system_config upsert** — neue Keys werden automatisch angelegt
 - **Sales Funnel KPI** — Fit-Checks, Checkout-Starts und Stripe-Anzahlungen fuer Online First
+- **Google Lead Search** — Region-/Zielgruppen-Suche via serverseitiger Custom Search JSON API; Import erst nach gepruefter Kontaktperson/E-Mail und ohne automatische Ansprache
 - **API-Zugriffsschutz** — `proxy.ts` verlangt Sitzungen und prueft Section-Permissions vor internen Service-Role-Routen
 
 ---
