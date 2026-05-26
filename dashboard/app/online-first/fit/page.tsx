@@ -17,11 +17,13 @@ type Result = {
   status: "checkout_ready" | "call_recommended";
   score: number;
   reason: string;
+  preview?: boolean;
 };
 
 const fieldClass = "mt-2 w-full rounded-xl border border-[#DED7C9] bg-white px-4 py-3 text-sm outline-none focus:border-[#1B2A5E]";
 const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 const bookingUrl = process.env.NEXT_PUBLIC_BOOKING_URL || "mailto:info@onlinefirst.eu?subject=Erstgespraech%20Leadgen-Website";
+const previewMode = process.env.NEXT_PUBLIC_ONLINE_FIRST_PREVIEW_MODE === "true";
 
 export default function FitPage() {
   const captchaRef = useRef<HTMLDivElement>(null);
@@ -114,6 +116,11 @@ export default function FitPage() {
       {siteKey && <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" onLoad={renderCaptcha} />}
       <div className="mx-auto max-w-3xl">
         <Link href="/online-first" className="text-sm text-[#536079]">← Zurück zum Angebot</Link>
+        {previewMode && (
+          <p className="mt-6 rounded-xl border border-[#E5DDCE] bg-[#FFF8EA] p-4 text-sm text-[#7A5C25]">
+            Vorschau: Der Fit-Check zeigt das Routing, speichert aber keine Kundendaten und startet keine Zahlung.
+          </p>
+        )}
         <div className="mt-8 rounded-3xl border border-[#E5DDCE] bg-white p-6 shadow-sm sm:p-10">
           {!result ? (
             <>
@@ -196,7 +203,7 @@ export default function FitPage() {
           ) : result.status === "checkout_ready" ? (
             <>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-green-700">Passendes Projekt</p>
-              <h1 className="mt-4 font-serif text-4xl font-light">Sie koennen direkt starten.</h1>
+              <h1 className="mt-4 font-serif text-4xl font-light">Sie können direkt starten.</h1>
               <p className="mt-5 text-[#536079]">{result.reason}</p>
               <div className="mt-8 rounded-2xl bg-[#F8F7F2] p-6">
                 <p className="font-semibold">Leadgen-Website · 5 Seiten + Funnel</p>
@@ -207,7 +214,7 @@ export default function FitPage() {
               <div className="mt-8 space-y-4 text-sm">
                 <label className="flex gap-3">
                   <input type="checkbox" checked={b2bConfirmed} onChange={(event) => setB2bConfirmed(event.target.checked)} />
-                  <span>Ich handle als Unternehmer/in und beauftrage dieses Projekt fuer mein Geschaeft.</span>
+                  <span>Ich handle als Unternehmer/in und beauftrage dieses Projekt für mein Geschäft.</span>
                 </label>
                 <label className="flex gap-3">
                   <input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} />
@@ -219,11 +226,15 @@ export default function FitPage() {
               </div>
               {error && <p className="mt-6 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</p>}
               <button
-                disabled={pending || !termsAccepted || !b2bConfirmed}
+                disabled={pending || !termsAccepted || !b2bConfirmed || result.preview}
                 onClick={startCheckout}
                 className="mt-8 w-full rounded-full bg-[#1B2A5E] px-7 py-4 font-semibold text-white disabled:opacity-50"
               >
-                {pending ? "Checkout wird geladen..." : "Verbindlich starten und Anzahlung leisten"}
+                {result.preview
+                  ? "Checkout im Vorschaumodus deaktiviert"
+                  : pending
+                    ? "Checkout wird geladen..."
+                    : "Verbindlich starten und Anzahlung leisten"}
               </button>
             </>
           ) : (

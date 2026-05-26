@@ -78,6 +78,19 @@ TURNSTILE_SECRET_KEY=...
 The new public funnel uses the Next.js endpoint instead of `lead-intake`; that
 Edge Function is retained for controlled external integrations.
 
+### Local Visual Preview
+
+For local UI reviews without a Supabase project or payment account, start the app
+with both preview flags set:
+
+```text
+ONLINE_FIRST_PREVIEW_MODE=true
+NEXT_PUBLIC_ONLINE_FIRST_PREVIEW_MODE=true
+```
+
+Preview mode evaluates and displays fit routing but deliberately does not write
+lead data, create checkout sessions or accept payment.
+
 ## Stripe Setup
 
 1. Configure Stripe automatic tax for the German B2B sale.

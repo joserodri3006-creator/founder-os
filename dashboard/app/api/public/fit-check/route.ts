@@ -13,9 +13,6 @@ import {
 } from "@/lib/public-sales";
 
 export async function POST(req: NextRequest) {
-  const limited = await enforcePublicRateLimit(req, "fit-check", 5);
-  if (limited) return limited;
-
   let input: FitInput;
   try {
     input = await req.json();
@@ -29,6 +26,21 @@ export async function POST(req: NextRequest) {
 
   const validationError = validateFitInput(input);
   if (validationError) return salesError(validationError);
+  const fit = evaluateFit(input);
+
+  if (process.env.ONLINE_FIRST_PREVIEW_MODE === "true") {
+    return NextResponse.json({
+      success: true,
+      preview: true,
+      submission_id: `preview-${Date.now()}`,
+      status: fit.status,
+      score: fit.score,
+      reason: fit.reason,
+    }, { status: 201 });
+  }
+
+  const limited = await enforcePublicRateLimit(req, "fit-check", 5);
+  if (limited) return limited;
   if (!await verifyTurnstile(req, input.turnstile_token)) {
     return salesError("Die Sicherheitspruefung ist fehlgeschlagen.", 403);
   }
@@ -36,7 +48,6 @@ export async function POST(req: NextRequest) {
   const email = cleanText(input.email, 254).toLowerCase();
   const now = new Date().toISOString();
   const attribution = attributionFrom(input, req);
-  const fit = evaluateFit(input);
 
   const { data: existing } = await supabaseAdmin
     .from("leads")
@@ -71,6 +82,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (leadError || !lead) {
+    console.error("Fit-check lead insert failed:", leadError?.message);
     return salesError("Ihre Anfrage konnte nicht gespeichert werden.", 500);
   }
 
@@ -104,6 +116,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (submissionError || !submission) {
+    console.error("Fit-check submission insert failed:", submissionError?.message);
     return salesError("Ihre Anfrage konnte nicht abgeschlossen werden.", 500);
   }
 
