@@ -30,7 +30,7 @@ const solutions = [
 
 const process = [
   {
-    title: "Fit-Check",
+    title: "Projekt-Fit",
     text: "Sie beantworten wenige Fragen zu Angebot, Zielgruppe und aktuellem Stand. So prüfen wir, ob das Paket zu Ihrem Vorhaben passt.",
   },
   {
@@ -75,11 +75,55 @@ const beforeAfter = [
   { before: "Zu viel Erklärung im Erstgespräch", after: "Stärkerer Auftritt für Empfehlungen und Social Media" },
 ];
 
+const references = [
+  {
+    title: "Sprachbrücke Frankfurt",
+    category: "1:1-Sprachunterricht & persönliche Dienstleistung",
+    description: "Website für persönliche Deutschkurse mit klarer Angebotsstruktur, mehrsprachiger Ausrichtung und direktem Weg zur kostenlosen Erstberatung.",
+    tags: "Positionierung · Mehrsprachigkeit · Erstberatung",
+    url: "https://sprachbruecke-ffm.de",
+    label: "sprachbruecke-ffm.de",
+  },
+  {
+    title: "Carlos Restrepo Guitarist",
+    category: "Personal Brand & Expertenauftritt",
+    description: "Personal-Brand-Website für einen internationalen Künstler mit Biografie, Medienbereich, Reviews und strukturiertem Anfrageformular.",
+    tags: "Personal Brand · Vertrauen · Anfrageformular",
+    url: "https://carlosrestrepoguitarist.com",
+    label: "carlosrestrepoguitarist.com",
+  },
+  {
+    title: "Brandary",
+    category: "Eigenes B2B-Markenprojekt",
+    description: "Eigenes Markenprojekt für Corporate Merchandise und Produktionsservices mit klarer Positionierung, Leistungsstruktur und Projektstart-CTA.",
+    tags: "B2B · Angebotsstruktur · Projektstart",
+    url: "https://bybrandary.de",
+    label: "bybrandary.de",
+    owned: true,
+  },
+];
+
+const trustPillars = [
+  {
+    title: "Struktur",
+    text: "Ihr Angebot wird so aufgebaut, dass Besucher logisch vom Problem zur Anfrage geführt werden.",
+  },
+  {
+    title: "Positionierung",
+    text: "Ihre Expertise, Zielgruppe und Ihr Nutzenversprechen werden klar herausgearbeitet.",
+  },
+  {
+    title: "Anfrageführung",
+    text: "Der nächste Schritt wird sichtbar, verständlich und möglichst reibungsarm gestaltet.",
+  },
+];
+
 const futureExtensions = [
   "Copywriting für alle Seiten",
   "KI-gestützter Lead-Fragebogen",
   "Automatische Lead-Qualifizierung",
-  "CRM-Anbindung und E-Mail-Sequenzen",
+  "CRM-Anbindung",
+  "E-Mail-Sequenzen nach Anfrage",
   "Conversion-Tracking",
   "FAQ- oder Angebotsassistent mit KI",
   "LinkedIn- oder Instagram-Landingpage-Erweiterung",
@@ -88,7 +132,7 @@ const futureExtensions = [
 const faqs = [
   {
     question: "Wie lange dauert die Umsetzung?",
-    answer: "In der Regel dauert die Umsetzung je nach Rückmeldung und Inhaltslage wenige Wochen. Der konkrete Zeitplan wird nach dem Fit-Check abgestimmt.",
+    answer: "In der Regel dauert die Umsetzung je nach Rückmeldung und Inhaltslage wenige Wochen. Der konkrete Zeitplan wird nach dem Projekt-Fit abgestimmt.",
   },
   {
     question: "Muss ich fertige Texte liefern?",
@@ -109,6 +153,14 @@ const faqs = [
   {
     question: "Für wen ist das Paket nicht geeignet?",
     answer: "Nicht geeignet ist das Paket für sehr komplexe Plattformen, große Shops, Mitgliederbereiche oder Projekte ohne klares Angebot.",
+  },
+  {
+    question: "Kann ich das Paket später erweitern?",
+    answer: "Ja. Der Authority Website Sprint bildet die Grundlage. Später können zusätzliche Seiten, Copywriting, CRM-Anbindung, E-Mail-Automation, KI-gestützte Lead-Qualifizierung oder Conversion-Tracking ergänzt werden.",
+  },
+  {
+    question: "Was passiert nach dem Projekt-Fit?",
+    answer: "Nach dem Projekt-Fit wird geprüft, ob das Paket zu Ihrem Angebot, Ihrer Zielgruppe und Ihrem gewünschten Anfrageprozess passt. Wenn es sinnvoll ist, folgt eine klare Empfehlung zum nächsten Schritt.",
   },
 ];
 
@@ -132,7 +184,7 @@ export default function OnlineFirstPage() {
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-7">
         <p className="font-serif text-xl tracking-[0.16em]">ONLINE FIRST</p>
         <Link href="/online-first/fit" className="rounded-full bg-[#14193A] px-5 py-3 text-sm font-semibold text-white">
-          Fit-Check starten
+          Projekt-Fit prüfen
         </Link>
       </header>
 
@@ -146,16 +198,16 @@ export default function OnlineFirstPage() {
               Ihre Beratungswebsite als Anfrage-System.
             </h1>
             <p className="mt-7 max-w-2xl text-lg leading-8 text-[#536079]">
-              Für Coaches und Berater, die klar positioniert auftreten, Vertrauen aufbauen und
+              Für Coaches, Berater und Experten, die klar positioniert auftreten, Vertrauen aufbauen und
               qualifizierte Erstgespräche gewinnen wollen: mit einer professionellen Website
               inklusive Kontakt- oder Termin-Funnel.
             </p>
-            <p className="mt-6 max-w-xl text-sm leading-7 text-[#536079]">
-              Ihre Website erklärt klar, wofür Sie stehen, wem Sie helfen und warum ein Gespräch sinnvoll ist.
+            <p className="mt-6 max-w-xl text-sm font-medium leading-7 text-[#536079]">
+              Umsetzung in wenigen Wochen mit klarem Festpreis und definiertem Umfang.
             </p>
             <div className="mt-10 flex flex-wrap items-center gap-4">
               <Link href="/online-first/fit" className="rounded-full bg-[#1B2A5E] px-7 py-4 font-semibold text-white">
-                Fit-Check starten
+                Projekt-Fit prüfen
               </Link>
               <a href="#umfang" className="rounded-full border border-[#D8D1C2] px-7 py-4 font-semibold">
                 Paketumfang ansehen
@@ -165,9 +217,9 @@ export default function OnlineFirstPage() {
 
           <div id="umfang" className="rounded-3xl border border-[#E5DDCE] bg-white p-7 shadow-sm sm:p-9">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A07840]">Kernpaket</p>
-            <h2 className="mt-4 font-serif text-3xl font-light">Coach &amp; Berater Website Sprint</h2>
+            <h2 className="mt-4 font-serif text-3xl font-light">Authority Website Sprint</h2>
             <p className="mt-3 text-sm leading-6 text-[#536079]">
-              4 verkaufsrelevante Seiten, rechtliche Pflichtseiten-Struktur und Kontakt- oder Termin-Funnel.
+              Für Coaches, Berater und Experten, die ihre Expertise klar positionieren und qualifizierte Anfragen gewinnen möchten.
             </p>
             <p className="mt-8 font-serif text-5xl font-light">2.490 EUR</p>
             <p className="mt-2 text-sm text-[#536079]">netto, zzgl. USt.</p>
@@ -214,7 +266,7 @@ export default function OnlineFirstPage() {
                 Aus Ihrer Website wird ein klarer Anfrage-Prozess.
               </h2>
               <p className="mt-6 text-[15px] leading-7 text-[#536079]">
-                Der Website Sprint verbindet Positionierung, Struktur, Design und Anfrageführung.
+                Der Authority Website Sprint verbindet Positionierung, Struktur, Design und Anfrageführung.
                 So entsteht keine beliebige Website, sondern ein digitales System, das Ihre
                 Expertise verständlich macht, Vertrauen aufbaut und Interessenten gezielt zum
                 nächsten Schritt führt.
@@ -260,7 +312,7 @@ export default function OnlineFirstPage() {
           <div className="mx-auto max-w-5xl">
             <div className="text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#A07840]">Transformation</p>
-              <h2 className="mt-4 font-serif text-4xl font-light">Was sich nach dem Website Sprint verändert</h2>
+              <h2 className="mt-4 font-serif text-4xl font-light">Was sich nach dem Authority Website Sprint verändert</h2>
             </div>
             <div className="mt-12 overflow-hidden rounded-3xl border border-[#E5DDCE]">
               <div className="grid grid-cols-2 bg-[#F8F7F2] px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#A07840] sm:px-8">
@@ -278,48 +330,75 @@ export default function OnlineFirstPage() {
         </section>
 
         <section className="px-6 py-20">
-          <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[1fr_0.92fr]">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#A07840]">Vertrauen</p>
-              <h2 className="mt-4 font-serif text-4xl font-light">Warum Online First?</h2>
-              <p className="mt-6 max-w-2xl text-[15px] leading-7 text-[#536079]">
-                Online First entwickelt Websites nicht als digitale Visitenkarten, sondern als
-                klare Verkaufs- und Anfrage-Systeme. Der Fokus liegt auf Positionierung, Struktur,
-                Nutzerführung und einem sauberen Projektprozess, damit aus Besuchern bessere
-                Anfragen werden.
-              </p>
-              <p className="mt-7 inline-flex rounded-full border border-[#E5DDCE] bg-white px-5 py-3 text-sm font-medium">
-                Entwickelt für Coaches, Berater und Experten
-              </p>
+          <div className="mx-auto max-w-6xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#A07840]">Referenzen</p>
+            <h2 className="mt-4 max-w-4xl font-serif text-4xl font-light leading-tight">
+              Ausgewählte Arbeiten mit Fokus auf Positionierung, Struktur und Anfrageführung
+            </h2>
+            <p className="mt-6 max-w-3xl text-[15px] leading-7 text-[#536079]">
+              Die folgenden Projekte zeigen, wie persönliche Marken, Dienstleistungen und B2B-Angebote
+              klarer sichtbar gemacht werden: mit sauberer Struktur, professioneller Darstellung und
+              direktem Weg zur Anfrage.
+            </p>
+            <div className="mt-12 grid gap-5 lg:grid-cols-3">
+              {references.map((reference) => (
+                <article key={reference.title} className="flex flex-col rounded-3xl border border-[#E5DDCE] bg-white p-7">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#A07840]">{reference.category}</p>
+                  <h3 className="mt-5 font-serif text-2xl font-light">{reference.title}</h3>
+                  {reference.owned && (
+                    <p className="mt-4 inline-flex self-start rounded-full bg-[#F2EFE8] px-3 py-2 text-xs font-semibold text-[#536079]">
+                      Eigenes Markenprojekt von Online First
+                    </p>
+                  )}
+                  <p className="mt-5 flex-1 text-sm leading-7 text-[#536079]">{reference.description}</p>
+                  <p className="mt-7 border-t border-[#EEE8DC] pt-5 text-xs font-semibold text-[#A07840]">{reference.tags}</p>
+                  <a
+                    href={reference.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-6 text-sm font-semibold text-[#1B2A5E] underline decoration-[#D8D1C2] underline-offset-4"
+                  >
+                    {reference.label}
+                  </a>
+                </article>
+              ))}
             </div>
-            <div className="rounded-3xl border border-[#E5DDCE] bg-white p-7 sm:p-9">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#A07840]">
-                Beispielprojekte folgen
-              </p>
-              <p className="mt-5 text-sm leading-7 text-[#536079]">
-                Ausgewählte Arbeiten und Kundenstimmen werden hier veröffentlicht, sobald die
-                jeweilige Freigabe vorliegt. Ihr Projekt startet mit einem nachvollziehbaren
-                Prozess und klar definiertem Umfang.
-              </p>
-              <div className="mt-7 grid grid-cols-3 gap-3">
-                {["Struktur", "Positionierung", "Anfragen"].map((item) => (
-                  <div key={item} className="rounded-xl bg-[#F8F7F2] px-3 py-5 text-center text-xs font-semibold text-[#536079]">
-                    {item}
-                  </div>
-                ))}
-              </div>
+          </div>
+        </section>
+
+        <section className="border-y border-[#E8E1D4] bg-white px-6 py-20">
+          <div className="mx-auto max-w-6xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#A07840]">Vertrauen</p>
+            <h2 className="mt-4 font-serif text-4xl font-light">Warum Online First?</h2>
+            <p className="mt-6 max-w-3xl text-[15px] leading-7 text-[#536079]">
+              Online First entwickelt Websites nicht als digitale Visitenkarten, sondern als klare
+              Anfrage-Systeme. Der Fokus liegt auf Positionierung, Angebotsstruktur, Nutzerführung
+              und einem sauberen Projektprozess, damit Besucher schneller verstehen, wofür Sie
+              stehen, wem Sie helfen und warum ein Gespräch sinnvoll ist.
+            </p>
+            <div className="mt-12 grid gap-5 lg:grid-cols-3">
+              {trustPillars.map((pillar) => (
+                <article key={pillar.title} className="rounded-2xl bg-[#F8F7F2] p-7">
+                  <h3 className="font-semibold">{pillar.title}</h3>
+                  <p className="mt-4 text-sm leading-7 text-[#536079]">{pillar.text}</p>
+                </article>
+              ))}
             </div>
           </div>
         </section>
 
         <section className="bg-[#F2EFE8] px-6 py-20">
-          <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[0.85fr_1.15fr]">
+          <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[0.9fr_1.1fr]">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#A07840]">Ausbaubar</p>
-              <h2 className="mt-4 font-serif text-4xl font-light">Bereit für spätere Automationen</h2>
+              <h2 className="mt-4 font-serif text-4xl font-light leading-tight">
+                Starten Sie mit einer klaren Website. Erweitern Sie später zu einem automatisierten Anfrage-System.
+              </h2>
               <p className="mt-6 text-[15px] leading-7 text-[#536079]">
-                Der Website Sprint ist der klare Einstieg. Wenn Ihre Anfragen wachsen, kann der
-                Prozess um Qualifizierung, CRM, E-Mail und Conversion-Messung erweitert werden.
+                Der Authority Website Sprint ist der Einstieg. Wenn Ihre Anfragen wachsen, kann
+                der Prozess um Qualifizierung, CRM, E-Mail-Automation und Conversion-Messung
+                erweitert werden. So entsteht Schritt für Schritt eine digitale Infrastruktur,
+                die nicht nur sichtbar macht, sondern Ihren Verkaufsprozess unterstützt.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -356,14 +435,15 @@ export default function OnlineFirstPage() {
           <div className="mx-auto max-w-5xl rounded-3xl bg-[#14193A] px-7 py-14 text-center text-white sm:px-14">
             <h2 className="font-serif text-4xl font-light">Wird Ihre Expertise online klar genug sichtbar?</h2>
             <p className="mx-auto mt-5 max-w-2xl leading-7 text-white/70">
-              Prüfen Sie, ob der Coach &amp; Berater Website Sprint zu Ihrem Angebot und Ihrem Anfrageprozess passt.
+              Prüfen Sie in wenigen Minuten, ob der Authority Website Sprint zu Ihrem Angebot,
+              Ihrem Ziel und Ihrem Anfrageprozess passt.
             </p>
-            <div className="mt-9 flex flex-wrap justify-center gap-4">
+            <div className="mt-9 flex flex-col items-center gap-6">
               <Link href="/online-first/fit" className="rounded-full bg-white px-8 py-4 font-semibold text-[#14193A]">
-                Fit-Check starten
+                Projekt-Fit prüfen
               </Link>
-              <a href="#umfang" className="rounded-full border border-white/30 px-8 py-4 font-semibold text-white">
-                Paketumfang ansehen
+              <a href="#umfang" className="text-sm font-medium text-white/70 underline decoration-white/30 underline-offset-4">
+                Paketumfang noch einmal ansehen
               </a>
             </div>
           </div>

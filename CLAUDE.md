@@ -159,8 +159,8 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - `/einstellungen/produkttypen` — Produkttypen pro Venture konfigurieren
 - `/einstellungen/marken` — Marken/Brands pro Venture verwalten
 - `/einstellungen/steuern` — Steuerklassen + Steuersätze pro Venture (P1.4 ✅)
-- `/online-first` — oeffentliche Salespage fuer den produktisierten `Coach & Berater Website Sprint` als Anfrage-System (Problem/Loesung, Passungsfilter, Transformation, FAQ, spaetere Erweiterungen)
-- `/online-first/fit` — Fit-Check mit Checkout-/Termin-Routing
+- `/online-first` — oeffentliche Salespage fuer den produktisierten `Authority Website Sprint` als Anfrage-System (Referenzen, Problem/Loesung, Passungsfilter, Transformation, FAQ, spaetere Erweiterungen)
+- `/online-first/fit` — strukturierter Projekt-Fit mit Angebots-/Zielgruppen-/Budgetqualifizierung und Checkout-/Termin-Routing
 - `/online-first/erfolg`, `/online-first/briefing`, `/online-first/rechtliches` — Checkout-Uebergabe und Launch-Gate
 
 ### Globale Features

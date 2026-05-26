@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const ONLINE_FIRST_PACKAGE = {
   code: "leadgen_website_5_page",
-  label: "Coach & Berater Website Sprint",
+  label: "Authority Website Sprint",
   netPriceCents: 249000,
   depositNetCents: 124500,
   termsVersion: "online-first-b2b-v1-2026-05-26",
@@ -17,12 +17,20 @@ export interface FitInput {
   company_name?: string;
   website?: string;
   profession?: string;
+  offer_description?: string;
+  target_audience?: string;
+  offer_price_range?: string;
+  acquisition_channel?: string;
+  website_status?: string;
   primary_goal?: string;
+  funnel_preference?: string;
   timeline?: string;
   pages_required?: string;
+  assets_status?: string;
+  budget_readiness?: string;
+  biggest_challenge?: string;
   needs_shop?: boolean;
   needs_custom_features?: boolean;
-  content_ready?: boolean;
   privacy_consent?: boolean;
   marketing_consent?: boolean;
   turnstile_token?: string;
@@ -42,7 +50,20 @@ export function validateFitInput(input: FitInput): string | null {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return "Bitte geben Sie eine gueltige E-Mail-Adresse ein.";
   }
-  if (!cleanText(input.primary_goal) || !cleanText(input.timeline) || !cleanText(input.pages_required)) {
+  if (
+    !cleanText(input.offer_description, 1000)
+    || !cleanText(input.target_audience, 1000)
+    || !cleanText(input.offer_price_range)
+    || !cleanText(input.acquisition_channel)
+    || !cleanText(input.website_status)
+    || !cleanText(input.primary_goal)
+    || !cleanText(input.funnel_preference)
+    || !cleanText(input.timeline)
+    || !cleanText(input.pages_required)
+    || !cleanText(input.assets_status)
+    || !cleanText(input.budget_readiness)
+    || !cleanText(input.biggest_challenge, 1500)
+  ) {
     return "Bitte beantworten Sie die Projektfragen vollstaendig.";
   }
   if (input.privacy_consent !== true) {
@@ -60,16 +81,24 @@ export function evaluateFit(input: FitInput) {
     };
   }
 
+  if (input.budget_readiness !== "confirmed") {
+    return {
+      score: 45,
+      status: "call_recommended" as const,
+      reason: "Budget und passender Umfang sollten vor dem Projektstart kurz geklaert werden.",
+    };
+  }
+
   let score = 60;
   if (input.profession === "coach" || input.profession === "consultant") score += 15;
   if (input.timeline === "within_30_days" || input.timeline === "within_60_days") score += 10;
-  if (input.content_ready) score += 10;
+  if (input.assets_status === "ready" || input.assets_status === "partial") score += 10;
   if (input.primary_goal === "lead_generation") score += 5;
 
   return {
     score: Math.min(score, 100),
     status: "checkout_ready" as const,
-    reason: "Das Vorhaben passt zum standardisierten Coach & Berater Website Sprint.",
+    reason: "Das Vorhaben passt zum standardisierten Authority Website Sprint.",
   };
 }
 

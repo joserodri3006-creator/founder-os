@@ -8,7 +8,7 @@ replacing the existing Founder OS CRM.
 Offer configuration:
 
 - Audience: German B2B consultants and coaches.
-- Product: `Coach & Berater Website Sprint` as a productized request system:
+- Product: `Authority Website Sprint` as a productized request system:
   four sales-relevant pages, legal-page structure and contact/booking funnel.
 - Price: `2,490 EUR` net plus applicable VAT.
 - Payment: `50%` Stripe deposit (`1,245 EUR` net) at order start.
@@ -18,7 +18,8 @@ Offer configuration:
 ## User Flow
 
 1. Visitor opens `/online-first`.
-2. `/online-first/fit` collects project fit, attribution and consent information.
+2. `/online-first/fit` collects structured project-fit, attribution and consent
+   information.
 3. `POST /api/public/fit-check` creates a CRM lead and `sales_submissions` row.
 4. Qualified visitors accept B2B/terms confirmation and call
    `POST /api/public/checkout`.
@@ -35,25 +36,35 @@ Landing-page positioning:
 - The public offer is framed as a professional request system for coaches,
   consultants and expert service providers, rather than generic web design.
 - The sales page includes problem/solution framing, package fit filtering,
-  before/after transformation, trust context, FAQ and a future extensions area.
-- Customer examples and testimonials must only be published after suitable
-  permissions and approved material are available.
+  before/after transformation, a references area, trust context, FAQ and a
+  future extensions area.
+- Listed references are Sprachbrücke Frankfurt, Carlos Restrepo Guitarist and
+  Brandary; Brandary is explicitly presented as Online First's own B2B brand
+  project rather than a customer project.
+- Calls to action use `Projekt-Fit prüfen` and lead into structured
+  qualification instead of a simple contact capture.
 
 Existing functions retained:
 
 - The existing `online_first` 50/50 payment model is reused.
+- The internal package code `leadgen_website_5_page` is deliberately retained
+  for checkout and historical record compatibility; its customer-facing label
+  is `Authority Website Sprint`.
 - `status-workflow` remains responsible for ordinary won-lead handling and now
   avoids inserting a second order when a Stripe checkout already produced one.
 - Manual dashboard/CSV lead creation continues through `/api/leads`, behind login.
 
 ## Database Migration
 
-Apply `supabase/migrations/sales_funnel.sql` before deploying the dashboard code.
-It is additive and introduces:
+Apply `supabase/migrations/sales_funnel.sql` and the additive follow-up
+`supabase/migrations/sales_funnel_authority_fit_fields.sql` before deploying the
+dashboard code. They introduce:
 
 - Extra funnel, consent and attribution columns on `leads`.
 - Stripe correlation columns on `orders`.
-- `sales_submissions` for fit answers and routing decisions.
+- `sales_submissions` for fit answers and routing decisions, including offer,
+  target audience, current acquisition, preferred inquiry path, assets, budget
+  readiness and current online-presence challenge.
 - `sales_checkout_sessions` for idempotent payment fulfillment.
 - `consent_events` for versioned evidence.
 - `project_briefings` for paid-customer implementation input.

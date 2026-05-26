@@ -22,7 +22,7 @@ type Result = {
 
 const fieldClass = "mt-2 w-full rounded-xl border border-[#DED7C9] bg-white px-4 py-3 text-sm outline-none focus:border-[#1B2A5E]";
 const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-const bookingUrl = process.env.NEXT_PUBLIC_BOOKING_URL || "mailto:info@onlinefirst.eu?subject=Erstgespraech%20Website%20Sprint";
+const bookingUrl = process.env.NEXT_PUBLIC_BOOKING_URL || "mailto:info@onlinefirst.eu?subject=Erstgespraech%20Authority%20Website%20Sprint";
 const previewMode = process.env.NEXT_PUBLIC_ONLINE_FIRST_PREVIEW_MODE === "true";
 
 export default function FitPage() {
@@ -55,12 +55,20 @@ export default function FitPage() {
       company_name: form.get("company_name"),
       website: form.get("website"),
       profession: form.get("profession"),
+      offer_description: form.get("offer_description"),
+      target_audience: form.get("target_audience"),
+      offer_price_range: form.get("offer_price_range"),
+      acquisition_channel: form.get("acquisition_channel"),
+      website_status: form.get("website_status"),
       primary_goal: form.get("primary_goal"),
+      funnel_preference: form.get("funnel_preference"),
       timeline: form.get("timeline"),
       pages_required: form.get("pages_required"),
+      assets_status: form.get("assets_status"),
+      budget_readiness: form.get("budget_readiness"),
+      biggest_challenge: form.get("biggest_challenge"),
       needs_shop: form.get("needs_shop") === "on",
       needs_custom_features: form.get("needs_custom_features") === "on",
-      content_ready: form.get("content_ready") === "on",
       privacy_consent: form.get("privacy_consent") === "on",
       marketing_consent: form.get("marketing_consent") === "on",
       website_confirmation: form.get("website_confirmation"),
@@ -82,7 +90,7 @@ export default function FitPage() {
     });
     const data = await response.json();
     if (!response.ok) {
-      setError(data.error || "Der Fit-Check konnte nicht abgeschlossen werden.");
+      setError(data.error || "Der Projekt-Fit konnte nicht abgeschlossen werden.");
     } else {
       setResult(data);
     }
@@ -118,16 +126,17 @@ export default function FitPage() {
         <Link href="/online-first" className="text-sm text-[#536079]">← Zurück zum Angebot</Link>
         {previewMode && (
           <p className="mt-6 rounded-xl border border-[#E5DDCE] bg-[#FFF8EA] p-4 text-sm text-[#7A5C25]">
-            Vorschau: Der Fit-Check zeigt das Routing, speichert aber keine Kundendaten und startet keine Zahlung.
+            Vorschau: Der Projekt-Fit zeigt das Routing, speichert aber keine Kundendaten und startet keine Zahlung.
           </p>
         )}
         <div className="mt-8 rounded-3xl border border-[#E5DDCE] bg-white p-6 shadow-sm sm:p-10">
           {!result ? (
             <>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#A07840]">Fit-Check</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#A07840]">Projekt-Fit</p>
               <h1 className="mt-4 font-serif text-4xl font-light">Ist das Paket der richtige Start?</h1>
               <p className="mt-4 text-sm leading-7 text-[#536079]">
-                In wenigen Minuten prüfen wir, ob Ihre Website direkt als Festpreisprojekt starten kann.
+                In wenigen Minuten prüfen wir, ob der Authority Website Sprint zu Angebot,
+                Zielgruppe und gewünschtem Anfrageprozess passt.
               </p>
               <form className="mt-9 space-y-6" onSubmit={submitFit}>
                 <input className="hidden" name="website_confirmation" tabIndex={-1} autoComplete="off" />
@@ -145,9 +154,17 @@ export default function FitPage() {
                     <input className={fieldClass} name="company_name" />
                   </label>
                 </div>
-                <label className="block text-sm font-medium">Bestehende Website
-                  <input className={fieldClass} type="url" name="website" placeholder="https://" />
-                </label>
+                <div className="border-t border-[#EEE8DC] pt-6">
+                  <p className="mb-5 text-xs font-semibold uppercase tracking-[0.18em] text-[#A07840]">Angebot und Zielgruppe</p>
+                  <div className="space-y-5">
+                    <label className="block text-sm font-medium">Was bieten Sie an? *
+                      <textarea className={`${fieldClass} min-h-24 resize-y`} name="offer_description" required placeholder="Zum Beispiel: Führungskräfte-Coaching für neue Teamleiter" />
+                    </label>
+                    <label className="block text-sm font-medium">Wer ist Ihre Zielgruppe? *
+                      <textarea className={`${fieldClass} min-h-24 resize-y`} name="target_audience" required placeholder="Für wen ist Ihr Angebot konkret gedacht?" />
+                    </label>
+                  </div>
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-medium">Tätigkeit *
                     <select className={fieldClass} name="profession" required defaultValue="">
@@ -157,6 +174,43 @@ export default function FitPage() {
                       <option value="other">Andere Dienstleistung</option>
                     </select>
                   </label>
+                  <label className="text-sm font-medium">Preisrahmen Ihres Angebots *
+                    <select className={fieldClass} name="offer_price_range" required defaultValue="">
+                      <option value="" disabled>Bitte wählen</option>
+                      <option value="under_1000">Unter 1.000 EUR</option>
+                      <option value="1000_to_3000">1.000 bis 3.000 EUR</option>
+                      <option value="3000_to_10000">3.000 bis 10.000 EUR</option>
+                      <option value="over_10000">Über 10.000 EUR</option>
+                      <option value="varies">Variiert / noch offen</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-medium">Wie gewinnen Sie aktuell Anfragen? *
+                    <select className={fieldClass} name="acquisition_channel" required defaultValue="">
+                      <option value="" disabled>Bitte wählen</option>
+                      <option value="referrals">Empfehlungen</option>
+                      <option value="linkedin">LinkedIn</option>
+                      <option value="instagram">Instagram</option>
+                      <option value="ads">Ads</option>
+                      <option value="website">Bestehende Website / SEO</option>
+                      <option value="mixed">Mehrere Kanäle</option>
+                      <option value="none">Noch keine verlässliche Quelle</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-medium">Haben Sie bereits eine Website? *
+                    <select className={fieldClass} name="website_status" required defaultValue="">
+                      <option value="" disabled>Bitte wählen</option>
+                      <option value="live_needs_update">Ja, sie soll überarbeitet werden</option>
+                      <option value="live_replace">Ja, sie soll ersetzt werden</option>
+                      <option value="none">Nein, noch nicht</option>
+                    </select>
+                  </label>
+                </div>
+                <label className="block text-sm font-medium">Website-Adresse, falls vorhanden
+                  <input className={fieldClass} type="url" name="website" placeholder="https://" />
+                </label>
+                <div className="border-t border-[#EEE8DC] pt-6">
+                  <p className="mb-5 text-xs font-semibold uppercase tracking-[0.18em] text-[#A07840]">Ziel und Umsetzung</p>
+                  <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm font-medium">Hauptziel *
                     <select className={fieldClass} name="primary_goal" required defaultValue="lead_generation">
                       <option value="lead_generation">Mehr qualifizierte Anfragen</option>
@@ -164,7 +218,16 @@ export default function FitPage() {
                       <option value="launch">Neues Angebot launchen</option>
                     </select>
                   </label>
-                  <label className="text-sm font-medium">Gewünschter Start *
+                  <label className="text-sm font-medium">Kontakt oder Terminbuchung? *
+                    <select className={fieldClass} name="funnel_preference" required defaultValue="">
+                      <option value="" disabled>Bitte wählen</option>
+                      <option value="contact_form">Qualifiziertes Kontaktformular</option>
+                      <option value="booking">Direkte Terminbuchung</option>
+                      <option value="both">Beides kombiniert</option>
+                      <option value="unsure">Noch offen</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-medium">Wann soll die Website online sein? *
                     <select className={fieldClass} name="timeline" required defaultValue="within_60_days">
                       <option value="within_30_days">Innerhalb von 30 Tagen</option>
                       <option value="within_60_days">Innerhalb von 60 Tagen</option>
@@ -177,9 +240,28 @@ export default function FitPage() {
                       <option value="more_than_5">Mehr als 5 Seiten</option>
                     </select>
                   </label>
+                  <label className="text-sm font-medium">Texte, Bilder oder Branding *
+                    <select className={fieldClass} name="assets_status" required defaultValue="">
+                      <option value="" disabled>Bitte wählen</option>
+                      <option value="ready">Bereits weitgehend vorhanden</option>
+                      <option value="partial">Teilweise vorhanden</option>
+                      <option value="needed">Muss noch entwickelt werden</option>
+                    </select>
+                  </label>
+                  <label className="text-sm font-medium">Budget ab 2.490 EUR netto *
+                    <select className={fieldClass} name="budget_readiness" required defaultValue="">
+                      <option value="" disabled>Bitte wählen</option>
+                      <option value="confirmed">Ist grundsätzlich eingeplant</option>
+                      <option value="clarify">Muss noch abgestimmt werden</option>
+                      <option value="not_planned">Ist aktuell nicht eingeplant</option>
+                    </select>
+                  </label>
+                  </div>
                 </div>
+                <label className="block text-sm font-medium">Was ist aktuell die größte Herausforderung mit Ihrer Website oder Online-Präsenz? *
+                  <textarea className={`${fieldClass} min-h-28 resize-y`} name="biggest_challenge" required />
+                </label>
                 <div className="space-y-3 rounded-xl bg-[#F8F7F2] p-5 text-sm">
-                  <label className="flex gap-3"><input type="checkbox" name="content_ready" /> Texte/Branding sind bereits teilweise vorhanden.</label>
                   <label className="flex gap-3"><input type="checkbox" name="needs_shop" /> Ich benötige Shop- oder Zahlungsfunktionen auf der Website.</label>
                   <label className="flex gap-3"><input type="checkbox" name="needs_custom_features" /> Ich benötige spezielle Integrationen oder individuelle Funktionen.</label>
                 </div>
@@ -196,7 +278,7 @@ export default function FitPage() {
                 {siteKey && <div ref={captchaRef} />}
                 {error && <p className="rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</p>}
                 <button disabled={pending} className="w-full rounded-full bg-[#1B2A5E] px-7 py-4 font-semibold text-white disabled:opacity-60">
-                  {pending ? "Wird geprüft..." : "Fit prüfen"}
+                  {pending ? "Wird geprüft..." : "Projekt-Fit prüfen"}
                 </button>
               </form>
             </>
@@ -206,7 +288,7 @@ export default function FitPage() {
               <h1 className="mt-4 font-serif text-4xl font-light">Sie können direkt starten.</h1>
               <p className="mt-5 text-[#536079]">{result.reason}</p>
               <div className="mt-8 rounded-2xl bg-[#F8F7F2] p-6">
-                <p className="font-semibold">Coach &amp; Berater Website Sprint</p>
+                <p className="font-semibold">Authority Website Sprint</p>
                 <p className="mt-2 text-sm text-[#536079]">
                   4 verkaufsrelevante Seiten, Pflichtseiten-Struktur und Kontakt- oder Termin-Funnel
                 </p>
