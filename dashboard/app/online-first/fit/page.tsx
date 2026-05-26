@@ -22,7 +22,7 @@ type Result = {
 
 const fieldClass = "mt-2 w-full rounded-xl border border-[#DED7C9] bg-white px-4 py-3 text-sm outline-none focus:border-[#1B2A5E]";
 const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-const bookingUrl = process.env.NEXT_PUBLIC_BOOKING_URL || "mailto:info@onlinefirst.eu?subject=Erstgespraech%20Leadgen-Website";
+const bookingUrl = process.env.NEXT_PUBLIC_BOOKING_URL || "mailto:info@onlinefirst.eu?subject=Erstgespraech%20Website%20Sprint";
 const previewMode = process.env.NEXT_PUBLIC_ONLINE_FIRST_PREVIEW_MODE === "true";
 
 export default function FitPage() {
@@ -206,8 +206,11 @@ export default function FitPage() {
               <h1 className="mt-4 font-serif text-4xl font-light">Sie können direkt starten.</h1>
               <p className="mt-5 text-[#536079]">{result.reason}</p>
               <div className="mt-8 rounded-2xl bg-[#F8F7F2] p-6">
-                <p className="font-semibold">Leadgen-Website · 5 Seiten + Funnel</p>
-                <p className="mt-2 text-sm text-[#536079]">Gesamtpreis: 2.490 EUR netto zzgl. USt.</p>
+                <p className="font-semibold">Coach &amp; Berater Website Sprint</p>
+                <p className="mt-2 text-sm text-[#536079]">
+                  4 verkaufsrelevante Seiten, Pflichtseiten-Struktur und Kontakt- oder Termin-Funnel
+                </p>
+                <p className="mt-3 text-sm text-[#536079]">Gesamtpreis: 2.490 EUR netto zzgl. USt.</p>
                 <p className="mt-5 font-serif text-3xl">1.245 EUR netto</p>
                 <p className="text-sm text-[#536079]">Anzahlung jetzt, Restzahlung nach Abnahme</p>
               </div>

@@ -8,7 +8,8 @@ replacing the existing Founder OS CRM.
 Offer configuration:
 
 - Audience: German B2B consultants and coaches.
-- Product: five-page lead-generation website with contact/booking funnel.
+- Product: `Coach & Berater Website Sprint` as a productized request system:
+  four sales-relevant pages, legal-page structure and contact/booking funnel.
 - Price: `2,490 EUR` net plus applicable VAT.
 - Payment: `50%` Stripe deposit (`1,245 EUR` net) at order start.
 - Routing: fit projects enter checkout; shop, custom-integration or larger
@@ -28,6 +29,15 @@ Offer configuration:
    input into the paid order and advances it into processing.
 8. Founder OS `/dashboard` reports fit checks, checkout starts, deposits and
    net deposit revenue for the month.
+
+Landing-page positioning:
+
+- The public offer is framed as a professional request system for coaches,
+  consultants and expert service providers, rather than generic web design.
+- The sales page includes problem/solution framing, package fit filtering,
+  before/after transformation, trust context, FAQ and a future extensions area.
+- Customer examples and testimonials must only be published after suitable
+  permissions and approved material are available.
 
 Existing functions retained:
 

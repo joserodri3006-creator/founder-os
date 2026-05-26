@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const ONLINE_FIRST_PACKAGE = {
   code: "leadgen_website_5_page",
-  label: "Leadgen-Website fuer Berater und Coaches",
+  label: "Coach & Berater Website Sprint",
   netPriceCents: 249000,
   depositNetCents: 124500,
   termsVersion: "online-first-b2b-v1-2026-05-26",
@@ -69,7 +69,7 @@ export function evaluateFit(input: FitInput) {
   return {
     score: Math.min(score, 100),
     status: "checkout_ready" as const,
-    reason: "Das Vorhaben passt zum standardisierten Leadgen-Website-Paket.",
+    reason: "Das Vorhaben passt zum standardisierten Coach & Berater Website Sprint.",
   };
 }
 

@@ -159,7 +159,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - `/einstellungen/produkttypen` — Produkttypen pro Venture konfigurieren
 - `/einstellungen/marken` — Marken/Brands pro Venture verwalten
 - `/einstellungen/steuern` — Steuerklassen + Steuersätze pro Venture (P1.4 ✅)
-- `/online-first` — oeffentliche B2B-Landingpage fuer Leadgen-Websites
+- `/online-first` — oeffentliche Salespage fuer den produktisierten `Coach & Berater Website Sprint` als Anfrage-System (Problem/Loesung, Passungsfilter, Transformation, FAQ, spaetere Erweiterungen)
 - `/online-first/fit` — Fit-Check mit Checkout-/Termin-Routing
 - `/online-first/erfolg`, `/online-first/briefing`, `/online-first/rechtliches` — Checkout-Uebergabe und Launch-Gate
 
