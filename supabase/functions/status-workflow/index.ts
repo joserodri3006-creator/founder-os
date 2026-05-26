@@ -220,14 +220,22 @@ Deno.serve(async (req) => {
 
         // Order anlegen
         if (customerId) {
-          const { error: orderError } = await supabase.from("orders").insert({
-            venture: lead.venture,
-            customer_id: customerId,
-            lead_id: lead.id,
-            title: `Webdesign-Projekt — ${lead.company_name ?? `${lead.first_name} ${lead.last_name}`}`,
-            status: "neu",
-          });
-          if (orderError) console.error("Order-Anlage fehlgeschlagen:", orderError);
+          const { data: existingOrder } = await supabase
+            .from("orders")
+            .select("id")
+            .eq("lead_id", lead.id)
+            .maybeSingle();
+
+          if (!existingOrder) {
+            const { error: orderError } = await supabase.from("orders").insert({
+              venture: lead.venture,
+              customer_id: customerId,
+              lead_id: lead.id,
+              title: `Webdesign-Projekt — ${lead.company_name ?? `${lead.first_name} ${lead.last_name}`}`,
+              status: "neu",
+            });
+            if (orderError) console.error("Order-Anlage fehlgeschlagen:", orderError);
+          }
         }
         break;
       }

@@ -21,6 +21,9 @@ export async function GET(req: NextRequest) {
     { data: newCustomers },
     { data: recentLeads },
     { count: followUpsFaellig },
+    { count: fitChecks },
+    { count: checkoutStarts },
+    { data: paidCheckouts },
   ] = await Promise.all([
     supabaseAdmin
       .from("leads")
@@ -64,6 +67,25 @@ export async function GET(req: NextRequest) {
       .lte("follow_up_date", today)
       .not("follow_up_date", "is", null)
       .is("archived_at", null),
+
+    supabaseAdmin
+      .from("sales_submissions")
+      .select("id", { count: "exact", head: true })
+      .eq("venture", venture)
+      .gte("created_at", monthStart),
+
+    supabaseAdmin
+      .from("sales_checkout_sessions")
+      .select("id,sales_submissions!inner(venture)", { count: "exact", head: true })
+      .eq("sales_submissions.venture", venture)
+      .gte("created_at", monthStart),
+
+    supabaseAdmin
+      .from("sales_checkout_sessions")
+      .select("amount_net_cents,sales_submissions!inner(venture)")
+      .eq("sales_submissions.venture", venture)
+      .eq("status", "paid")
+      .gte("paid_at", monthStart),
   ]);
 
   return NextResponse.json({
@@ -75,5 +97,14 @@ export async function GET(req: NextRequest) {
     },
     followUpsFaellig: followUpsFaellig ?? 0,
     recentLeads:      recentLeads ?? [],
+    salesFunnel: {
+      fitChecks: fitChecks ?? 0,
+      checkoutStarts: checkoutStarts ?? 0,
+      depositsPaid: (paidCheckouts ?? []).length,
+      depositRevenueNetCents: (paidCheckouts ?? []).reduce(
+        (sum, checkout) => sum + (checkout.amount_net_cents ?? 0),
+        0
+      ),
+    },
   });
 }

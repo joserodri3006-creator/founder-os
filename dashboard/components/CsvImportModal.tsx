@@ -122,12 +122,11 @@ export default function CsvImportModal({ onClose, onImported }: Props) {
     for (let i = 0; i < validRows.length; i++) {
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/lead-intake`,
+          "/api/leads",
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
             },
             body: JSON.stringify(buildPayload(validRows[i])),
           }

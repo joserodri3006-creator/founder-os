@@ -17,6 +17,12 @@ interface DashboardData {
   kpi: Kpi;
   followUpsFaellig: number;
   recentLeads: Lead[];
+  salesFunnel?: {
+    fitChecks: number;
+    checkoutStarts: number;
+    depositsPaid: number;
+    depositRevenueNetCents: number;
+  };
 }
 
 const DAYS   = ["Sonntag","Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag"];
@@ -61,7 +67,7 @@ export default function DashboardPage() {
   );
   if (!data) return null;
 
-  const { kpi, followUpsFaellig, recentLeads } = data;
+  const { kpi, followUpsFaellig, recentLeads, salesFunnel } = data;
 
   return (
     <div className="px-4 py-5 sm:p-8 max-w-7xl mx-auto">
@@ -149,6 +155,33 @@ export default function DashboardPage() {
           href="/kunden"
         />
       </div>
+
+      {venture === "online_first" && salesFunnel && (
+        <div className="mb-8 rounded-2xl border border-[#D1D5E8] bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: "#C8A96E" }}>
+                Automatisierter Vertrieb
+              </p>
+              <h2 className="mt-1 text-lg font-semibold" style={{ color: "#14193A" }}>
+                Funnel im aktuellen Monat
+              </h2>
+            </div>
+            <Link href="/online-first" className="text-sm font-medium" style={{ color: "#3A5BA0" }}>
+              Landingpage
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <FunnelMetric label="Fit-Checks" value={String(salesFunnel.fitChecks)} />
+            <FunnelMetric label="Checkout-Starts" value={String(salesFunnel.checkoutStarts)} />
+            <FunnelMetric label="Anzahlungen" value={String(salesFunnel.depositsPaid)} />
+            <FunnelMetric
+              label="Anzahlung netto"
+              value={`${(salesFunnel.depositRevenueNetCents / 100).toLocaleString("de-DE")} EUR`}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Neueste Leads */}
       <div
@@ -246,6 +279,15 @@ export default function DashboardPage() {
           </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FunnelMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl p-4" style={{ background: "#F7F8FC" }}>
+      <p className="text-xs" style={{ color: "#6B7280" }}>{label}</p>
+      <p className="mt-2 text-xl font-semibold" style={{ color: "#14193A" }}>{value}</p>
     </div>
   );
 }

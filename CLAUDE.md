@@ -38,6 +38,8 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 | Founder-Interface | Next.js Dashboard (Vercel) | Live unter Vercel-URL |
 | E-Commerce | WooCommerce REST API | Blazed Outfitters, Brandary Shop |
 | E-Mail | Resend.com | Transaktional + Campaigns (Domain onlinefirst.eu verifiziert) |
+| Payment | Stripe Checkout | Online-First B2B-Anzahlung im oeffentlichen Funnel |
+| Bot-Schutz | Cloudflare Turnstile | Oeffentliche Formular-Submissions |
 | Social Media | Buffer API | Content-Scheduling |
 | Dokumente | Google Drive | Reports, Vorlagen, Ablage |
 
@@ -86,7 +88,17 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 
 **orders-Spalten:**
 `invoice_number`, `invoice_generated_at`, `invoice_html`, `invoice_data` (JSONB),
-`payment_model_id`, `payment_steps` (JSONB), `invoice_sent`, `anzahlung_erhalten`, `restzahlung_erhalten`
+`payment_model_id`, `payment_steps` (JSONB), `invoice_sent`, `anzahlung_erhalten`, `restzahlung_erhalten`,
+`stripe_checkout_session_id`, `stripe_payment_intent_id`, `checkout_source`,
+`briefing_token`, `briefing_completed_at`
+
+**Online-First Sales-Funnel (Migration `sales_funnel.sql`):**
+- `sales_submissions` — Fit-Check-Antworten, Routing, Attribution und Consent-Verknuepfung
+- `sales_checkout_sessions` — Stripe-Checkout und idempotente Zahlungsuebergabe
+- `consent_events` — versionierte Datenschutz-, Marketing-, AGB- und B2B-Nachweise
+- `project_briefings` — strukturierte Projektangaben nach erfolgreicher Anzahlung
+- `public_request_limits` — Rate-Limit-Ereignisse oeffentlicher Formularrouten
+- `leads` ergaenzt um `funnel_stage`, `fit_status`, `fit_score`, Consent und Attribution
 
 **Views:** `v_lead_pipeline`, `v_due_follow_ups`, `v_daily_new_leads`, `v_reactivation_today`
 
@@ -105,7 +117,8 @@ Password: [in .env.local / Vercel env vars]
 ```
 
 MCP-Config: `~/.claude/settings.json` → `@modelcontextprotocol/server-postgres`
-Direktverbindung Node.js: password = `Jlraxx3006?!`
+Credentials duerfen ausschliesslich in lokalen Umgebungsvariablen bzw. dem
+Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert werden.
 
 ---
 
@@ -146,6 +159,9 @@ Direktverbindung Node.js: password = `Jlraxx3006?!`
 - `/einstellungen/produkttypen` — Produkttypen pro Venture konfigurieren
 - `/einstellungen/marken` — Marken/Brands pro Venture verwalten
 - `/einstellungen/steuern` — Steuerklassen + Steuersätze pro Venture (P1.4 ✅)
+- `/online-first` — oeffentliche B2B-Landingpage fuer Leadgen-Websites
+- `/online-first/fit` — Fit-Check mit Checkout-/Termin-Routing
+- `/online-first/erfolg`, `/online-first/briefing`, `/online-first/rechtliches` — Checkout-Uebergabe und Launch-Gate
 
 ### Globale Features
 - **Venture Switcher** in Sidebar — persistiert in localStorage, alle Seiten reagieren
@@ -156,6 +172,8 @@ Direktverbindung Node.js: password = `Jlraxx3006?!`
 - **Anhänge** — Datei-Upload/Download/Löschen mit optionaler Beschreibung (Supabase Storage Bucket `attachments`)
 - **Notizen** — Freitextfeld mit Auto-Save (1s Debounce) auf Kunden, Aufträgen, Produkten
 - **system_config upsert** — neue Keys werden automatisch angelegt
+- **Sales Funnel KPI** — Fit-Checks, Checkout-Starts und Stripe-Anzahlungen fuer Online First
+- **API-Zugriffsschutz** — `proxy.ts` verlangt Sitzungen und prueft Section-Permissions vor internen Service-Role-Routen
 
 ---
 
@@ -324,12 +342,24 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 RESEND_API_KEY
+NEXT_PUBLIC_SITE_URL
+NEXT_PUBLIC_TURNSTILE_SITE_KEY
+NEXT_PUBLIC_BOOKING_URL
+TURNSTILE_SECRET_KEY
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+ONLINE_FIRST_LEGAL_APPROVED
 ```
 
 ---
 
 ## Offene Punkte (Phase 1)
 
+- [ ] **KRITISCH:** geleaktes Supabase-DB-Passwort rotieren und Git-Historie bereinigen (siehe `SECURITY.md`)
+- [ ] `sales_funnel.sql` in Supabase ausfuehren und aktualisierte Edge Functions deployen
+- [ ] Stripe/Turnstile/Booking-Variablen konfigurieren und Webhook registrieren
+- [ ] Deutsche B2B-Vertrags-, Datenschutz- und Trackingtexte juristisch pruefen; erst danach `ONLINE_FIRST_LEGAL_APPROVED=true`
+- [ ] Entity-level Venture-Checks fuer dynamische interne API-IDs vor breiter Teamfreigabe ergaenzen
 - [ ] pgvector Extension aktivieren (Supabase Dashboard → Extensions → vector)
 - [ ] `worknest` zum `venture` Enum hinzufügen (aktuell nicht in DB)
 - [ ] Vercel-URL in dieses Dokument eintragen sobald bekannt
@@ -361,4 +391,4 @@ RESEND_API_KEY
 
 ---
 
-*Zuletzt aktualisiert: 2026-04-09 — P1 Features vollständig: P1.1 Aktionspreis, P1.2 Kategorien 3-Ebenen, P1.3 SEO-Felder, P1.4 Steuer-Konfiguration, P1.5 Storefront-Sync (WooCommerce)*
+*Zuletzt aktualisiert: 2026-05-26 — Online-First Sales Funnel, Checkout-Integration und Security-Hardening im Branch `codex/automated-sales-platform`; Deployment-Schritte siehe `docs/ONLINE_FIRST_SALES.md` und `SECURITY.md`.*

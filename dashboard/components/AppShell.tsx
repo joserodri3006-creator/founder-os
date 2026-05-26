@@ -4,13 +4,13 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 
-const AUTH_PATHS = ["/login", "/invite", "/auth"];
+const SHELL_FREE_PATHS = ["/login", "/invite", "/auth", "/online-first"];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
-  const isAuthPage = AUTH_PATHS.some((p) => pathname?.startsWith(p));
+  const isAuthPage = SHELL_FREE_PATHS.some((p) => pathname?.startsWith(p));
 
   return (
     <div className="flex h-screen overflow-hidden">

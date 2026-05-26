@@ -20,42 +20,66 @@ interface LeadPayload {
   source?: LeadSource;
   venture?: Venture;
   automation_enabled?: boolean;
+  turnstile_token?: string;
 }
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, content-type",
-  "Content-Type": "application/json",
-};
+function cors(origin: string | null) {
+  const permittedOrigin = Deno.env.get("PUBLIC_SITE_ORIGIN") ?? "";
+  return {
+    "Access-Control-Allow-Origin": origin && origin === permittedOrigin ? origin : permittedOrigin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, content-type",
+    "Content-Type": "application/json",
+    "Vary": "Origin",
+  };
+}
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get("origin");
+  const headers = cors(origin);
+  const permittedOrigin = Deno.env.get("PUBLIC_SITE_ORIGIN");
+  if (!permittedOrigin || (origin && origin !== permittedOrigin)) {
+    return new Response(JSON.stringify({ error: "Origin not allowed" }), { status: 403, headers });
+  }
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS });
+    return new Response(null, { status: 204, headers });
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: CORS });
+    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers });
   }
 
   let payload: LeadPayload;
   try {
     payload = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers: CORS });
+    return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers });
+  }
+
+  const turnstileSecret = Deno.env.get("TURNSTILE_SECRET_KEY");
+  if (!turnstileSecret || !payload.turnstile_token) {
+    return new Response(JSON.stringify({ error: "Security verification required" }), { status: 403, headers });
+  }
+  const verification = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    body: new URLSearchParams({ secret: turnstileSecret, response: payload.turnstile_token }),
+  }).then((response) => response.json()).catch(() => ({ success: false }));
+  if (!verification.success) {
+    return new Response(JSON.stringify({ error: "Security verification failed" }), { status: 403, headers });
   }
 
   const { first_name, last_name, email } = payload;
   if (!first_name?.trim() || !last_name?.trim() || !email?.trim()) {
     return new Response(
       JSON.stringify({ error: "first_name, last_name und email sind Pflichtfelder" }),
-      { status: 400, headers: CORS }
+      { status: 400, headers }
     );
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
-    return new Response(JSON.stringify({ error: "Ungültige E-Mail-Adresse" }), { status: 400, headers: CORS });
+    return new Response(JSON.stringify({ error: "Ungueltige E-Mail-Adresse" }), { status: 400, headers });
   }
 
   const supabase = createClient(
@@ -106,7 +130,7 @@ Deno.serve(async (req) => {
 
   if (error) {
     console.error("DB Insert Error:", error);
-    return new Response(JSON.stringify({ error: "Datenbankfehler", detail: error.message }), { status: 500, headers: CORS });
+    return new Response(JSON.stringify({ error: "Datenbankfehler", detail: error.message }), { status: 500, headers });
   }
 
   // Lead-Qualifizierung asynchron triggern (nur bei nicht-Duplikat)
@@ -139,6 +163,6 @@ Deno.serve(async (req) => {
 
   return new Response(
     JSON.stringify({ success: true, duplicate: isDuplicate, lead }),
-    { status: 201, headers: CORS }
+    { status: 201, headers }
   );
 });

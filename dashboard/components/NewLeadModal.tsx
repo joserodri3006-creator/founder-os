@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useVenture } from "@/context/VentureContext";
 
 const SOURCES = ["website", "linkedin", "empfehlung", "kaltakquise", "ki_suche", "csv_import"] as const;
@@ -50,12 +49,11 @@ export default function NewLeadModal({ onClose, onCreated }: Props) {
 
     try {
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/lead-intake`,
+        "/api/leads",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
           },
           body: JSON.stringify({
             first_name: form.first_name.trim(),

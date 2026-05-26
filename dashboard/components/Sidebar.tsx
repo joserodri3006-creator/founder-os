@@ -23,7 +23,8 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/invite") ||
-    pathname.startsWith("/auth")
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/online-first")
   ) {
     return null;
   }

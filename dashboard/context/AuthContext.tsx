@@ -91,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    const isPublicRoute = ["/login", "/auth", "/invite"].some(p =>
+    const isPublicRoute = ["/login", "/auth", "/invite", "/online-first"].some(p =>
       window.location.pathname.startsWith(p)
     );
 
