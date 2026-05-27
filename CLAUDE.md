@@ -40,7 +40,7 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 | E-Mail | Resend.com | Transaktional + Campaigns (Domain onlinefirst.eu verifiziert) |
 | Payment | Stripe Checkout | Online-First B2B-Anzahlung im oeffentlichen Funnel |
 | Bot-Schutz | Cloudflare Turnstile | Oeffentliche Formular-Submissions |
-| Lead-Recherche | Google Custom Search JSON API | Manuelle regionale Kandidatensuche fuer Online First |
+| Lead-Recherche | Serper Google Search API | Manuelle regionale Kandidatensuche fuer Online First; Google Custom Search nur Legacy-Fallback |
 | Social Media | Buffer API | Content-Scheduling |
 | Dokumente | Google Drive | Reports, Vorlagen, Ablage |
 
@@ -174,7 +174,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - **Notizen** — Freitextfeld mit Auto-Save (1s Debounce) auf Kunden, Aufträgen, Produkten
 - **system_config upsert** — neue Keys werden automatisch angelegt
 - **Sales Funnel KPI** — Fit-Checks, Checkout-Starts und Stripe-Anzahlungen fuer Online First
-- **Google Lead Search** — In `/leads` unabhaengig vom aktiven Venture sichtbar; Region-/Zielgruppen-Suche via serverseitiger Custom Search JSON API, Import nach gepruefter Kontaktperson/E-Mail stets nach `online_first` und ohne automatische Ansprache
+- **Google Lead Search** — In `/leads` unabhaengig vom aktiven Venture sichtbar; Region-/Zielgruppen-Suche via serverseitigem `SERPER_API_KEY`, Google Custom Search nur Legacy-Fallback, Import nach gepruefter Kontaktperson/E-Mail stets nach `online_first` und ohne automatische Ansprache
 - **API-Zugriffsschutz** — `proxy.ts` verlangt Sitzungen und prueft Section-Permissions vor internen Service-Role-Routen
 
 ---
@@ -351,6 +351,7 @@ TURNSTILE_SECRET_KEY
 STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 ONLINE_FIRST_LEGAL_APPROVED
+SERPER_API_KEY
 ```
 
 ---

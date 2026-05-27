@@ -33,9 +33,10 @@ application logs.
   Stripe Checkout Session ID.
 - Online checkout requires `ONLINE_FIRST_LEGAL_APPROVED=true`, so it cannot accept
   payments until approved B2B/legal documents are published.
-- Manual Google lead research keeps `GOOGLE_CUSTOM_SEARCH_API_KEY` and
-  `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` server-side; imported candidates require
-  reviewed contact details and start with outreach automation disabled.
+- Manual Google lead research keeps `SERPER_API_KEY` (or grandfathered
+  `GOOGLE_CUSTOM_SEARCH_API_KEY` / `GOOGLE_CUSTOM_SEARCH_ENGINE_ID`) server-side;
+  imported candidates require reviewed contact details and start with outreach
+  automation disabled.
 
 ## Remaining Hardening
 

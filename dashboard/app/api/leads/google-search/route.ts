@@ -14,12 +14,110 @@ type GoogleSearchItem = {
   snippet?: string;
 };
 
+type SerperSearchItem = {
+  title?: string;
+  link?: string;
+  snippet?: string;
+};
+
+type SearchResult = {
+  title: string;
+  company_name: string;
+  website: string;
+  display_link: string;
+  snippet: string;
+};
+
 function cleanText(value: unknown, maxLength = 200) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 
 function companyNameFromTitle(title: string) {
   return title.split(/\s[|–-]\s/)[0]?.trim().slice(0, 200) || title.slice(0, 200);
+}
+
+function normalizedResult(item: GoogleSearchItem): SearchResult | null {
+  const title = cleanText(item.title, 250);
+  const website = cleanText(item.link, 1000);
+  if (!title || !website) return null;
+  let displayLink = cleanText(item.displayLink, 250);
+  if (!displayLink) {
+    try {
+      displayLink = new URL(website).hostname;
+    } catch {
+      displayLink = website;
+    }
+  }
+  return {
+    title,
+    company_name: companyNameFromTitle(title),
+    website,
+    display_link: displayLink,
+    snippet: cleanText(item.snippet, 600),
+  };
+}
+
+async function searchWithSerper(apiKey: string, query: string, limit: number) {
+  const response = await fetch("https://google.serper.dev/search", {
+    method: "POST",
+    headers: {
+      "X-API-KEY": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ q: query, num: limit, gl: "de", hl: "de" }),
+    cache: "no-store",
+  });
+  const data = await response.json() as { organic?: SerperSearchItem[]; message?: string };
+  if (!response.ok) {
+    return {
+      error: data.message || "Die Google-Suche über Serper konnte nicht ausgefuehrt werden.",
+      status: response.status >= 500 ? 502 : 400,
+    };
+  }
+  return {
+    results: (data.organic ?? [])
+      .map((item) => normalizedResult(item))
+      .filter((item): item is SearchResult => Boolean(item)),
+    provider: "serper",
+  };
+}
+
+async function searchWithGoogleCustom(apiKey: string, engineId: string, query: string, limit: number) {
+  const params = new URLSearchParams({
+    key: apiKey,
+    cx: engineId,
+    q: query,
+    num: String(limit),
+    hl: "de",
+    gl: "de",
+    safe: "active",
+  });
+
+  const response = await fetch(`https://www.googleapis.com/customsearch/v1?${params}`, {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  const data = await response.json() as { items?: GoogleSearchItem[]; error?: { message?: string } };
+
+  if (!response.ok) {
+    if (data.error?.message?.includes("does not have the access to Custom Search JSON API")) {
+      return {
+        error: "Google Custom Search ist für neue Projekte nicht mehr verfügbar. Bitte SERPER_API_KEY in Vercel hinterlegen und neu deployen.",
+        status: 503,
+      };
+    }
+    return {
+      error: data.error?.message || "Die Google-Suche konnte nicht ausgefuehrt werden.",
+      status: response.status >= 500 ? 502 : 400,
+    };
+  }
+
+  return {
+    results: (data.items ?? [])
+      .map((item) => normalizedResult(item))
+      .filter((item): item is SearchResult => Boolean(item)),
+    provider: "google_custom_search",
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -43,12 +141,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ungueltige Zielgruppe." }, { status: 400 });
   }
 
-  const apiKey = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
-  const engineId = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID;
-  if (!apiKey || !engineId) {
+  const serperApiKey = process.env.SERPER_API_KEY;
+  const googleApiKey = process.env.GOOGLE_CUSTOM_SEARCH_API_KEY;
+  const googleEngineId = process.env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID;
+  if (!serperApiKey && (!googleApiKey || !googleEngineId)) {
     return NextResponse.json(
       {
-        error: "Google Search ist noch nicht konfiguriert. Bitte GOOGLE_CUSTOM_SEARCH_API_KEY und GOOGLE_CUSTOM_SEARCH_ENGINE_ID hinterlegen.",
+        error: "Google Search ist noch nicht konfiguriert. Bitte SERPER_API_KEY serverseitig in Vercel hinterlegen.",
         configurationRequired: true,
       },
       { status: 503 }
@@ -57,38 +156,13 @@ export async function POST(req: NextRequest) {
 
   const queryParts = [segmentTerm, specialization, region, "-jobs", "-stellenangebote"].filter(Boolean);
   const query = queryParts.join(" ");
-  const params = new URLSearchParams({
-    key: apiKey,
-    cx: engineId,
-    q: query,
-    num: String(limit),
-    hl: "de",
-    gl: "de",
-    safe: "active",
-  });
+  const search = serperApiKey
+    ? await searchWithSerper(serperApiKey, query, limit)
+    : await searchWithGoogleCustom(googleApiKey!, googleEngineId!, query, limit);
 
-  const response = await fetch(`https://www.googleapis.com/customsearch/v1?${params}`, {
-    headers: { Accept: "application/json" },
-    cache: "no-store",
-  });
-  const data = await response.json() as { items?: GoogleSearchItem[]; error?: { message?: string } };
-
-  if (!response.ok) {
-    return NextResponse.json(
-      { error: data.error?.message || "Die Google-Suche konnte nicht ausgefuehrt werden." },
-      { status: response.status >= 500 ? 502 : 400 }
-    );
+  if ("error" in search) {
+    return NextResponse.json({ error: search.error }, { status: search.status });
   }
 
-  const results = (data.items ?? [])
-    .filter((item) => item.link && item.title)
-    .map((item) => ({
-      title: cleanText(item.title, 250),
-      company_name: companyNameFromTitle(cleanText(item.title, 250)),
-      website: cleanText(item.link, 1000),
-      display_link: cleanText(item.displayLink, 250),
-      snippet: cleanText(item.snippet, 600),
-    }));
-
-  return NextResponse.json({ query, region, segment, results });
+  return NextResponse.json({ query, region, segment, provider: search.provider, results: search.results });
 }

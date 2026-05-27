@@ -11,8 +11,9 @@ Founder OS now provides a manual lead-research workflow for selling the
    of the currently selected venture.
 2. Choose a region such as `Hessen`, a target segment and an optional
    specialization.
-3. `POST /api/leads/google-search` requests up to ten results from Google's
-   official Custom Search JSON API.
+3. `POST /api/leads/google-search` requests up to ten Google results through
+   Serper. Existing grandfathered Google Custom Search credentials remain a
+   fallback only.
 4. The user reviews the websites, selects suitable candidates, supplies a
    contact person and business email, and explicitly confirms that both were
    checked on the public website.
@@ -26,25 +27,27 @@ or verification for outreach.
 
 ## Required Configuration
 
-Provide these server-side environment values in Vercel and local `.env.local`:
+Provide this server-side environment value in Vercel and local `.env.local`:
 
 ```text
-GOOGLE_CUSTOM_SEARCH_API_KEY=...
-GOOGLE_CUSTOM_SEARCH_ENGINE_ID=...
+SERPER_API_KEY=...
 ```
 
-Set up a Google Programmable Search Engine for web results and enable the Custom
-Search JSON API for the Google Cloud project owning the API key. Keys must never
-be exposed via `NEXT_PUBLIC_*`, committed to the repository or stored in browser
+Create the key in Serper and store it only server-side. Keys must never be
+exposed via `NEXT_PUBLIC_*`, committed to the repository or stored in browser
 configuration.
 
-Google's documented service requires the API key and Programmable Search Engine
-ID and returns results through its REST JSON interface. Google documents a daily
-free quota and paid usage beyond that quota; check the current quota and billing
-settings before enabling repeated prospecting.
+The former implementation used Google Custom Search JSON API. Google now states
+that this API is closed to new customers and existing customers must migrate by
+January 1, 2027. If grandfathered credentials are already available, Founder OS
+still accepts `GOOGLE_CUSTOM_SEARCH_API_KEY` and
+`GOOGLE_CUSTOM_SEARCH_ENGINE_ID` as a fallback when `SERPER_API_KEY` is absent.
 
 Official reference:
 <https://developers.google.com/custom-search/v1/overview?hl=de>
+
+Serper:
+<https://serper.dev/>
 
 ## Existing Automation
 
