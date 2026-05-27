@@ -174,7 +174,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - **Notizen** — Freitextfeld mit Auto-Save (1s Debounce) auf Kunden, Aufträgen, Produkten
 - **system_config upsert** — neue Keys werden automatisch angelegt
 - **Sales Funnel KPI** — Fit-Checks, Checkout-Starts und Stripe-Anzahlungen fuer Online First
-- **Google Lead Search** — Region-/Zielgruppen-Suche via serverseitiger Custom Search JSON API; Import erst nach gepruefter Kontaktperson/E-Mail und ohne automatische Ansprache
+- **Google Lead Search** — In `/leads` unabhaengig vom aktiven Venture sichtbar; Region-/Zielgruppen-Suche via serverseitiger Custom Search JSON API, Import nach gepruefter Kontaktperson/E-Mail stets nach `online_first` und ohne automatische Ansprache
 - **API-Zugriffsschutz** — `proxy.ts` verlangt Sitzungen und prueft Section-Permissions vor internen Service-Role-Routen
 
 ---

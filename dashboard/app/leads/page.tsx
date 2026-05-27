@@ -128,21 +128,19 @@ export default function LeadsPage() {
           <p className="text-sm mt-0.5" style={{ color: '#6B7280' }}>{leads.length} Leads</p>
         </div>
         <div className="flex items-center gap-2.5">
-          {venture === "online_first" && (
-            <button
-              onClick={() => setShowGoogleSearch(true)}
-              className="text-sm px-4 py-2 rounded-lg transition-colors font-medium"
-              style={{
-                border: '1.5px solid #D1D5E8',
-                background: '#FFFFFF',
-                color: '#14193A',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#EEF0F7')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#FFFFFF')}
-            >
-              Google Leads suchen
-            </button>
-          )}
+          <button
+            onClick={() => setShowGoogleSearch(true)}
+            className="text-sm px-4 py-2 rounded-lg transition-colors font-medium"
+            style={{
+              border: '1.5px solid #D1D5E8',
+              background: '#FFFFFF',
+              color: '#14193A',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#EEF0F7')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#FFFFFF')}
+          >
+            Google Leads suchen
+          </button>
           <button
             onClick={() => setShowCsvImport(true)}
             className="text-sm px-4 py-2 rounded-lg transition-colors font-medium"

@@ -7,7 +7,8 @@ Founder OS now provides a manual lead-research workflow for selling the
 
 ## Workflow
 
-1. In `/leads`, select the `Online First` venture and open `Google Leads suchen`.
+1. In `/leads`, open `Google Leads suchen`; the action is visible regardless
+   of the currently selected venture.
 2. Choose a region such as `Hessen`, a target segment and an optional
    specialization.
 3. `POST /api/leads/google-search` requests up to ten results from Google's
@@ -15,8 +16,9 @@ Founder OS now provides a manual lead-research workflow for selling the
 4. The user reviews the websites, selects suitable candidates, supplies a
    contact person and business email, and explicitly confirms that both were
    checked on the public website.
-5. Selected records are created through the existing `/api/leads` endpoint with
-   source `ki_suche`, a Google-research note and `automation_enabled=false`.
+5. Selected records are created for the `Online First` venture through the
+   existing `/api/leads` endpoint with source `ki_suche`, a Google-research
+   note and `automation_enabled=false`.
 
 Google results are deliberately not imported as immediately contactable leads
 without reviewed contact data. Search snippets are research context, not consent

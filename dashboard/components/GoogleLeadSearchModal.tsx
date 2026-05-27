@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useVenture } from "@/context/VentureContext";
 
 type SearchResult = {
   title: string;
@@ -28,7 +27,6 @@ interface Props {
 const fieldClass = "w-full rounded-lg border border-[#D1D5E8] bg-white px-3 py-2 text-sm outline-none focus:border-[#1B2A5E]";
 
 export default function GoogleLeadSearchModal({ onClose, onImported }: Props) {
-  const { venture } = useVenture();
   const [region, setRegion] = useState("Hessen");
   const [segment, setSegment] = useState("all");
   const [specialization, setSpecialization] = useState("");
@@ -106,7 +104,7 @@ export default function GoogleLeadSearchModal({ onClose, onImported }: Props) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            venture,
+            venture: "online_first",
             first_name: candidate.first_name,
             last_name: candidate.last_name,
             email: candidate.email,
@@ -157,6 +155,9 @@ export default function GoogleLeadSearchModal({ onClose, onImported }: Props) {
 
         <div className="overflow-y-auto p-6">
           <form onSubmit={search} className="rounded-xl border border-[#E5DDCE] bg-white p-5">
+            <p className="mb-5 rounded-lg bg-[#F2EFE8] px-4 py-3 text-sm text-[#536079]">
+              Gefundene und geprüfte Leads werden dem Venture <strong>Online First</strong> für den Authority Website Sprint zugeordnet.
+            </p>
             <div className="grid gap-4 sm:grid-cols-3">
               <label className="text-sm font-medium text-[#14193A]">Region
                 <input className={`mt-2 ${fieldClass}`} value={region} onChange={(event) => setRegion(event.target.value)} required placeholder="Hessen" />
