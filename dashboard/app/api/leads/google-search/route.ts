@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const SEGMENT_TERMS: Record<string, string> = {
   coaches: "Coach Coaching",
@@ -36,6 +37,34 @@ function companyNameFromTitle(title: string) {
   return title.split(/\s[|–-]\s/)[0]?.trim().slice(0, 200) || title.slice(0, 200);
 }
 
+function normalizeWebsite(value: string) {
+  try {
+    const url = new URL(value.startsWith("http") ? value : `https://${value}`);
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+    const path = url.pathname.replace(/\/+$/, "");
+    return `${host}${path === "/" ? "" : path}`;
+  } catch {
+    return value
+      .replace(/^https?:\/\//i, "")
+      .replace(/^www\./i, "")
+      .replace(/\/+$/, "")
+      .toLowerCase();
+  }
+}
+
+function websiteHost(value: string) {
+  try {
+    const url = new URL(value.startsWith("http") ? value : `https://${value}`);
+    return url.hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return value
+      .replace(/^https?:\/\//i, "")
+      .replace(/^www\./i, "")
+      .split("/")[0]
+      .toLowerCase();
+  }
+}
+
 function normalizedResult(item: GoogleSearchItem): SearchResult | null {
   const title = cleanText(item.title, 250);
   const website = cleanText(item.link, 1000);
@@ -55,6 +84,47 @@ function normalizedResult(item: GoogleSearchItem): SearchResult | null {
     display_link: displayLink,
     snippet: cleanText(item.snippet, 600),
   };
+}
+
+async function existingLeadWebsiteKeys() {
+  const { data, error } = await supabaseAdmin
+    .from("leads")
+    .select("website")
+    .eq("venture", "online_first")
+    .not("website", "is", null);
+
+  if (error) {
+    console.error("Google lead search duplicate filter failed:", error.message);
+    return { urls: new Set<string>(), hosts: new Set<string>() };
+  }
+
+  return (data ?? []).reduce(
+    (acc, lead) => {
+      if (typeof lead.website === "string" && lead.website.trim()) {
+        acc.urls.add(normalizeWebsite(lead.website));
+        acc.hosts.add(websiteHost(lead.website));
+      }
+      return acc;
+    },
+    { urls: new Set<string>(), hosts: new Set<string>() }
+  );
+}
+
+function filterAlreadyImported(results: SearchResult[], existing: { urls: Set<string>; hosts: Set<string> }) {
+  const seenUrls = new Set<string>();
+  const seenHosts = new Set<string>();
+
+  return results.filter((result) => {
+    const urlKey = normalizeWebsite(result.website);
+    const hostKey = websiteHost(result.website);
+    const isExisting = existing.urls.has(urlKey) || existing.hosts.has(hostKey);
+    const isRepeatedResult = seenUrls.has(urlKey) || seenHosts.has(hostKey);
+
+    seenUrls.add(urlKey);
+    seenHosts.add(hostKey);
+
+    return !isExisting && !isRepeatedResult;
+  });
 }
 
 async function searchWithSerper(apiKey: string, query: string, limit: number) {
@@ -164,5 +234,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: search.error }, { status: search.status });
   }
 
-  return NextResponse.json({ query, region, segment, provider: search.provider, results: search.results });
+  const existingWebsites = await existingLeadWebsiteKeys();
+  const filteredResults = filterAlreadyImported(search.results, existingWebsites);
+
+  return NextResponse.json({
+    query,
+    region,
+    segment,
+    provider: search.provider,
+    results: filteredResults,
+    filtered_count: search.results.length - filteredResults.length,
+  });
 }

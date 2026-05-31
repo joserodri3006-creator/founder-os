@@ -14,10 +14,13 @@ Founder OS now provides a manual lead-research workflow for selling the
 3. `POST /api/leads/google-search` requests up to ten Google results through
    Serper. Existing grandfathered Google Custom Search credentials remain a
    fallback only.
-4. The user reviews the websites, selects suitable candidates, supplies a
+4. Results whose website domain already exists in Online First leads are hidden
+   before the user sees the list. Duplicate domains inside the same search
+   response are also collapsed.
+5. The user reviews the websites, selects suitable candidates, supplies a
    contact person and business email, and explicitly confirms that both were
    checked on the public website.
-5. Selected records are created for the `Online First` venture through the
+6. Selected records are created for the `Online First` venture through the
    existing `/api/leads` endpoint with source `ki_suche`, a Google-research
    note and `automation_enabled=false`.
 

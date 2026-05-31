@@ -10,6 +10,12 @@ type SearchResult = {
   snippet: string;
 };
 
+type SearchResponse = {
+  query: string;
+  results: SearchResult[];
+  filtered_count?: number;
+};
+
 type Candidate = SearchResult & {
   selected: boolean;
   first_name: string;
@@ -48,12 +54,13 @@ export default function GoogleLeadSearchModal({ onClose, onImported }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ region, segment, specialization, limit: 10 }),
       });
-      const data = await response.json();
+      const data = await response.json() as SearchResponse & { error?: string };
       if (!response.ok) {
         setError(data.error || "Die Google-Suche konnte nicht ausgefuehrt werden.");
         setResults([]);
         return;
       }
+      const filteredCount = data.filtered_count ?? 0;
       setQuery(data.query);
       setResults(
         data.results.map((result: SearchResult) => ({
@@ -66,7 +73,13 @@ export default function GoogleLeadSearchModal({ onClose, onImported }: Props) {
           contact_verified: false,
         }))
       );
-      setMessage(`${data.results.length} Kandidaten gefunden. Bitte Kontaktangaben prüfen und passende Leads auswählen.`);
+      setMessage(
+        data.results.length
+          ? `${data.results.length} neue Kandidaten gefunden${filteredCount ? `, ${filteredCount} bereits gespeicherte Treffer ausgeblendet` : ""}. Bitte Kontaktangaben prüfen und passende Leads auswählen.`
+          : filteredCount
+            ? `Keine neuen Kandidaten gefunden. ${filteredCount} bereits gespeicherte Treffer wurden ausgeblendet.`
+            : "Keine Kandidaten gefunden. Bitte Region oder Spezialisierung anpassen."
+      );
     } catch {
       setError("Die Google-Suche ist aktuell nicht erreichbar. Bitte erneut versuchen.");
       setResults([]);
