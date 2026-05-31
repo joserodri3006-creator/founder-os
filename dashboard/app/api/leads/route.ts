@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+const REVIEW_COLUMNS = [
+  "review_status",
+  "lead_potential",
+  "contact_channel",
+  "next_action",
+  "review_notes",
+  "reviewed_at",
+];
+
+function isMissingReviewColumnError(message: string | undefined) {
+  return Boolean(message && REVIEW_COLUMNS.some((column) => message.includes(column)));
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
@@ -33,7 +46,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await buildQuery(reviewSelect);
   if (!error) return NextResponse.json(data ?? []);
 
-  if (!error.message.includes("review_status") && !error.message.includes("lead_potential")) {
+  if (!isMissingReviewColumnError(error.message)) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -113,7 +126,7 @@ export async function POST(req: NextRequest) {
     .select("id,first_name,last_name,email,status,created_at")
     .single();
 
-  if (insertResult.error?.message.includes("review_status")) {
+  if (isMissingReviewColumnError(insertResult.error?.message)) {
     insertResult = await supabaseAdmin
       .from("leads")
       .insert(insertPayload)

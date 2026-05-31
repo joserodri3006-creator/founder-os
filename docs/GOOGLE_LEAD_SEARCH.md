@@ -78,3 +78,8 @@ The dashboard API is backward-compatible if the migration has not been applied
 yet: lead listing and creation continue without review fields, and the UI falls
 back to default labels. Apply the migration before relying on persisted review
 decisions in production.
+
+If Supabase returns a schema-cache error such as `Could not find the
+'contact_channel' column`, the import API retries without review columns so lead
+capture still works. Apply the migration and redeploy/reload Supabase schema
+cache to persist review decisions.

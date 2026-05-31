@@ -3,6 +3,19 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 type Params = { params: Promise<{ id: string }> };
 
+const REVIEW_COLUMNS = [
+  "review_status",
+  "lead_potential",
+  "contact_channel",
+  "next_action",
+  "review_notes",
+  "reviewed_at",
+];
+
+function isMissingReviewColumnError(message: string | undefined) {
+  return Boolean(message && REVIEW_COLUMNS.some((column) => message.includes(column)));
+}
+
 export async function GET(_req: NextRequest, { params }: Params) {
   const { id } = await params;
   const { data, error } = await supabaseAdmin.from("leads").select("*").eq("id", id).single();
@@ -14,7 +27,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const body = await req.json();
   let { error } = await supabaseAdmin.from("leads").update(body).eq("id", id);
-  if (error?.message.includes("review_status") || error?.message.includes("lead_potential")) {
+  if (isMissingReviewColumnError(error?.message)) {
     const {
       review_status,
       lead_potential,
