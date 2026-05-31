@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Lead, LeadStatus, STATUS_LABELS, STATUS_COLORS } from "@/lib/types";
+import {
+  CONTACT_CHANNEL_LABELS,
+  Lead,
+  LeadStatus,
+  NEXT_ACTION_LABELS,
+  REVIEW_STATUS_LABELS,
+  STATUS_LABELS,
+  STATUS_COLORS,
+} from "@/lib/types";
 import Link from "next/link";
 import { useVenture } from "@/context/VentureContext";
 import NewLeadModal from "@/components/NewLeadModal";
@@ -228,10 +236,10 @@ export default function LeadsPage() {
           }}
         >
           <div className="overflow-x-auto">
-          <table className="w-full" style={{ minWidth: '700px' }}>
+          <table className="w-full" style={{ minWidth: '880px' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #EEF0F7', background: '#F7F8FC' }}>
-                {["Name", "Unternehmen", "Status", "Branche", "Quelle", "Draft", "Erstellt", "Aktionen"].map(h => (
+                {["Name", "Unternehmen", "Status", "Review", "Nächste Aktion", "Quelle", "Draft", "Erstellt", "Aktionen"].map(h => (
                   <th
                     key={h}
                     className="px-4 py-3 text-left font-semibold uppercase"
@@ -291,7 +299,33 @@ export default function LeadsPage() {
                       {ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
                     </select>
                   </td>
-                  <td className="px-4 py-3.5 text-sm" style={{ color: '#6B7280' }}>{lead.industry ?? "—"}</td>
+                  <td className="px-4 py-3.5">
+                    <div className="flex flex-col gap-1">
+                      <span
+                        className="w-fit rounded-full px-2 py-0.5 text-xs font-semibold"
+                        style={{
+                          background: lead.review_status === "ready_for_outreach"
+                            ? "rgba(22,163,74,0.1)"
+                            : lead.review_status === "blocked"
+                              ? "rgba(220,38,38,0.08)"
+                              : "#EEF0F7",
+                          color: lead.review_status === "ready_for_outreach"
+                            ? "#15803D"
+                            : lead.review_status === "blocked"
+                              ? "#B91C1C"
+                              : "#1B2A5E",
+                        }}
+                      >
+                        {REVIEW_STATUS_LABELS[lead.review_status ?? "unreviewed"]}
+                      </span>
+                      <span className="text-xs" style={{ color: '#6B7280' }}>
+                        {CONTACT_CHANNEL_LABELS[lead.contact_channel ?? "unchecked"]}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3.5 text-sm" style={{ color: '#6B7280' }}>
+                    {NEXT_ACTION_LABELS[lead.next_action ?? "website_pruefen"]}
+                  </td>
                   <td className="px-4 py-3.5 text-sm capitalize" style={{ color: '#6B7280' }}>{lead.source}</td>
                   <td className="px-4 py-3.5">
                     {lead.ai_draft_approved === true && (
@@ -332,7 +366,7 @@ export default function LeadsPage() {
               ))}
               {leads.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-sm" style={{ color: '#6B7280' }}>
+                  <td colSpan={9} className="px-4 py-12 text-center text-sm" style={{ color: '#6B7280' }}>
                     Keine Leads gefunden
                   </td>
                 </tr>

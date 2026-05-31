@@ -13,7 +13,26 @@ export async function GET(_req: NextRequest, { params }: Params) {
 export async function PUT(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const body = await req.json();
-  const { error } = await supabaseAdmin.from("leads").update(body).eq("id", id);
+  let { error } = await supabaseAdmin.from("leads").update(body).eq("id", id);
+  if (error?.message.includes("review_status") || error?.message.includes("lead_potential")) {
+    const {
+      review_status,
+      lead_potential,
+      contact_channel,
+      next_action,
+      review_notes,
+      reviewed_at,
+      ...fallbackBody
+    } = body;
+    void review_status;
+    void lead_potential;
+    void contact_channel;
+    void next_action;
+    void review_notes;
+    void reviewed_at;
+    const fallback = await supabaseAdmin.from("leads").update(fallbackBody).eq("id", id);
+    error = fallback.error;
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }

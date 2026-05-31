@@ -23,6 +23,9 @@ Founder OS now provides a manual lead-research workflow for selling the
 6. Selected records are created for the `Online First` venture through the
    existing `/api/leads` endpoint with source `ki_suche`, a Google-research
    note and `automation_enabled=false`.
+7. Imported leads start in the review workflow with `review_status=unreviewed`,
+   `contact_channel=unchecked` and `next_action=website_pruefen`. The user
+   reviews fit, contact route and the next action before outreach.
 
 Google results are deliberately not imported as immediately contactable leads
 without reviewed contact data. Search snippets are research context, not consent
@@ -57,3 +60,21 @@ Serper:
 The earlier `supabase/functions/ki-lead-search` scheduled Claude-based research
 remains unchanged. This new workflow is an on-demand, user-reviewed Google search
 inside the CRM and does not turn on automated outreach for imported prospects.
+
+## Review Workflow
+
+The additive migration `google_lead_review_workflow.sql` adds these optional CRM
+fields to `leads`:
+
+- `review_status`: unreviewed, reviewed, ready_for_outreach or blocked.
+- `lead_potential`: a_potential, b_potential or not_fit.
+- `contact_channel`: unchecked, email_ok, phone_better, linkedin_better or
+  do_not_contact.
+- `next_action`: website_pruefen, linkedin_pruefen,
+  erstansprache_vorbereiten, fit_check_senden, nachfassen or archivieren.
+- `review_notes` and `reviewed_at` for audit context.
+
+The dashboard API is backward-compatible if the migration has not been applied
+yet: lead listing and creation continue without review fields, and the UI falls
+back to default labels. Apply the migration before relying on persisted review
+decisions in production.

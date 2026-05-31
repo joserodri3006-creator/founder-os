@@ -1,10 +1,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Lead, LeadStatus, STATUS_LABELS } from "@/lib/types";
+import {
+  CONTACT_CHANNEL_LABELS,
+  LEAD_POTENTIAL_LABELS,
+  Lead,
+  LeadContactChannel,
+  LeadNextAction,
+  LeadPotential,
+  LeadReviewStatus,
+  LeadStatus,
+  NEXT_ACTION_LABELS,
+  REVIEW_STATUS_LABELS,
+  STATUS_LABELS,
+} from "@/lib/types";
 
 const SOURCES = ["website", "linkedin", "empfehlung", "kaltakquise", "ki_suche", "csv_import"] as const;
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as LeadStatus[];
+const REVIEW_STATUSES = Object.keys(REVIEW_STATUS_LABELS) as LeadReviewStatus[];
+const LEAD_POTENTIALS = Object.keys(LEAD_POTENTIAL_LABELS) as LeadPotential[];
+const CONTACT_CHANNELS = Object.keys(CONTACT_CHANNEL_LABELS) as LeadContactChannel[];
+const NEXT_ACTIONS = Object.keys(NEXT_ACTION_LABELS) as LeadNextAction[];
 
 interface Props {
   leadId: string;
@@ -45,6 +61,14 @@ export default function EditLeadModal({ leadId, onClose, onSaved }: Props) {
         city: lead.city || null,
         industry: lead.industry || null,
         contact_reason: lead.contact_reason || null,
+        review_status: lead.review_status ?? "unreviewed",
+        lead_potential: lead.lead_potential || null,
+        contact_channel: lead.contact_channel ?? "unchecked",
+        next_action: lead.next_action ?? "website_pruefen",
+        review_notes: lead.review_notes || null,
+        reviewed_at: lead.review_status && lead.review_status !== "unreviewed"
+          ? lead.reviewed_at || new Date().toISOString()
+          : null,
         notes: lead.notes || null,
         source: lead.source,
         status: lead.status,
@@ -89,6 +113,54 @@ export default function EditLeadModal({ leadId, onClose, onSaved }: Props) {
           </div>
           <Field label="Branche" value={lead.industry ?? ""} onChange={(v) => set("industry", v)} />
           <Field label="Kontaktgrund" value={lead.contact_reason ?? ""} onChange={(v) => set("contact_reason", v)} />
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Lead-Review</p>
+              <p className="mt-0.5 text-xs text-gray-500">
+                Für recherchierte Leads: Potenzial, zulässigen Kontaktweg und nächste Aktion festhalten.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <SelectField
+                label="Review-Status"
+                value={lead.review_status ?? "unreviewed"}
+                onChange={(v) => set("review_status", v)}
+                options={REVIEW_STATUSES.map((value) => ({ value, label: REVIEW_STATUS_LABELS[value] }))}
+              />
+              <SelectField
+                label="Potenzial"
+                value={lead.lead_potential ?? ""}
+                onChange={(v) => set("lead_potential", v)}
+                options={[
+                  { value: "", label: "Noch nicht bewertet" },
+                  ...LEAD_POTENTIALS.map((value) => ({ value, label: LEAD_POTENTIAL_LABELS[value] })),
+                ]}
+              />
+              <SelectField
+                label="Kontaktweg"
+                value={lead.contact_channel ?? "unchecked"}
+                onChange={(v) => set("contact_channel", v)}
+                options={CONTACT_CHANNELS.map((value) => ({ value, label: CONTACT_CHANNEL_LABELS[value] }))}
+              />
+              <SelectField
+                label="Nächste Aktion"
+                value={lead.next_action ?? "website_pruefen"}
+                onChange={(v) => set("next_action", v)}
+                options={NEXT_ACTIONS.map((value) => ({ value, label: NEXT_ACTION_LABELS[value] }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Review-Notiz</label>
+              <textarea
+                value={lead.review_notes ?? ""}
+                onChange={(e) => set("review_notes", e.target.value)}
+                rows={3}
+                placeholder="Warum passt der Lead? Welcher Kontaktweg ist sauber? Was ist der nächste Schritt?"
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 resize-none bg-white"
+              />
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -149,6 +221,28 @@ function Field({ label, value, onChange, type = "text" }: {
       <label className="text-xs text-gray-500 mb-1 block">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
         className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+    </div>
+  );
+}
+
+function SelectField({ label, value, onChange, options }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: Array<{ value: string; label: string }>;
+}) {
+  return (
+    <div>
+      <label className="text-xs text-gray-500 mb-1 block">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white"
+      >
+        {options.map((option) => (
+          <option key={option.value || "empty"} value={option.value}>{option.label}</option>
+        ))}
+      </select>
     </div>
   );
 }

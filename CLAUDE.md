@@ -142,7 +142,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 
 ### Seiten
 - `/dashboard` — KPI-Kacheln pro Venture, neueste Leads
-- `/leads` — Pipeline, Status inline, Neuer Lead Modal, CSV Import, kontrollierte Google-Lead-Suche fuer Online First, Duplikat-Markierung, Bearbeiten/Kopieren/Archivieren/Löschen
+- `/leads` — Pipeline, Status inline, Neuer Lead Modal, CSV Import, kontrollierte Google-Lead-Suche fuer Online First, Review-Felder fuer Potenzial/Kontaktweg/naechste Aktion, Duplikat-Markierung, Bearbeiten/Kopieren/Archivieren/Löschen
 - `/leads/[id]` — Lead-Detail mit Aktivitäten
 - `/drafts` — KI-Drafts reviewen, editieren, senden (per Venture gefiltert)
 - `/kunden` — Kundenliste, Bearbeiten/Kopieren/Archivieren/Löschen, Archiv-Toggle
@@ -174,7 +174,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - **Notizen** — Freitextfeld mit Auto-Save (1s Debounce) auf Kunden, Aufträgen, Produkten
 - **system_config upsert** — neue Keys werden automatisch angelegt
 - **Sales Funnel KPI** — Fit-Checks, Checkout-Starts und Stripe-Anzahlungen fuer Online First
-- **Google Lead Search** — In `/leads` unabhaengig vom aktiven Venture sichtbar; Region-/Zielgruppen-Suche via serverseitigem `SERPER_API_KEY`, Google Custom Search nur Legacy-Fallback, Import nach gepruefter Kontaktperson/E-Mail stets nach `online_first` und ohne automatische Ansprache
+- **Google Lead Search** — In `/leads` unabhaengig vom aktiven Venture sichtbar; Region-/Zielgruppen-Suche via serverseitigem `SERPER_API_KEY`, Google Custom Search nur Legacy-Fallback, Import nach gepruefter Kontaktperson/E-Mail stets nach `online_first` und ohne automatische Ansprache. Bereits gespeicherte Website-Domains werden bei neuen Suchen ausgeblendet; importierte Leads starten im Review mit `review_status=unreviewed`, `contact_channel=unchecked` und `next_action=website_pruefen`.
 - **API-Zugriffsschutz** — `proxy.ts` verlangt Sitzungen und prueft Section-Permissions vor internen Service-Role-Routen
 
 ---

@@ -8,24 +8,49 @@ export async function GET(req: NextRequest) {
   const venture = searchParams.get("venture");
   const showArchived = searchParams.get("archived") === "true";
 
-  let query = supabaseAdmin
-    .from("leads")
-    .select("id,first_name,last_name,email,company_name,status,source,city,industry,follow_up_date,ai_draft_approved,archived_at,created_at,venture,is_duplicate")
-    .order("created_at", { ascending: false });
+  const baseSelect = "id,first_name,last_name,email,company_name,status,source,city,industry,follow_up_date,ai_draft_approved,archived_at,created_at,venture,is_duplicate";
+  const reviewSelect = `${baseSelect},review_status,lead_potential,contact_channel,next_action`;
 
-  if (showArchived) {
-    query = query.not("archived_at", "is", null);
-  } else {
-    query = query.is("archived_at", null);
+  function buildQuery(select: string) {
+    let query = supabaseAdmin
+      .from("leads")
+      .select(select)
+      .order("created_at", { ascending: false });
+
+    if (showArchived) {
+      query = query.not("archived_at", "is", null);
+    } else {
+      query = query.is("archived_at", null);
+    }
+
+    if (status && status !== "alle") query = query.eq("status", status);
+    if (source && source !== "alle") query = query.eq("source", source);
+    if (venture && venture !== "alle") query = query.eq("venture", venture);
+
+    return query;
   }
 
-  if (status && status !== "alle") query = query.eq("status", status);
-  if (source && source !== "alle") query = query.eq("source", source);
-  if (venture && venture !== "alle") query = query.eq("venture", venture);
+  const { data, error } = await buildQuery(reviewSelect);
+  if (!error) return NextResponse.json(data ?? []);
 
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data ?? []);
+  if (!error.message.includes("review_status") && !error.message.includes("lead_potential")) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const fallback = await buildQuery(baseSelect);
+  if (fallback.error) return NextResponse.json({ error: fallback.error.message }, { status: 500 });
+  const fallbackLeads = Array.isArray(fallback.data)
+    ? fallback.data as unknown as Array<Record<string, unknown>>
+    : [];
+  return NextResponse.json(
+    fallbackLeads.map((lead) => ({
+      ...lead,
+      review_status: "unreviewed",
+      lead_potential: null,
+      contact_channel: "unchecked",
+      next_action: "website_pruefen",
+    }))
+  );
 }
 
 export async function PATCH(req: NextRequest) {
@@ -56,28 +81,47 @@ export async function POST(req: NextRequest) {
     .eq("venture", venture)
     .maybeSingle();
 
-  const { data: lead, error } = await supabaseAdmin
+  const reviewFields = {
+    review_status: body.review_status?.trim() || "unreviewed",
+    lead_potential: body.lead_potential?.trim() || null,
+    contact_channel: body.contact_channel?.trim() || "unchecked",
+    next_action: body.next_action?.trim() || "website_pruefen",
+    review_notes: body.review_notes?.trim() || null,
+  };
+  const insertPayload = {
+    venture,
+    first_name: firstName,
+    last_name: lastName,
+    email,
+    phone: body.phone?.trim() || null,
+    company_name: body.company_name?.trim() || null,
+    website: body.website?.trim() || null,
+    city: body.city?.trim() || null,
+    region: body.region?.trim() || "Hessen",
+    industry: body.industry?.trim() || null,
+    contact_reason: body.contact_reason?.trim() || null,
+    notes: body.notes?.trim() || null,
+    source: allowedSources.includes(body.source) ? body.source : "website",
+    status: "neu",
+    automation_enabled: body.automation_enabled ?? true,
+    is_duplicate: Boolean(existing),
+  };
+
+  let insertResult = await supabaseAdmin
     .from("leads")
-    .insert({
-      venture,
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      phone: body.phone?.trim() || null,
-      company_name: body.company_name?.trim() || null,
-      website: body.website?.trim() || null,
-      city: body.city?.trim() || null,
-      region: body.region?.trim() || "Hessen",
-      industry: body.industry?.trim() || null,
-      contact_reason: body.contact_reason?.trim() || null,
-      notes: body.notes?.trim() || null,
-      source: allowedSources.includes(body.source) ? body.source : "website",
-      status: "neu",
-      automation_enabled: body.automation_enabled ?? true,
-      is_duplicate: Boolean(existing),
-    })
+    .insert({ ...insertPayload, ...reviewFields })
     .select("id,first_name,last_name,email,status,created_at")
     .single();
+
+  if (insertResult.error?.message.includes("review_status")) {
+    insertResult = await supabaseAdmin
+      .from("leads")
+      .insert(insertPayload)
+      .select("id,first_name,last_name,email,status,created_at")
+      .single();
+  }
+
+  const { data: lead, error } = insertResult;
 
   if (error || !lead) return NextResponse.json({ error: error?.message ?? "Lead konnte nicht angelegt werden" }, { status: 500 });
 

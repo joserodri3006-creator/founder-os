@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Lead, STATUS_LABELS, STATUS_COLORS } from "@/lib/types";
+import {
+  CONTACT_CHANNEL_LABELS,
+  LEAD_POTENTIAL_LABELS,
+  Lead,
+  NEXT_ACTION_LABELS,
+  REVIEW_STATUS_LABELS,
+  STATUS_LABELS,
+  STATUS_COLORS,
+} from "@/lib/types";
 import Link from "next/link";
 
 interface Activity {
@@ -78,6 +86,16 @@ export default function LeadDetailPage() {
           <Field label="Quelle" value={lead.source} />
           <Field label="Venture" value={lead.venture} />
           <Field label="Follow-up" value={lead.follow_up_date ? new Date(lead.follow_up_date).toLocaleDateString("de-DE") : null} />
+          <Field label="Review-Status" value={REVIEW_STATUS_LABELS[lead.review_status ?? "unreviewed"]} />
+          <Field label="Potenzial" value={lead.lead_potential ? LEAD_POTENTIAL_LABELS[lead.lead_potential] : null} />
+          <Field label="Kontaktweg" value={CONTACT_CHANNEL_LABELS[lead.contact_channel ?? "unchecked"]} />
+          <Field label="Nächste Aktion" value={NEXT_ACTION_LABELS[lead.next_action ?? "website_pruefen"]} />
+          {lead.review_notes && (
+            <div className="col-span-2">
+              <p className="text-xs text-gray-500 mb-1">Review-Notiz</p>
+              <p className="text-gray-700 whitespace-pre-wrap text-xs">{lead.review_notes}</p>
+            </div>
+          )}
           {lead.contact_reason && (
             <div className="col-span-2">
               <p className="text-xs text-gray-500 mb-1">Kontaktgrund</p>

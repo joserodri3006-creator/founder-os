@@ -128,6 +128,11 @@ export default function GoogleLeadSearchModal({ onClose, onImported }: Props) {
             industry: segment === "consultants" ? "Beratung" : segment === "coaches" ? "Coaching" : "Coaching / Beratung / Expertise",
             source: "ki_suche",
             automation_enabled: false,
+            review_status: "unreviewed",
+            lead_potential: null,
+            contact_channel: "unchecked",
+            next_action: "website_pruefen",
+            review_notes: "Google-Lead importiert. Bitte Website, Kontaktweg und nächste Aktion prüfen.",
             contact_reason: `Google Search Recherche fuer Authority Website Sprint (${region})`,
             notes: [
               `Recherchequelle: Google Search (${query})`,
