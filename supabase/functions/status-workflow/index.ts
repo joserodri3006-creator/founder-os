@@ -58,56 +58,117 @@ async function callClaude(prompt: string, system: string, model = "claude-haiku-
 
 interface VentureContext {
   name: string;
-  senderIntro: string;
-  targetGroup: string;
-  defaultContactReason: string;
+  absender: string;       // Wer schreibt
+  leistung: string;       // Was wir konkret machen
+  typischePainPoints: string;  // Branchenspezifische Probleme die wir lösen
+  beispiele: string;      // Konkrete Beispiele/Ergebnisse
+  cta: string;            // Gewünschte nächste Aktion
 }
 
 const VENTURE_CONTEXTS: Record<string, VentureContext> = {
   online_first: {
     name: "Online First",
-    senderIntro: "Du bist Jose, Gründer von Online First — einer Webdesign-Agentur aus Hessen.",
-    targetGroup: "Unternehmen ohne moderne Website oder Onlineshop",
-    defaultContactReason: "Interesse an einer professionellen Website",
+    absender: "Jose Rodriguez, Gründer von Online First (Webdesign-Agentur, Hessen)",
+    leistung: "professionelle Websites, Landingpages und Onlineshops — fertig in 2–4 Wochen, kein Abo, einmaliger Festpreis",
+    typischePainPoints: `- Veraltete Website die auf Mobilgeräten nicht funktioniert
+- Keine Sichtbarkeit bei Google (kaum Anfragen über die Website)
+- Website wird intern gepflegt aber sieht unprofessionell aus
+- Kein Onlineshop obwohl der Umsatz davon profitieren würde
+- Konkurrenz hat modernere Auftritte und zieht Kunden ab`,
+    beispiele: "Handwerksbetriebe, Dienstleister, Fachbetriebe, lokale Unternehmen — typisch: 30–50% mehr Anfragen nach Relaunch",
+    cta: "Kurzes 15-Minuten-Gespräch um zu schauen ob und wie wir helfen können",
   },
   brandary: {
-    name: "Brandary",
-    senderIntro: "Du bist Jose, Gründer von Brandary — einem Print Studio für hochwertige Druckprodukte (Visitenkarten, Flyer, Merchandise).",
-    targetGroup: "Unternehmen und Vereine die Druckprodukte benötigen",
-    defaultContactReason: "Interesse an Druckprodukten",
+    name: "Brandary Print Studio",
+    absender: "Frederick Feldmann, Brandary Print Studio Frankfurt",
+    leistung: "Textilveredlung, DTF-Druck, Stickerei, Workwear-Branding — kleine Mengen ab 1 Stück, schnelle Lieferung",
+    typischePainPoints: `- Hohe Mindestmengen bei anderen Anbietern
+- Lange Lieferzeiten (4–6 Wochen) die Projekte verzögern
+- Schlechte Druckqualität die nach wenigen Wäschen verblasst
+- Kein persönlicher Ansprechpartner — nur anonyme Onlinebestellungen
+- Teurer Zwischenhändler der den Preis hochtreibt`,
+    beispiele: "Vereins-Hoodies, Firmen-Workwear, Event-Merchandise, Gastro-Uniformen — direkt vom Studio, kein Zwischenhändler",
+    cta: "Kurze Anfrage mit Motiv und Menge — wir machen ein Angebot innerhalb von 24h",
   },
   droplane: {
     name: "Droplane",
-    senderIntro: "Du bist Jose, Gründer von Droplane — einer Creator-Plattform für Content Creator, Fotografen und Videografen.",
-    targetGroup: "Content Creator, Fotografen, Videografen und Influencer",
-    defaultContactReason: "Interesse an der Droplane Creator-Plattform",
+    absender: "Jose Rodriguez, Gründer von Droplane",
+    leistung: "Creator-Plattform: Portfolio, Buchungssystem und Community für Fotografen, Videografen und Content Creator",
+    typischePainPoints: `- Anfragen kommen über Instagram DM — chaotisch, kein System
+- Kein professionelles Portfolio das Kunden überzeugt
+- Preise werden jedes Mal neu verhandelt statt klar kommuniziert
+- Kein Buchungsprozess — Kunden canceln spontan
+- Kein Weg die eigene Community zu monetarisieren`,
+    beispiele: "Creator mit 5k–200k Followern die endlich einen professionellen Auftritt wollen der Anfragen automatisch qualifiziert",
+    cta: "Kurze Demo — ich zeige dir wie das für deinen Case konkret aussehen würde",
   },
   blazed_outfitters: {
     name: "Blazed Outfitters",
-    senderIntro: "Du bist Jose, Gründer von Blazed Outfitters — einer Streetwear-Marke.",
-    targetGroup: "Boutiquen, Concept Stores und Fashion-Influencer als Kooperationspartner",
-    defaultContactReason: "Interesse an einer Kooperation mit Blazed Outfitters",
+    absender: "Jose Rodriguez, Gründer von Blazed Outfitters",
+    leistung: "limitierte Streetwear-Drops mit Cannabis-Ästhetik — Kooperationen mit Stores, Boutiquen und Resellern",
+    typischePainPoints: `- Sortiment braucht frische, authentische Streetwear-Labels
+- Kunden fragen nach Lifestyle-Brands mit echtem Hintergrund
+- Keine Limited-Edition Pieces die Traffic in den Store bringen
+- Fehlende Kooperationen mit aufstrebenden Marken`,
+    beispiele: "Limitierte Kollektionen, Konsignationsmodell möglich, keine Mindestabnahme für erste Kooperation",
+    cta: "Produktfotos und Preisliste schicken — oder kurzes Gespräch wenn du neugierig bist",
+  },
+  itaba: {
+    name: "Itaba",
+    absender: "Jose Rodriguez, Itaba",
+    leistung: "handgefertigte Wohnaccessoires und Naturmaterialien — für Innenarchitekten, Interior-Stores und B2B-Einkäufer",
+    typischePainPoints: `- Massengefertigte Produkte ohne Charakter und Differenzierung
+- Lieferanten die keine kleinen Mengen für Testorders anbieten
+- Kein direkter Kontakt zum Hersteller — nur Zwischenhändler
+- Kunden wollen nachhaltige, authentische Produkte — Sortiment hält nicht mit`,
+    beispiele: "Tische, Leuchten, Küchenaccessoires aus Naturmaterialien — Kleinserien, individuelle B2B-Konditionen möglich",
+    cta: "Produktkatalog und B2B-Konditionen — einfach kurz antworten",
   },
 };
 
 async function generateDraft(lead: Lead, type: "erstkonakt" | "follow_up"): Promise<{ subject: string; body: string }> {
   const ctx = VENTURE_CONTEXTS[lead.venture] ?? VENTURE_CONTEXTS.online_first;
 
-  const system = `${ctx.senderIntro}
-Schreibe eine ${type === "erstkonakt" ? "Erstkontakt-Mail" : "Follow-Up-Mail"} an einen potenziellen ${ctx.targetGroup}.
-Stil: professionell, persönlich, auf Augenhöhe. Kein Verkaufsdruck. Auf Deutsch.
-Antworte NUR mit einem JSON-Objekt ohne Markdown: {"subject": "...", "body": "..."}`;
+  const isFollowUp = type === "follow_up";
 
-  const prompt = `Lead:
+  const system = `Du bist ${ctx.absender}.
+Du schreibst eine ${isFollowUp ? "Follow-Up-Mail" : "Erstkontakt-Mail"} — auf Deutsch, direkt, konkret.
+
+WICHTIG — Diese Regeln sind nicht verhandelbar:
+1. KEIN generischer Einstieg. Nie "Ich hoffe diese E-Mail findet Sie gut", nie "Mein Name ist X und ich bin...".
+2. Steig sofort mit einem konkreten Bezug zum Unternehmen oder zur Branche ein.
+3. Nenne EIN konkretes Problem das dieser Lead wahrscheinlich kennt — passend zu seiner Branche und Situation.
+4. Erkläre in 1–2 Sätzen wie du das löst. Konkret, nicht abstrakt.
+5. Ein klarer CTA am Ende — keine offene Floskel.
+6. Länge: maximal 120 Wörter im Body. Kürzer ist besser.
+7. Kein "Mit freundlichen Grüßen" — schreib einfach den Vornamen als Abschluss.
+8. Subject-Line: spezifisch, kein Clickbait, max. 8 Wörter.
+${isFollowUp ? "9. Follow-Up: Beziehe dich darauf, dass du bereits geschrieben hast. Kein Vorwurf, aber direkt." : ""}
+
+Was wir anbieten: ${ctx.leistung}
+Typische Probleme die wir lösen:
+${ctx.typischePainPoints}
+Typische Kunden/Ergebnisse: ${ctx.beispiele}
+Gewünschte nächste Aktion: ${ctx.cta}
+
+Antworte NUR mit einem JSON-Objekt ohne Markdown-Blöcke:
+{"subject": "...", "body": "..."}`;
+
+  const leadInfo = `
+Lead-Daten:
 - Name: ${lead.first_name} ${lead.last_name}
-- Unternehmen: ${lead.company_name ?? "unbekannt"}
-- Branche: ${lead.industry ?? "unbekannt"}
-- Kontaktgrund: ${lead.contact_reason ?? ctx.defaultContactReason}
-- Stadt: ${lead.city ?? "unbekannt"}
-- Venture: ${ctx.name}
-${type === "follow_up" ? "- Kontext: Diese Person wurde bereits kontaktiert aber hat noch nicht geantwortet." : ""}`;
+- Unternehmen: ${lead.company_name ?? "—"}
+- Branche: ${lead.industry ?? "—"}
+- Stadt: ${lead.city ?? "—"}
+- Kontaktgrund / Notiz: ${lead.contact_reason ?? lead.notes ?? "Keine spezifischen Infos vorhanden"}
+- Quelle: ${lead.source}
 
-  const raw = await callClaude(prompt, system);
+Schreibe die Mail direkt an ${lead.first_name}. Nutze die verfügbaren Infos um einen KONKRETEN Bezug herzustellen.
+Wenn Branche oder Unternehmen bekannt sind: Nenne ein branchenspezifisches Problem.
+Wenn wenig Info vorhanden: Nutze ein universell relevantes Problem aus der Zielgruppe.`;
+
+  // Sonnet für Drafts — Qualität ist hier entscheidend
+  const raw = await callClaude(leadInfo, system, "claude-sonnet-4-6");
   return JSON.parse(raw);
 }
 
