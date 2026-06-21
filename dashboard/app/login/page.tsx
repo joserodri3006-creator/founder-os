@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import { useRouter } from "next/navigation";
+
+type HealthStatus = "checking" | "ok" | "warn" | "error";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,35 +13,70 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"login" | "register">("login");
-
   const [resetSent, setResetSent] = useState(false);
+  const [healthStatus, setHealthStatus] = useState<HealthStatus>("checking");
+  const [healthIssues, setHealthIssues] = useState<string[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
+  const [oauthUrl, setOauthUrl] = useState("");
+
   const supabase = createClient();
 
-  async function handleReset() {
-    if (!email) { setError("Bitte E-Mail-Adresse eingeben."); return; }
-    setLoading(true);
-    setError(null);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/login`,
-    });
-    setLoading(false);
-    if (error) { setError(error.message); return; }
-    setResetSent(true);
-  }
+  // Auf mount: URL-Parameter lesen (Fehler vom auth/callback) + Health-Check
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlError = params.get("error");
+    const urlMsg = params.get("msg");
+
+    if (urlError === "auth" && urlMsg) {
+      setError(`Anmeldung fehlgeschlagen: ${decodeURIComponent(urlMsg)}`);
+    } else if (urlError === "auth") {
+      setError("Anmeldung fehlgeschlagen. Bitte erneut versuchen.");
+    } else if (urlError === "config") {
+      setError("Serverkonfiguration fehlerhaft — bitte den Administrator informieren.");
+    }
+
+    // OAuth-URL für spätere Anzeige
+    setOauthUrl(`${window.location.origin}/auth/callback`);
+
+    // Health-Check im Hintergrund
+    fetch("/api/health")
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          setHealthStatus("ok");
+        } else {
+          setHealthStatus("error");
+          setHealthIssues(data.issues ?? []);
+        }
+      })
+      .catch(() => {
+        setHealthStatus("warn");
+        setHealthIssues(["Health-Check konnte nicht geladen werden"]);
+      });
+  }, []);
 
   async function handleEmail(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error } =
+    const { error: authError } =
       mode === "login"
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({ email, password });
 
-    if (error) {
-      setError(error.message);
+    if (authError) {
       setLoading(false);
+      if (authError.message.includes("Invalid login credentials")) {
+        setError("E-Mail oder Passwort falsch. Passwort vergessen? Link unten nutzen.");
+      } else if (authError.message.includes("Email not confirmed")) {
+        setError("E-Mail noch nicht bestätigt — bitte den Bestätigungslink in deiner E-Mail klicken.");
+      } else if (authError.message.includes("Invalid API key") || authError.message.includes("apikey")) {
+        setError("Serverkonfigurationsfehler (API-Key). Administrator informieren.");
+        setHealthStatus("error");
+      } else {
+        setError(authError.message);
+      }
       return;
     }
     router.push("/dashboard");
@@ -48,14 +85,51 @@ export default function LoginPage() {
 
   async function handleGoogle() {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
+    setError(null);
+    const { error: authError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-    if (error) { setError(error.message); setLoading(false); }
+    if (authError) {
+      setError(authError.message);
+      setLoading(false);
+    }
+    // Falls kein Fehler: Browser navigiert zu Google → kein weiteres Handling hier
   }
+
+  async function handleReset() {
+    if (!email) {
+      setError("Bitte zuerst E-Mail-Adresse eingeben.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/login`,
+    });
+    setLoading(false);
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+    setResetSent(true);
+  }
+
+  const healthColor = {
+    checking: "#9CA3AF",
+    ok: "#16A34A",
+    warn: "#D97706",
+    error: "#DC2626",
+  }[healthStatus];
+
+  const healthLabel = {
+    checking: "Verbindung wird geprüft…",
+    ok: "Verbunden",
+    warn: "Status unbekannt",
+    error: "Verbindungsproblem",
+  }[healthStatus];
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -67,9 +141,58 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 px-8 py-8 shadow-sm">
-          <h2 className="text-base font-semibold text-gray-800 mb-6">
-            {mode === "login" ? "Anmelden" : "Konto erstellen"}
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-base font-semibold text-gray-800">
+              {mode === "login" ? "Anmelden" : "Konto erstellen"}
+            </h2>
+            {/* Health-Status-Indikator */}
+            <button
+              onClick={() => setShowDebug(d => !d)}
+              className="flex items-center gap-1.5 text-xs"
+              style={{ color: healthColor }}
+              title="Systemstatus anzeigen"
+            >
+              <span className="w-2 h-2 rounded-full" style={{ background: healthColor }} />
+              {healthLabel}
+            </button>
+          </div>
+
+          {/* Debug-Panel */}
+          {showDebug && (
+            <div className="mb-5 p-3 rounded-lg text-xs space-y-1 border"
+              style={{ background: "#F9FAFB", borderColor: "#E5E7EB", color: "#374151" }}>
+              <p className="font-semibold mb-2">Systemdiagnose</p>
+              {healthStatus === "ok" && (
+                <p style={{ color: "#16A34A" }}>✓ Supabase erreichbar und konfiguriert</p>
+              )}
+              {healthIssues.map((issue, i) => (
+                <p key={i} style={{ color: "#DC2626" }}>✗ {issue}</p>
+              ))}
+              <p className="mt-2 pt-2 border-t border-gray-200">
+                <span className="font-medium">OAuth Redirect URL:</span><br />
+                <code className="break-all">{oauthUrl || "wird geladen…"}</code>
+              </p>
+              <p className="text-gray-500 mt-1">
+                Diese URL muss in{" "}
+                <strong>Supabase → Authentication → URL Configuration → Redirect URLs</strong>{" "}
+                eingetragen sein.
+              </p>
+              <a
+                href={`https://app.supabase.com/project/bshuqljbanmphmjyicdc/auth/url-configuration`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-1 underline"
+                style={{ color: "#3B82F6" }}
+              >
+                → Supabase URL-Config öffnen
+              </a>
+              <p className="mt-2">
+                <a href="/api/health" target="_blank" className="underline" style={{ color: "#3B82F6" }}>
+                  → Vollständige Diagnose (/api/health)
+                </a>
+              </p>
+            </div>
+          )}
 
           {/* Google */}
           <button
@@ -119,7 +242,9 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <p className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+              <div className="text-xs text-red-700 bg-red-50 border border-red-200 px-3 py-2.5 rounded-lg">
+                {error}
+              </div>
             )}
 
             <button
@@ -127,17 +252,15 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
-              {loading ? "..." : mode === "login" ? "Anmelden" : "Konto erstellen"}
+              {loading ? "…" : mode === "login" ? "Anmelden" : "Konto erstellen"}
             </button>
           </form>
 
-          {resetSent && (
-            <p className="text-xs text-green-600 bg-green-50 px-3 py-2 rounded-lg mt-4 text-center">
-              ✓ Passwort-Reset-Link gesendet — bitte E-Mail prüfen.
+          {resetSent ? (
+            <p className="text-xs text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-lg mt-4 text-center">
+              ✓ Reset-Link wurde gesendet — bitte E-Mail prüfen.
             </p>
-          )}
-
-          {mode === "login" && !resetSent && (
+          ) : mode === "login" && (
             <p className="text-xs text-center mt-3">
               <button
                 type="button"
