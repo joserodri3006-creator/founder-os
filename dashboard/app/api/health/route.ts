@@ -35,15 +35,16 @@ export async function GET() {
     issues.push("NEXT_PUBLIC_SUPABASE_ANON_KEY fehlt in Vercel Environment Variables");
   }
 
-  // --- 2. Supabase Auth Erreichbarkeit ---
+  // --- 2. Supabase Auth Erreichbarkeit (mit apikey, damit kein 401) ---
   if (url) {
     try {
-      const res = await fetch(`${url}/auth/v1/health`, {
+      const res = await fetch(`${url.trim()}/auth/v1/health`, {
+        headers: { apikey: anonKey },
         signal: AbortSignal.timeout(5000),
       });
-      if (res.ok) {
-        const body = await res.json().catch(() => ({}));
-        checks.supabase_reachable = { ok: true, detail: `Status: ${JSON.stringify(body)}` };
+      if (res.ok || res.status === 401) {
+        // 401 = Auth läuft, aber kein anonymer Zugriff → in Ordnung
+        checks.supabase_reachable = { ok: true, detail: `HTTP ${res.status} — Supabase Auth erreichbar` };
       } else {
         checks.supabase_reachable = { ok: false, detail: `HTTP ${res.status} — Supabase möglicherweise pausiert` };
         issues.push(`Supabase antwortet mit ${res.status} — Projekt möglicherweise pausiert (Supabase Dashboard prüfen)`);
