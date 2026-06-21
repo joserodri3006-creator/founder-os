@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,5 +19,9 @@ export async function POST() {
     }
   );
   await supabase.auth.signOut();
-  return NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"));
+  // Use request origin to always redirect to the correct domain
+  const origin = req.headers.get("x-forwarded-proto") && req.headers.get("x-forwarded-host")
+    ? `${req.headers.get("x-forwarded-proto")}://${req.headers.get("x-forwarded-host")}`
+    : new URL(req.url).origin;
+  return NextResponse.redirect(new URL("/login", origin));
 }

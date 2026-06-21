@@ -12,7 +12,20 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<"login" | "register">("login");
 
+  const [resetSent, setResetSent] = useState(false);
   const supabase = createClient();
+
+  async function handleReset() {
+    if (!email) { setError("Bitte E-Mail-Adresse eingeben."); return; }
+    setLoading(true);
+    setError(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/login`,
+    });
+    setLoading(false);
+    if (error) { setError(error.message); return; }
+    setResetSent(true);
+  }
 
   async function handleEmail(e: React.FormEvent) {
     e.preventDefault();
@@ -117,6 +130,25 @@ export default function LoginPage() {
               {loading ? "..." : mode === "login" ? "Anmelden" : "Konto erstellen"}
             </button>
           </form>
+
+          {resetSent && (
+            <p className="text-xs text-green-600 bg-green-50 px-3 py-2 rounded-lg mt-4 text-center">
+              ✓ Passwort-Reset-Link gesendet — bitte E-Mail prüfen.
+            </p>
+          )}
+
+          {mode === "login" && !resetSent && (
+            <p className="text-xs text-center mt-3">
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={loading}
+                className="text-gray-400 hover:text-gray-600 underline underline-offset-2"
+              >
+                Passwort vergessen?
+              </button>
+            </p>
+          )}
 
           <p className="text-xs text-center text-gray-400 mt-5">
             {mode === "login" ? (
