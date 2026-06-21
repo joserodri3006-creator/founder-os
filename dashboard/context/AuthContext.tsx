@@ -56,7 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let permissions: Permissions = mergePermissions({});
 
     if (roleData) {
-      role = roleData.role as Role;
+      const rawRole = roleData.role;
+      // Unbekannte Rollen (z.B. b2b_partner) auf employee mappen
+      role = (["founder", "manager", "employee"].includes(rawRole) ? rawRole : "employee") as Role;
       venture = roleData.venture ?? null;
       if (role === "founder") permissions = FOUNDER_PERMISSIONS;
       else if (role === "manager") permissions = MANAGER_PERMISSIONS;
