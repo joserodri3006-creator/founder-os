@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Founder OS — Datenmodell</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0E1221;
+      color: #F7F8FC;
+      min-height: 100vh;
+      padding: 32px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 36px;
+    }
+
+    .logo {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, #1B2A5E, #C8A96E);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800; color: #F7F8FC;
+      letter-spacing: -1px;
+    }
+
+    header h1 {
+      font-size: 22px; font-weight: 700; color: #F7F8FC;
+    }
+    header span {
+      font-size: 13px; color: #8891AA; margin-top: 2px; display: block;
+    }
+
+    .meta {
+      margin-left: auto;
+      text-align: right;
+      font-size: 12px;
+      color: #8891AA;
+      line-height: 1.6;
+    }
+
+    .legend {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #AAB4CC;
+    }
+
+    .dot {
+      width: 12px; height: 12px; border-radius: 3px;
+    }
+
+    .section {
+      margin-bottom: 40px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #C8A96E;
+      margin-bottom: 16px;
+      padding-left: 4px;
+      border-left: 3px solid #C8A96E;
+      padding-left: 10px;
+    }
+
+    .diagram-wrap {
+      background: #14193A;
+      border-radius: 14px;
+      border: 1px solid #1E2D5A;
+      padding: 28px;
+      overflow-x: auto;
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .tables-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
+    }
+
+    .table-card {
+      background: #14193A;
+      border: 1px solid #1E2D5A;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .table-header {
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .table-header .badge {
+      font-size: 9px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-left: auto;
+    }
+
+    .cat-crm    { background: #1B2A5E; border-color: #2A3F80; color: #7B9CFF; }
+    .cat-orders { background: #1A2E1A; border-color: #2A4A2A; color: #6EC87B; }
+    .cat-products { background: #2A1E12; border-color: #4A3520; color: #C8A96E; }
+    .cat-system { background: #1E1A2E; border-color: #352A4A; color: #9B6EC8; }
+    .cat-views  { background: #1A2828; border-color: #2A4040; color: #6EC8C8; }
+
+    .badge-crm      { background: #2A3F80; color: #7B9CFF; }
+    .badge-orders   { background: #2A4A2A; color: #6EC87B; }
+    .badge-products { background: #4A3520; color: #C8A96E; }
+    .badge-system   { background: #352A4A; color: #9B6EC8; }
+    .badge-views    { background: #2A4040; color: #6EC8C8; }
+
+    .table-cols {
+      padding: 8px 14px 12px;
+      font-size: 11px;
+      color: #8891AA;
+      line-height: 2;
+    }
+
+    .table-cols .col {
+      display: flex;
+      gap: 6px;
+    }
+
+    .col-name { color: #C8D0E0; font-family: 'JetBrains Mono', monospace; }
+    .col-type { color: #556080; font-size: 10px; }
+    .col-pk   { color: #C8A96E; font-weight: 700; font-size: 9px; }
+    .col-fk   { color: #7B9CFF; font-size: 9px; }
+
+    .divider {
+      height: 1px;
+      background: #1E2D5A;
+      margin: 8px 0;
+    }
+
+    .enums-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .enum-card {
+      background: #14193A;
+      border: 1px solid #1E2D5A;
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    .enum-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: #9B6EC8;
+      font-family: monospace;
+      margin-bottom: 8px;
+    }
+
+    .enum-values {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .enum-val {
+      font-size: 10px;
+      background: #1E2D5A;
+      color: #AAB4CC;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+
+    footer {
+      margin-top: 48px;
+      text-align: center;
+      font-size: 11px;
+      color: #3A4460;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">FO</div>
+  <div>
+    <h1>Founder OS — Datenmodell</h1>
+    <span>Supabase · Projekt bshuqljbanmphmjyicdc · Stand 2026-04-29</span>
+  </div>
+  <div class="meta">
+    24 Tabellen · 4 Views<br>
+    5 Ventures · 1 Datenbank
+  </div>
+</header>
+
+<!-- LEGEND -->
+<div class="legend">
+  <div class="legend-item"><div class="dot" style="background:#2A3F80"></div> CRM (Leads, Kunden)</div>
+  <div class="legend-item"><div class="dot" style="background:#2A4A2A"></div> Aufträge & Zahlungen</div>
+  <div class="legend-item"><div class="dot" style="background:#4A3520"></div> Produktverwaltung</div>
+  <div class="legend-item"><div class="dot" style="background:#352A4A"></div> System & Auth</div>
+  <div class="legend-item"><div class="dot" style="background:#2A4040"></div> Views (read-only)</div>
+</div>
+
+<!-- ER DIAGRAM -->
+<div class="section">
+  <div class="section-title">Entity-Relationship-Diagramm</div>
+  <div class="diagram-wrap">
+    <div class="mermaid">
+erDiagram
+  leads {
+    uuid id PK
+    venture venture
+    string first_name
+    string last_name
+    string company_name
+    string email
+    string phone
+    string website
+    string city
+    string industry
+    lead_status status
+    lead_source source
+    text notes
+    boolean is_duplicate
+    boolean automation_enabled
+    timestamptz created_at
+  }
+
+  lead_activities {
+    uuid id PK
+    uuid lead_id FK
+    string type
+    text content
+    timestamptz created_at
+  }
+
+  customers {
+    uuid id PK
+    venture venture
+    string first_name
+    string last_name
+    string company_name
+    string email
+    string phone
+    string city
+    text notes
+    timestamptz archived_at
+    timestamptz created_at
+  }
+
+  orders {
+    uuid id PK
+    uuid customer_id FK
+    uuid payment_model_id FK
+    venture venture
+    order_status status
+    decimal total_amount
+    string invoice_number
+    text invoice_html
+    jsonb invoice_data
+    jsonb payment_steps
+    boolean invoice_sent
+    boolean anzahlung_erhalten
+    boolean restzahlung_erhalten
+    text notes
+    timestamptz archived_at
+    timestamptz created_at
+  }
+
+  order_activities {
+    uuid id PK
+    uuid order_id FK
+    string type
+    text content
+    timestamptz created_at
+  }
+
+  payment_models {
+    uuid id PK
+    venture venture
+    string name
+    jsonb steps
+    boolean is_default
+    timestamptz created_at
+  }
+
+  mail_templates {
+    uuid id PK
+    venture venture
+    string name
+    string subject
+    text body_html
+    timestamptz created_at
+  }
+
+  attachments {
+    uuid id PK
+    string entity_type
+    uuid entity_id
+    string filename
+    string storage_path
+    string description
+    integer file_size
+    timestamptz created_at
+  }
+
+  products {
+    uuid id PK
+    venture venture
+    uuid type_id FK
+    uuid brand_id FK
+    uuid tax_class_id FK
+    string name
+    string sku
+    string slug
+    string status
+    decimal price
+    decimal compare_price
+    decimal cost_price
+    decimal sale_price
+    date sale_from
+    date sale_until
+    text description
+    text short_description
+    decimal weight
+    boolean has_inventory
+    integer stock_quantity
+    boolean featured
+    string meta_title
+    text meta_description
+    string og_title
+    text og_description
+    string canonical_url
+    boolean no_index
+    jsonb images
+    string sync_status
+    integer wc_product_id
+    timestamptz last_synced_at
+    text notes
+    timestamptz created_at
+  }
+
+  product_types {
+    uuid id PK
+    venture venture
+    string name
+    boolean has_variants
+    boolean has_inventory
+    boolean has_weight
+  }
+
+  product_brands {
+    uuid id PK
+    venture venture
+    string name
+    string slug
+    string logo_url
+  }
+
+  product_categories {
+    uuid id PK
+    venture venture
+    uuid parent_id FK
+    string name
+    string slug
+    string path
+    integer level
+    integer sort_order
+    text description
+    string meta_title
+    text meta_description
+  }
+
+  product_tags {
+    uuid id PK
+    venture venture
+    string name
+  }
+
+  product_variants {
+    uuid id PK
+    uuid product_id FK
+    string sku
+    decimal price
+    integer stock_quantity
+    boolean active
+    jsonb option_values
+  }
+
+  product_variant_options {
+    uuid id PK
+    uuid product_id FK
+    string name
+    jsonb values
+  }
+
+  inventory_movements {
+    uuid id PK
+    uuid product_id FK
+    uuid variant_id FK
+    string type
+    integer quantity
+    integer stock_before
+    integer stock_after
+    text notes
+    timestamptz created_at
+  }
+
+  product_category_map {
+    uuid product_id FK
+    uuid category_id FK
+  }
+
+  product_tag_map {
+    uuid product_id FK
+    uuid tag_id FK
+  }
+
+  tax_classes {
+    uuid id PK
+    venture venture
+    string name
+    boolean is_default
+    timestamptz created_at
+  }
+
+  tax_rates {
+    uuid id PK
+    uuid tax_class_id FK
+    string country_code
+    decimal rate
+    string label
+  }
+
+  product_sync_log {
+    uuid id PK
+    uuid product_id FK
+    string status
+    string action
+    integer wc_product_id
+    text error_message
+    timestamptz created_at
+  }
+
+  system_config {
+    uuid id PK
+    string key
+    text value
+    timestamptz updated_at
+  }
+
+  user_venture_roles {
+    uuid id PK
+    uuid user_id
+    venture venture
+    string role
+    timestamptz created_at
+  }
+
+  user_invites {
+    uuid id PK
+    string email
+    venture venture
+    string role
+    string token
+    timestamptz expires_at
+    timestamptz created_at
+  }
+
+  leads          ||--o{ lead_activities       : "hat"
+  customers      ||--o{ orders                : "hat"
+  orders         }o--|| payment_models        : "nutzt"
+  orders         ||--o{ order_activities      : "hat"
+  products       }o--|| product_types         : "ist"
+  products       }o--|| product_brands        : "von"
+  products       }o--o| tax_classes           : "mit"
+  products       ||--o{ product_variants      : "hat"
+  products       ||--o{ product_variant_options : "hat"
+  products       ||--o{ inventory_movements   : "log"
+  products       ||--o{ product_sync_log      : "sync"
+  products       ||--o{ product_category_map  : "in"
+  products       ||--o{ product_tag_map       : "tagged"
+  product_categories ||--o{ product_category_map : "enthält"
+  product_categories ||--o{ product_categories  : "parent"
+  product_tags   ||--o{ product_tag_map       : "hat"
+  tax_classes    ||--o{ tax_rates             : "hat"
+    </div>
+  </div>
+</div>
+
+<!-- TABLE REFERENCE -->
+<div class="section">
+  <div class="section-title">Tabellen-Referenz</div>
+  <div class="tables-grid">
+
+    <!-- CRM -->
+    <div class="table-card">
+      <div class="table-header cat-crm">leads <span class="badge badge-crm">CRM</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">venture</span><span class="col-type">enum</span></div>
+        <div class="col"><span class="col-name">first_name, last_name</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">company_name, email</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">phone, website, city</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">status</span><span class="col-type">lead_status enum</span></div>
+        <div class="col"><span class="col-name">source</span><span class="col-type">lead_source enum</span></div>
+        <div class="col"><span class="col-name">notes</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">is_duplicate</span><span class="col-type">bool</span></div>
+        <div class="col"><span class="col-name">automation_enabled</span><span class="col-type">bool</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-crm">lead_activities <span class="badge badge-crm">CRM</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">lead_id</span><span class="col-type">→ leads</span></div>
+        <div class="col"><span class="col-name">type, content</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">created_at</span><span class="col-type">timestamptz</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-crm">customers <span class="badge badge-crm">CRM</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">venture</span><span class="col-type">enum</span></div>
+        <div class="col"><span class="col-name">first_name, last_name</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">company_name, email</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">phone, city</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">notes</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">archived_at</span><span class="col-type">timestamptz</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-crm">mail_templates <span class="badge badge-crm">CRM</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">venture</span><span class="col-type">enum</span></div>
+        <div class="col"><span class="col-name">name, subject</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">body_html</span><span class="col-type">text</span></div>
+      </div>
+    </div>
+
+    <!-- ORDERS -->
+    <div class="table-card">
+      <div class="table-header cat-orders">orders <span class="badge badge-orders">Aufträge</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">customer_id</span><span class="col-type">→ customers</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">payment_model_id</span><span class="col-type">→ payment_models</span></div>
+        <div class="col"><span class="col-name">venture, status</span><span class="col-type">enum</span></div>
+        <div class="col"><span class="col-name">total_amount</span><span class="col-type">decimal</span></div>
+        <div class="col"><span class="col-name">invoice_number</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">invoice_html, invoice_data</span><span class="col-type">text / jsonb</span></div>
+        <div class="col"><span class="col-name">payment_steps</span><span class="col-type">jsonb</span></div>
+        <div class="col"><span class="col-name">invoice_sent</span><span class="col-type">bool</span></div>
+        <div class="col"><span class="col-name">anzahlung_erhalten</span><span class="col-type">bool</span></div>
+        <div class="col"><span class="col-name">restzahlung_erhalten</span><span class="col-type">bool</span></div>
+        <div class="col"><span class="col-name">notes, archived_at</span><span class="col-type">text / ts</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-orders">order_activities <span class="badge badge-orders">Aufträge</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">order_id</span><span class="col-type">→ orders</span></div>
+        <div class="col"><span class="col-name">type, content</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">created_at</span><span class="col-type">timestamptz</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-orders">payment_models <span class="badge badge-orders">Aufträge</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">venture</span><span class="col-type">enum</span></div>
+        <div class="col"><span class="col-name">name</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">steps</span><span class="col-type">jsonb</span></div>
+        <div class="col"><span class="col-name">is_default</span><span class="col-type">bool</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-orders">attachments <span class="badge badge-orders">Aufträge</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">entity_type</span><span class="col-type">text (order/customer/product)</span></div>
+        <div class="col"><span class="col-name">entity_id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">filename, storage_path</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">description</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">file_size</span><span class="col-type">int</span></div>
+      </div>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div class="table-card">
+      <div class="table-header cat-products">products <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">type_id, brand_id</span><span class="col-type">→ types / brands</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">tax_class_id</span><span class="col-type">→ tax_classes</span></div>
+        <div class="col"><span class="col-name">name, sku, slug</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">status</span><span class="col-type">draft/active/archived</span></div>
+        <div class="col"><span class="col-name">price, compare_price, cost_price</span><span class="col-type">decimal</span></div>
+        <div class="col"><span class="col-name">sale_price, sale_from, sale_until</span><span class="col-type">decimal/date</span></div>
+        <div class="col"><span class="col-name">description, short_description</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">weight, stock_quantity</span><span class="col-type">decimal/int</span></div>
+        <div class="col"><span class="col-name">has_inventory, featured</span><span class="col-type">bool</span></div>
+        <div class="col"><span class="col-name">meta_title, meta_description</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">og_title, og_description</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">canonical_url, no_index</span><span class="col-type">text/bool</span></div>
+        <div class="col"><span class="col-name">images</span><span class="col-type">jsonb array</span></div>
+        <div class="col"><span class="col-name">sync_status, wc_product_id</span><span class="col-type">text/int</span></div>
+        <div class="col"><span class="col-name">last_synced_at</span><span class="col-type">timestamptz</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-products">product_types <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">venture, name</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">has_variants</span><span class="col-type">bool</span></div>
+        <div class="col"><span class="col-name">has_inventory</span><span class="col-type">bool</span></div>
+        <div class="col"><span class="col-name">has_weight</span><span class="col-type">bool</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-products">product_brands <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">venture, name, slug</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">logo_url</span><span class="col-type">text</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-products">product_categories <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">parent_id</span><span class="col-type">→ self (L1→L2→L3)</span></div>
+        <div class="col"><span class="col-name">venture, name</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">slug, path</span><span class="col-type">auto via DB-Trigger</span></div>
+        <div class="col"><span class="col-name">level</span><span class="col-type">1 / 2 / 3</span></div>
+        <div class="col"><span class="col-name">sort_order</span><span class="col-type">int</span></div>
+        <div class="col"><span class="col-name">meta_title, meta_description</span><span class="col-type">text</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-products">product_variants <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">product_id</span><span class="col-type">→ products</span></div>
+        <div class="col"><span class="col-name">sku</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">price</span><span class="col-type">decimal</span></div>
+        <div class="col"><span class="col-name">stock_quantity</span><span class="col-type">int</span></div>
+        <div class="col"><span class="col-name">option_values</span><span class="col-type">jsonb</span></div>
+        <div class="col"><span class="col-name">active</span><span class="col-type">bool</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-products">product_variant_options <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">product_id</span><span class="col-type">→ products</span></div>
+        <div class="col"><span class="col-name">name</span><span class="col-type">text (z.B. "Größe")</span></div>
+        <div class="col"><span class="col-name">values</span><span class="col-type">jsonb (["S","M","L"])</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-products">inventory_movements <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">product_id</span><span class="col-type">→ products</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">variant_id</span><span class="col-type">→ product_variants</span></div>
+        <div class="col"><span class="col-name">type</span><span class="col-type">eingang/ausgang/korrektur/retoure</span></div>
+        <div class="col"><span class="col-name">quantity</span><span class="col-type">int</span></div>
+        <div class="col"><span class="col-name">stock_before, stock_after</span><span class="col-type">int</span></div>
+        <div class="col"><span class="col-name">notes</span><span class="col-type">text</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-products">product_category_map <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">product_id</span><span class="col-type">→ products</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">category_id</span><span class="col-type">→ product_categories</span></div>
+        <div class="col" style="color:#556080; font-size:10px; margin-top:4px;">n:m Verknüpfung</div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-products">product_tag_map <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">product_id</span><span class="col-type">→ products</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">tag_id</span><span class="col-type">→ product_tags</span></div>
+        <div class="col" style="color:#556080; font-size:10px; margin-top:4px;">n:m Verknüpfung</div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-products">product_tags <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">venture, name</span><span class="col-type">text</span></div>
+        <div class="col" style="color:#556080; font-size:10px; margin-top:4px;">unique (name, venture)</div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-products">tax_classes <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">venture, name</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">is_default</span><span class="col-type">bool</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-products">tax_rates <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">tax_class_id</span><span class="col-type">→ tax_classes</span></div>
+        <div class="col"><span class="col-name">country_code, label</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">rate</span><span class="col-type">decimal (z.B. 19.00)</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-products">product_sync_log <span class="badge badge-products">Produkte</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-fk">FK</span><span class="col-name">product_id</span><span class="col-type">→ products</span></div>
+        <div class="col"><span class="col-name">status</span><span class="col-type">success/error/pending</span></div>
+        <div class="col"><span class="col-name">action</span><span class="col-type">create/update</span></div>
+        <div class="col"><span class="col-name">wc_product_id</span><span class="col-type">int</span></div>
+        <div class="col"><span class="col-name">error_message</span><span class="col-type">text</span></div>
+      </div>
+    </div>
+
+    <!-- SYSTEM -->
+    <div class="table-card">
+      <div class="table-header cat-system">system_config <span class="badge badge-system">System</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">key</span><span class="col-type">text (unique)</span></div>
+        <div class="col"><span class="col-name">value</span><span class="col-type">text / JSON</span></div>
+        <div class="col"><span class="col-name">updated_at</span><span class="col-type">timestamptz</span></div>
+        <div class="divider"></div>
+        <div style="font-size:10px; color:#556080;">Keys: ki_search_enabled, ki_search_ventures,<br>venture_info_{x}, {x}_wc_config, ...</div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-system">user_venture_roles <span class="badge badge-system">System</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">user_id</span><span class="col-type">uuid (auth.users)</span></div>
+        <div class="col"><span class="col-name">venture</span><span class="col-type">enum</span></div>
+        <div class="col"><span class="col-name">role</span><span class="col-type">owner/admin/member</span></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-system">user_invites <span class="badge badge-system">System</span></div>
+      <div class="table-cols">
+        <div class="col"><span class="col-pk">PK</span><span class="col-name">id</span><span class="col-type">uuid</span></div>
+        <div class="col"><span class="col-name">email</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">venture, role</span><span class="col-type">text</span></div>
+        <div class="col"><span class="col-name">token</span><span class="col-type">text (unique)</span></div>
+        <div class="col"><span class="col-name">expires_at</span><span class="col-type">timestamptz</span></div>
+      </div>
+    </div>
+
+    <!-- VIEWS -->
+    <div class="table-card">
+      <div class="table-header cat-views">v_lead_pipeline <span class="badge badge-views">View</span></div>
+      <div class="table-cols" style="color:#556080; font-size:11px;">Leads mit Aktivitäten-Count, letzter Aktivität und Follow-Up-Status</div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-views">v_due_follow_ups <span class="badge badge-views">View</span></div>
+      <div class="table-cols" style="color:#556080; font-size:11px;">Leads deren Follow-Up heute oder früher fällig ist</div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-views">v_daily_new_leads <span class="badge badge-views">View</span></div>
+      <div class="table-cols" style="color:#556080; font-size:11px;">Heute neu eingegangene Leads pro Venture</div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-header cat-views">v_reactivation_today <span class="badge badge-views">View</span></div>
+      <div class="table-cols" style="color:#556080; font-size:11px;">Leads die heute zur Reaktivierung anstehen</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ENUMS -->
+<div class="section">
+  <div class="section-title">Enums</div>
+  <div class="enums-grid">
+    <div class="enum-card">
+      <div class="enum-name">venture</div>
+      <div class="enum-values">
+        <span class="enum-val">online_first</span>
+        <span class="enum-val">blazed_outfitters</span>
+        <span class="enum-val">droplane</span>
+        <span class="enum-val">brandary</span>
+        <span class="enum-val" style="opacity:0.5">worknest ⚠️ pending</span>
+      </div>
+    </div>
+    <div class="enum-card">
+      <div class="enum-name">lead_status</div>
+      <div class="enum-values">
+        <span class="enum-val">neu</span>
+        <span class="enum-val">kontaktiert</span>
+        <span class="enum-val">qualifiziert</span>
+        <span class="enum-val">angebot</span>
+        <span class="enum-val">gewonnen</span>
+        <span class="enum-val">verloren</span>
+      </div>
+    </div>
+    <div class="enum-card">
+      <div class="enum-name">lead_source</div>
+      <div class="enum-values">
+        <span class="enum-val">webformular</span>
+        <span class="enum-val">ki_suche</span>
+        <span class="enum-val">empfehlung</span>
+        <span class="enum-val">manuell</span>
+        <span class="enum-val">csv_import</span>
+      </div>
+    </div>
+    <div class="enum-card">
+      <div class="enum-name">order_status</div>
+      <div class="enum-values">
+        <span class="enum-val">entwurf</span>
+        <span class="enum-val">aktiv</span>
+        <span class="enum-val">in_bearbeitung</span>
+        <span class="enum-val">abgeschlossen</span>
+        <span class="enum-val">storniert</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STORAGE -->
+<div class="section">
+  <div class="section-title">Storage Buckets</div>
+  <div class="tables-grid">
+    <div class="table-card">
+      <div class="table-header cat-products">product-images <span class="badge badge-products">Storage</span></div>
+      <div class="table-cols" style="color:#8891AA;">
+        Pfad: <span style="font-family:monospace; color:#C8A96E;">{venture}/{product_id}/{timestamp}.{ext}</span>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-header cat-orders">attachments <span class="badge badge-orders">Storage</span></div>
+      <div class="table-cols" style="color:#8891AA;">
+        Pfad: <span style="font-family:monospace; color:#C8A96E;">{entity_type}/{entity_id}/{timestamp}_{filename}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>Founder OS · Supabase bshuqljbanmphmjyicdc · Stand 2026-04-29</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#1B2A5E',
+      primaryTextColor: '#F7F8FC',
+      primaryBorderColor: '#C8A96E',
+      lineColor: '#C8A96E',
+      secondaryColor: '#14193A',
+      tertiaryColor: '#0E1221',
+      edgeLabelBackground: '#14193A',
+      fontFamily: 'Inter, sans-serif',
+      fontSize: '12px',
+    },
+    er: {
+      diagramPadding: 20,
+      layoutDirection: 'TB',
+      minEntityWidth: 100,
+      minEntityHeight: 75,
+      entityPadding: 15,
+      useMaxWidth: true,
+    }
+  });
+</script>
+</body>
+</html>
