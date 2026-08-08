@@ -2,10 +2,24 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "founder-os-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/joserodriguez/Desktop/founder os/dashboard", "run", "dev"],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
       "name": "sentinellogic-dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "/Users/joserodriguez/Desktop/sentinellogic", "run", "dev"],
       "port": 3001,
+      "autoPort": true
+    },
+    {
+      "name": "sentinellogic-prod",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/joserodriguez/Desktop/sentinellogic", "run", "start"],
+      "port": 3002,
       "autoPort": true
     }
   ]

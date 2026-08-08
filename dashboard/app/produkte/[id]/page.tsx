@@ -98,6 +98,10 @@ export default function ProduktDetailPage() {
   const [taxClasses, setTaxClasses] = useState<{ id: string; name: string; rates: { rate: number }[] }[]>([]);
   const [editTaxClassId, setEditTaxClassId] = useState<string | null>(null);
 
+  // Return classes
+  const [returnClasses, setReturnClasses] = useState<{ id: string; name: string; cost: number }[]>([]);
+  const [editReturnClassId, setEditReturnClassId] = useState<string | null>(null);
+
   // Image upload
   const [uploading, setUploading] = useState(false);
 
@@ -106,11 +110,14 @@ export default function ProduktDetailPage() {
       fetch(`/api/produkte/${id}`).then(r => r.json()),
       fetch(`/api/produkte/${id}/lager`).then(r => r.json()),
     ]);
-    // Load tax classes for this venture
+    // Load tax + return classes for this venture
     if (p.venture) {
       fetch(`/api/steuerklassen?venture=${p.venture}`)
         .then(r => r.json())
         .then(data => setTaxClasses(Array.isArray(data) ? data : []));
+      fetch(`/api/retoureklassen?venture=${p.venture}`)
+        .then(r => r.json())
+        .then(data => setReturnClasses(Array.isArray(data) ? data : []));
     }
     setProduct(p);
     setSelectedCategories((p.categories ?? []).map((c: any) => c.id));
@@ -141,6 +148,7 @@ export default function ProduktDetailPage() {
     setEditCanonical(p.canonical_url ?? "");
     setEditNoIndex(p.no_index ?? false);
     setEditTaxClassId(p.tax_class_id ?? null);
+    setEditReturnClassId(p.return_class_id ?? null);
     setVariantOptions(p.variant_options ?? []);
     setVariants((p.variants ?? []).map((v: any) => ({
       ...v, price: v.price != null ? String(v.price) : "",
@@ -740,6 +748,29 @@ export default function ProduktDetailPage() {
                       </div>
                     )}
                   </div>
+                  {/* Retourekosten-Hinweis */}
+                  {movForm.type === "return" && (() => {
+                    const rc = editReturnClassId
+                      ? returnClasses.find(r => r.id === editReturnClassId)
+                      : null;
+                    return (
+                      <div className="rounded-md px-3 py-2.5 text-xs"
+                        style={{ background: rc && rc.cost === 0 ? "#F0FDF4" : "#FFFBEB", border: "1px solid", borderColor: rc && rc.cost === 0 ? "#BBF7D0" : "#FDE68A" }}>
+                        {!rc ? (
+                          <span className="text-gray-500">
+                            ℹ️ Für dieses Produkt ist keine Retoureklasse hinterlegt.{" "}
+                            <a href="/einstellungen/retoureklassen" className="underline text-blue-600">Jetzt anlegen →</a>
+                          </span>
+                        ) : rc.cost === 0 ? (
+                          <span style={{ color: "#16A34A" }}>✓ Retourekosten: <strong>Kostenlos</strong> (Klasse: {rc.name})</span>
+                        ) : (
+                          <span style={{ color: "#92400E" }}>
+                            ⚠️ Retourekosten: <strong>{Number(rc.cost).toFixed(2).replace(".", ",")} €</strong> (Klasse: {rc.name}) — trägt der Käufer
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Notiz</label>
                     <input type="text" value={movForm.note}
@@ -873,6 +904,51 @@ export default function ProduktDetailPage() {
               {saving === "tax" && <p className="text-xs text-gray-400">Gespeichert…</p>}
             </div>
           )}
+
+          {/* Retoureklasse */}
+          <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-3">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Retoureklasse</p>
+            {returnClasses.length === 0 ? (
+              <p className="text-xs text-gray-400">
+                Noch keine Retoureklassen.{" "}
+                <a href="/einstellungen/retoureklassen" className="text-blue-500 hover:underline">
+                  Jetzt anlegen →
+                </a>
+              </p>
+            ) : (
+              <>
+                <select
+                  value={editReturnClassId ?? ""}
+                  onChange={async e => {
+                    const val = e.target.value || null;
+                    setEditReturnClassId(val);
+                    await patch({ return_class_id: val }, "return_class");
+                  }}
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">— Keine —</option>
+                  {returnClasses.map(rc => (
+                    <option key={rc.id} value={rc.id}>
+                      {rc.name} ({rc.cost === 0 ? "kostenlos" : `${Number(rc.cost).toFixed(2).replace(".", ",")} €`})
+                    </option>
+                  ))}
+                </select>
+                {editReturnClassId && (() => {
+                  const rc = returnClasses.find(r => r.id === editReturnClassId);
+                  if (!rc) return null;
+                  return (
+                    <p className="text-xs rounded px-2 py-1.5"
+                      style={{ background: rc.cost === 0 ? "#F0FDF4" : "#FFFBEB", color: rc.cost === 0 ? "#16A34A" : "#D97706" }}>
+                      {rc.cost === 0
+                        ? "✓ Retoure kostenlos für Käufer"
+                        : `Retourekosten: ${Number(rc.cost).toFixed(2).replace(".", ",")} € trägt der Käufer`}
+                    </p>
+                  );
+                })()}
+                {saving === "return_class" && <p className="text-xs text-gray-400">Gespeichert…</p>}
+              </>
+            )}
+          </div>
 
           {/* Kategorien */}
           {allCategories.length > 0 && (

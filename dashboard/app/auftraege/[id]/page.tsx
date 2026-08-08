@@ -38,6 +38,7 @@ interface Order {
   description: string | null;
   briefing_url: string | null;
   tracking_number: string | null;
+  tracking_carrier: string | null;
   anzahlung_betrag: number | null;
   anzahlung_erhalten: boolean;
   restzahlung_erhalten: boolean;
@@ -117,6 +118,7 @@ export default function AuftragDetailPage() {
   const [editStatus, setEditStatus] = useState<string>("");
   const [editBriefingUrl, setEditBriefingUrl] = useState("");
   const [editTracking, setEditTracking] = useState("");
+  const [editCarrier, setEditCarrier] = useState("");
   const [invoiceLoading, setInvoiceLoading] = useState<string | null>(null);
   const [invoiceMsg, setInvoiceMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [invoiceEdit, setInvoiceEdit] = useState(false);
@@ -141,6 +143,7 @@ export default function AuftragDetailPage() {
     setEditStatus(o.status);
     setEditBriefingUrl(o.briefing_url ?? "");
     setEditTracking(o.tracking_number ?? "");
+    setEditCarrier(o.tracking_carrier ?? "");
     setActivities(Array.isArray(a) ? a : []);
     setLoading(false);
   }
@@ -378,24 +381,66 @@ export default function AuftragDetailPage() {
                 )}
               </div>
             </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Tracking-Nummer</label>
+            <div className="space-y-2">
+              <label className="text-xs text-gray-500 block">Tracking / Sendungsverfolgung</label>
               <div className="flex gap-2">
+                <select
+                  value={editCarrier}
+                  onChange={e => setEditCarrier(e.target.value)}
+                  className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 w-36 shrink-0"
+                >
+                  <option value="">— Carrier —</option>
+                  <option value="dhl">DHL</option>
+                  <option value="dpd">DPD</option>
+                  <option value="ups">UPS</option>
+                  <option value="gls">GLS</option>
+                  <option value="hermes">Hermes</option>
+                  <option value="fedex">FedEx</option>
+                  <option value="dhl_express">DHL Express</option>
+                  <option value="other">Sonstige</option>
+                </select>
                 <input
                   type="text"
                   value={editTracking}
                   onChange={(e) => setEditTracking(e.target.value)}
-                  placeholder="z.B. DHL / Sendungsnummer"
+                  placeholder="Sendungsnummer"
                   className="flex-1 text-sm border border-gray-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
-                {editTracking !== (order.tracking_number ?? "") && (
-                  <button onClick={() => patch({ tracking_number: editTracking || null })}
+                {(editTracking !== (order.tracking_number ?? "") || editCarrier !== (order.tracking_carrier ?? "")) && (
+                  <button
+                    onClick={() => patch({ tracking_number: editTracking || null, tracking_carrier: editCarrier || null })}
                     disabled={saving === "tracking_number"}
-                    className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
+                    className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 shrink-0">
                     {saving === "tracking_number" ? "..." : "Speichern"}
                   </button>
                 )}
               </div>
+              {order.tracking_number && order.tracking_carrier && order.tracking_carrier !== "other" && (() => {
+                const urls: Record<string, string> = {
+                  dhl: `https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode=${order.tracking_number}`,
+                  dpd: `https://tracking.dpd.de/status/de_DE/parcel/${order.tracking_number}`,
+                  ups: `https://www.ups.com/track?tracknum=${order.tracking_number}&loc=de_DE`,
+                  gls: `https://gls-group.eu/DE/de/paketverfolgung.html?match=${order.tracking_number}`,
+                  hermes: `https://www.myhermes.de/empfangen/sendungsverfolgung/#${order.tracking_number}`,
+                  fedex: `https://www.fedex.com/de-de/tracking.html?tracknumbers=${order.tracking_number}`,
+                  dhl_express: `https://www.dhl.com/de-de/home/tracking.html?tracking-id=${order.tracking_number}`,
+                };
+                const url = urls[order.tracking_carrier];
+                if (!url) return null;
+                return (
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    Sendung bei {order.tracking_carrier.toUpperCase().replace("_EXPRESS", " Express").replace("DHL_EXPRESS", "DHL Express")} verfolgen →
+                  </a>
+                );
+              })()}
             </div>
           </div>
 

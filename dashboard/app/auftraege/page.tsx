@@ -18,6 +18,8 @@ interface Order {
   notes: string | null;
   archived_at: string | null;
   invoice_number: string | null;
+  tracking_number: string | null;
+  tracking_carrier: string | null;
   customer: {
     id: string;
     first_name: string;
@@ -124,7 +126,9 @@ export default function AuftraegePage() {
       !q ||
       o.title.toLowerCase().includes(q) ||
       `${o.customer?.first_name ?? ""} ${o.customer?.last_name ?? ""}`.toLowerCase().includes(q) ||
-      (o.customer?.company_name ?? "").toLowerCase().includes(q)
+      (o.customer?.company_name ?? "").toLowerCase().includes(q) ||
+      (o.invoice_number ?? "").toLowerCase().includes(q) ||
+      (o.tracking_number ?? "").toLowerCase().includes(q)
     );
   });
 
@@ -196,10 +200,10 @@ export default function AuftraegePage() {
       >
         <input
           type="text"
-          placeholder="Suchen..."
+          placeholder="Suchen nach Titel, Kunde, Re.-Nr., Sendungsnr. …"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={inputStyle}
+          style={{ ...inputStyle, minWidth: "260px" }}
         />
         <select
           value={filterStatus}
@@ -275,6 +279,11 @@ export default function AuftraegePage() {
                     >
                       {o.title}
                     </Link>
+                    {o.tracking_number && (
+                      <div className="text-xs mt-0.5" style={{ color: "#6B7280" }}>
+                        📦 {o.tracking_carrier ? o.tracking_carrier.toUpperCase().replace("_", " ") : ""} {o.tracking_number}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3.5 text-xs font-mono" style={{ color: o.invoice_number ? "#14193A" : "#D1D5E8" }}>
                     {o.invoice_number ?? "—"}
