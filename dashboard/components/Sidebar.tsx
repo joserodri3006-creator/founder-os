@@ -62,6 +62,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
         { href: "/einstellungen/marken", label: "Marken", show: canEdit("settings") },
         { href: "/einstellungen/steuern", label: "Steuern", show: canEdit("settings") },
         { href: "/einstellungen/retoureklassen", label: "Retoureklassen", show: canEdit("settings") },
+        { href: "/einstellungen/lieferanten", label: "Lieferanten", show: canEdit("settings") },
         { href: "/einstellungen/benachrichtigungen", label: "Benachrichtigungen", show: true },
       ],
     },

@@ -28,6 +28,7 @@ export default function NeuesProduktPage() {
   const [form, setForm] = useState({
     name: "",
     sku: "",
+    internal_number: "",
     short_description: "",
     description: "",
     price: "",
@@ -91,6 +92,7 @@ export default function NeuesProduktPage() {
       venture,
       name: form.name.trim(),
       sku: form.sku.trim() || null,
+      internal_number: form.internal_number.trim() || null,
       short_description: form.short_description.trim() || null,
       description: form.description.trim() || null,
       price: form.price ? parseFloat(form.price) : null,
@@ -162,11 +164,19 @@ export default function NeuesProduktPage() {
             <textarea rows={4} value={form.description} onChange={e => upd({ description: e.target.value })}
               className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none" />
           </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">SKU</label>
-            <input type="text" value={form.sku} onChange={e => upd({ sku: e.target.value })}
-              placeholder="z.B. BOF-001"
-              className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">SKU</label>
+              <input type="text" value={form.sku} onChange={e => upd({ sku: e.target.value })}
+                placeholder="z.B. BOF-001"
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Interne Nr.</label>
+              <input type="text" value={form.internal_number} onChange={e => upd({ internal_number: e.target.value })}
+                placeholder="z.B. ART-0042"
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+            </div>
           </div>
         </div>
 

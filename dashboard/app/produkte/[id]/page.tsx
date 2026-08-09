@@ -98,6 +98,24 @@ export default function ProduktDetailPage() {
   const [taxClasses, setTaxClasses] = useState<{ id: string; name: string; rates: { rate: number }[] }[]>([]);
   const [editTaxClassId, setEditTaxClassId] = useState<string | null>(null);
 
+  // Interne Nummer
+  const [editInternalNumber, setEditInternalNumber] = useState("");
+
+  // Händler / Lieferanten
+  interface SupplierEntry {
+    product_id: string;
+    supplier_id: string;
+    purchase_price: number | null;
+    lead_time_days: number | null;
+    is_primary: boolean;
+    notes: string | null;
+    supplier: { id: string; name: string; contact_name: string | null; email: string | null; phone: string | null };
+  }
+  const [allSuppliers, setAllSuppliers] = useState<{ id: string; name: string }[]>([]);
+  const [productSuppliers, setProductSuppliers] = useState<SupplierEntry[]>([]);
+  const [showAddSupplier, setShowAddSupplier] = useState(false);
+  const [supForm, setSupForm] = useState({ supplier_id: "", purchase_price: "", lead_time_days: "", is_primary: false, notes: "" });
+
   // Return classes
   const [returnClasses, setReturnClasses] = useState<{ id: string; name: string; cost: number }[]>([]);
   const [editReturnClassId, setEditReturnClassId] = useState<string | null>(null);
@@ -106,11 +124,12 @@ export default function ProduktDetailPage() {
   const [uploading, setUploading] = useState(false);
 
   async function load() {
-    const [p, m] = await Promise.all([
+    const [p, m, sup] = await Promise.all([
       fetch(`/api/produkte/${id}`).then(r => r.json()),
       fetch(`/api/produkte/${id}/lager`).then(r => r.json()),
+      fetch(`/api/produkte/${id}/lieferanten`).then(r => r.json()),
     ]);
-    // Load tax + return classes for this venture
+    // Load tax + return classes + all suppliers for this venture
     if (p.venture) {
       fetch(`/api/steuerklassen?venture=${p.venture}`)
         .then(r => r.json())
@@ -118,7 +137,11 @@ export default function ProduktDetailPage() {
       fetch(`/api/retoureklassen?venture=${p.venture}`)
         .then(r => r.json())
         .then(data => setReturnClasses(Array.isArray(data) ? data : []));
+      fetch(`/api/lieferanten?venture=${p.venture}`)
+        .then(r => r.json())
+        .then(data => setAllSuppliers(Array.isArray(data) ? data : []));
     }
+    setProductSuppliers(Array.isArray(sup) ? sup : []);
     setProduct(p);
     setSelectedCategories((p.categories ?? []).map((c: any) => c.id));
     if (p.venture) {
@@ -134,6 +157,7 @@ export default function ProduktDetailPage() {
     setEditDescription(p.description ?? "");
     setEditShortDesc(p.short_description ?? "");
     setEditSku(p.sku ?? "");
+    setEditInternalNumber(p.internal_number ?? "");
     setEditWeight(p.weight != null ? String(p.weight) : "");
     setEditFeatured(p.is_featured ?? false);
     setEditTrackInventory(p.track_inventory ?? false);
@@ -297,6 +321,12 @@ export default function ProduktDetailPage() {
                 <input type="text" value={editSku} onChange={e => setEditSku(e.target.value)}
                   className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
               </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Interne Nr.</label>
+                <input type="text" value={editInternalNumber} onChange={e => setEditInternalNumber(e.target.value)}
+                  placeholder="z.B. ART-0042"
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
               {hasWeight && (
                 <div>
                   <label className="text-xs text-gray-500 block mb-1">Gewicht (kg)</label>
@@ -318,6 +348,7 @@ export default function ProduktDetailPage() {
             <div className="flex gap-3">
               <button onClick={() => patch({
                 name: editName, sku: editSku || null,
+                internal_number: editInternalNumber || null,
                 short_description: editShortDesc || null, description: editDescription || null,
                 weight: editWeight ? parseFloat(editWeight) : null,
                 is_featured: editFeatured, track_inventory: editTrackInventory,
@@ -434,6 +465,151 @@ export default function ProduktDetailPage() {
               className="text-sm px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors">
               {saving === "prices" ? "..." : "Preise speichern"}
             </button>
+          </div>
+
+          {/* Händler / Lieferanten */}
+          <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Lieferanten</p>
+              <button
+                onClick={() => setShowAddSupplier(v => !v)}
+                className="text-xs text-blue-600 hover:text-blue-700"
+              >
+                {showAddSupplier ? "Abbrechen" : "+ Hinzufügen"}
+              </button>
+            </div>
+
+            {/* Add form */}
+            {showAddSupplier && (
+              <div className="border border-dashed border-gray-200 rounded-lg p-3 space-y-2">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Lieferant</label>
+                  <select
+                    value={supForm.supplier_id}
+                    onChange={e => setSupForm(f => ({ ...f, supplier_id: e.target.value }))}
+                    className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">— Wählen —</option>
+                    {allSuppliers
+                      .filter(s => !productSuppliers.find(ps => ps.supplier_id === s.id))
+                      .map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  {allSuppliers.length === 0 && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Noch keine Lieferanten.{" "}
+                      <a href="/einstellungen/lieferanten" className="text-blue-500 hover:underline">Anlegen →</a>
+                    </p>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">EK-Preis (€)</label>
+                    <input type="number" step="0.01" min="0"
+                      value={supForm.purchase_price}
+                      onChange={e => setSupForm(f => ({ ...f, purchase_price: e.target.value }))}
+                      placeholder="0.00"
+                      className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Lieferzeit (Tage)</label>
+                    <input type="number" min="0"
+                      value={supForm.lead_time_days}
+                      onChange={e => setSupForm(f => ({ ...f, lead_time_days: e.target.value }))}
+                      placeholder="—"
+                      className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Notiz</label>
+                  <input type="text"
+                    value={supForm.notes}
+                    onChange={e => setSupForm(f => ({ ...f, notes: e.target.value }))}
+                    placeholder="z.B. Mindestbestellmenge 10 Stk."
+                    className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                  <input type="checkbox"
+                    checked={supForm.is_primary}
+                    onChange={e => setSupForm(f => ({ ...f, is_primary: e.target.checked }))}
+                    className="rounded"
+                  />
+                  Primärer Lieferant
+                </label>
+                <button
+                  disabled={!supForm.supplier_id || saving === "supplier"}
+                  onClick={async () => {
+                    setSaving("supplier");
+                    await fetch(`/api/produkte/${id}/lieferanten`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        supplier_id: supForm.supplier_id,
+                        purchase_price: supForm.purchase_price ? parseFloat(supForm.purchase_price) : null,
+                        lead_time_days: supForm.lead_time_days ? parseInt(supForm.lead_time_days) : null,
+                        is_primary: supForm.is_primary,
+                        notes: supForm.notes || null,
+                      }),
+                    });
+                    setSupForm({ supplier_id: "", purchase_price: "", lead_time_days: "", is_primary: false, notes: "" });
+                    setShowAddSupplier(false);
+                    await load();
+                    setSaving(null);
+                  }}
+                  className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {saving === "supplier" ? "…" : "Hinzufügen"}
+                </button>
+              </div>
+            )}
+
+            {/* List */}
+            {productSuppliers.length === 0 && !showAddSupplier ? (
+              <p className="text-xs text-gray-400">Noch kein Lieferant verknüpft.</p>
+            ) : (
+              <div className="space-y-2">
+                {productSuppliers.map(ps => (
+                  <div key={ps.supplier_id} className="flex items-start justify-between gap-3 py-2 border-b border-gray-100 last:border-0">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-800">{ps.supplier.name}</p>
+                        {ps.is_primary && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700">Primär</span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                        {ps.purchase_price != null && (
+                          <span className="text-xs text-gray-500">EK: {Number(ps.purchase_price).toFixed(2).replace(".", ",")} €</span>
+                        )}
+                        {ps.lead_time_days != null && (
+                          <span className="text-xs text-gray-500">~{ps.lead_time_days} Tage</span>
+                        )}
+                        {ps.supplier.email && (
+                          <a href={`mailto:${ps.supplier.email}`} className="text-xs text-blue-500 hover:underline">{ps.supplier.email}</a>
+                        )}
+                      </div>
+                      {ps.notes && <p className="text-xs text-gray-400 mt-0.5">{ps.notes}</p>}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Lieferant „${ps.supplier.name}" von diesem Produkt entfernen?`)) return;
+                        await fetch(`/api/produkte/${id}/lieferanten`, {
+                          method: "DELETE",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ supplier_id: ps.supplier_id }),
+                        });
+                        await load();
+                      }}
+                      className="text-xs text-red-400 hover:text-red-600 shrink-0"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Bilder */}
@@ -877,6 +1053,12 @@ export default function ProduktDetailPage() {
               <p className="text-xs text-gray-400">Erstellt</p>
               <p className="text-gray-700">{new Date(product.created_at).toLocaleDateString("de-DE")}</p>
             </div>
+            {product.updated_at && product.updated_at !== product.created_at && (
+              <div>
+                <p className="text-xs text-gray-400">Geändert</p>
+                <p className="text-gray-700">{new Date(product.updated_at).toLocaleDateString("de-DE")}</p>
+              </div>
+            )}
           </div>
 
           {/* Steuerklasse */}
