@@ -41,6 +41,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
         { href: "/leads", label: "Leads", show: canView("leads") },
         { href: "/kunden", label: "Kunden", show: canView("customers") },
         { href: "/auftraege", label: "Aufträge", show: canView("orders") },
+        { href: "/retouren", label: "Retouren", show: canView("orders") },
         { href: "/drafts", label: "KI-Drafts", show: canView("drafts") },
       ],
     },

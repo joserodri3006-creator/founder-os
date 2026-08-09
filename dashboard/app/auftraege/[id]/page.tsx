@@ -45,6 +45,7 @@ interface Order {
   invoice_sent: boolean;
   invoice_number: string | null;
   invoice_generated_at: string | null;
+  invoice_html: string | null;
   payment_model_id: string | null;
   payment_steps: PaymentStep[];
   customer: {
@@ -70,9 +71,11 @@ interface Activity {
 
 const STATUS_LABELS: Record<string, string> = {
   neu: "Neu",
+  bezahlt: "Bezahlt",
   briefing: "Briefing",
   in_bearbeitung: "In Bearbeitung",
   in_produktion: "In Produktion",
+  versendet: "Versendet",
   review: "Review / Abnahme",
   abgeschlossen: "Abgeschlossen",
   nachbetreuung: "Nachbetreuung",
@@ -83,19 +86,21 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   neu: "bg-blue-100 text-blue-700",
+  bezahlt: "bg-emerald-100 text-emerald-700",
   briefing: "bg-cyan-100 text-cyan-700",
   in_bearbeitung: "bg-yellow-100 text-yellow-700",
   in_produktion: "bg-orange-100 text-orange-700",
+  versendet: "bg-indigo-100 text-indigo-700",
   review: "bg-purple-100 text-purple-700",
   abgeschlossen: "bg-green-100 text-green-700",
   nachbetreuung: "bg-teal-100 text-teal-700",
   storniert: "bg-red-100 text-red-700",
   pausiert: "bg-gray-100 text-gray-600",
-  angebot_gesendet: "bg-indigo-100 text-indigo-700",
+  angebot_gesendet: "bg-sky-100 text-sky-700",
 };
 
 // Visuelle Reihenfolge der Status-Timeline
-const STATUS_TIMELINE = ["neu", "briefing", "in_bearbeitung", "in_produktion", "review", "abgeschlossen", "nachbetreuung"];
+const STATUS_TIMELINE = ["neu", "briefing", "in_bearbeitung", "in_produktion", "versendet", "review", "abgeschlossen", "nachbetreuung"];
 
 const ACTIVITY_COLORS: Record<string, string> = {
   status_change: "bg-blue-100 text-blue-700",
@@ -124,6 +129,28 @@ export default function AuftragDetailPage() {
   const [invoiceEdit, setInvoiceEdit] = useState(false);
   const [availableModels, setAvailableModels] = useState<PaymentModel[]>([]);
   const [paymentModelLoading, setPaymentModelLoading] = useState<string | null>(null);
+  // Bestellpositionen
+  interface OrderItem {
+    id: string; order_id: string; product_id: string | null;
+    product_name: string; sku: string | null;
+    quantity: number; unit_price: number; notes: string | null;
+  }
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [itemForm, setItemForm] = useState({ product_name: "", sku: "", quantity: "1", unit_price: "", notes: "" });
+  const [itemSaving, setItemSaving] = useState(false);
+
+  // Versenden-Aktion
+  const [showVersenden, setShowVersenden] = useState(false);
+  const [versendForm, setVersendForm] = useState({ tracking_number: "", tracking_carrier: "" });
+  const [versendSaving, setVersendSaving] = useState(false);
+
+  // Storno
+  const [stornoSaving, setStornoSaving] = useState(false);
+
+  // Rechnungsvorschau
+  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
+
   const [invoiceData, setInvoiceData] = useState<{
     recipientName: string;
     recipientCompany: string;
@@ -135,9 +162,10 @@ export default function AuftragDetailPage() {
   } | null>(null);
 
   async function reload() {
-    const [o, a] = await Promise.all([
+    const [o, a, items] = await Promise.all([
       fetch(`/api/auftraege/${id}`).then(r => r.json()),
       fetch(`/api/auftraege/${id}/activities`).then(r => r.json()),
+      fetch(`/api/auftraege/${id}/positionen`).then(r => r.json()),
     ]);
     setOrder(o);
     setEditStatus(o.status);
@@ -145,6 +173,7 @@ export default function AuftragDetailPage() {
     setEditTracking(o.tracking_number ?? "");
     setEditCarrier(o.tracking_carrier ?? "");
     setActivities(Array.isArray(a) ? a : []);
+    setOrderItems(Array.isArray(items) ? items : []);
     setLoading(false);
   }
 
@@ -286,9 +315,26 @@ export default function AuftragDetailPage() {
                 <h1 className="text-lg font-semibold">{order.title}</h1>
                 {meta && <span className={`text-xs px-2 py-0.5 rounded-full font-medium mt-1 inline-block ${meta.color}`}>{meta.label}</span>}
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-600"}`}>
-                {STATUS_LABELS[order.status] ?? order.status}
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-600"}`}>
+                  {STATUS_LABELS[order.status] ?? order.status}
+                </span>
+                {order.status !== "storniert" && order.status !== "abgeschlossen" && (
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Bestellung wirklich stornieren? Käufer und Verkäufer werden per E-Mail informiert.")) return;
+                      setStornoSaving(true);
+                      await fetch(`/api/auftraege/${id}/stornieren`, { method: "POST" });
+                      await reload();
+                      setStornoSaving(false);
+                    }}
+                    disabled={stornoSaving}
+                    className="text-xs px-2.5 py-1 rounded-md border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                  >
+                    {stornoSaving ? "…" : "Stornieren"}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Status-Timeline */}
@@ -442,6 +488,202 @@ export default function AuftragDetailPage() {
                 );
               })()}
             </div>
+          </div>
+
+          {/* Versenden-Aktion */}
+          {order.status !== "versendet" && order.status !== "storniert" && order.status !== "abgeschlossen" && (
+            <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Versand</p>
+                <button
+                  onClick={() => setShowVersenden(v => !v)}
+                  className="text-xs text-indigo-600 hover:text-indigo-700"
+                >
+                  {showVersenden ? "Abbrechen" : "Als versendet markieren →"}
+                </button>
+              </div>
+              {showVersenden && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Carrier</label>
+                      <select
+                        value={versendForm.tracking_carrier}
+                        onChange={e => setVersendForm(f => ({ ...f, tracking_carrier: e.target.value }))}
+                        className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="">— Keiner —</option>
+                        <option value="dhl">DHL</option>
+                        <option value="dpd">DPD</option>
+                        <option value="ups">UPS</option>
+                        <option value="gls">GLS</option>
+                        <option value="hermes">Hermes</option>
+                        <option value="fedex">FedEx</option>
+                        <option value="dhl_express">DHL Express</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">Sendungsnummer</label>
+                      <input
+                        type="text"
+                        value={versendForm.tracking_number}
+                        onChange={e => setVersendForm(f => ({ ...f, tracking_number: e.target.value }))}
+                        placeholder="optional"
+                        className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setVersendSaving(true);
+                      await fetch(`/api/auftraege/${id}/versenden`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          tracking_number: versendForm.tracking_number || null,
+                          tracking_carrier: versendForm.tracking_carrier || null,
+                        }),
+                      });
+                      setShowVersenden(false);
+                      setVersendForm({ tracking_number: "", tracking_carrier: "" });
+                      await reload();
+                      setVersendSaving(false);
+                    }}
+                    disabled={versendSaving}
+                    className="text-sm px-4 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  >
+                    {versendSaving ? "…" : "Versenden + Käufer benachrichtigen"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Bestellpositionen */}
+          <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Bestellpositionen</p>
+              <button onClick={() => setShowAddItem(v => !v)} className="text-xs text-blue-600 hover:text-blue-700">
+                {showAddItem ? "Abbrechen" : "+ Position"}
+              </button>
+            </div>
+
+            {showAddItem && (
+              <div className="border border-dashed border-gray-200 rounded-lg p-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-500 block mb-1">Artikelname *</label>
+                    <input type="text" value={itemForm.product_name}
+                      onChange={e => setItemForm(f => ({ ...f, product_name: e.target.value }))}
+                      placeholder="z.B. T-Shirt Schwarz"
+                      className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">SKU</label>
+                    <input type="text" value={itemForm.sku}
+                      onChange={e => setItemForm(f => ({ ...f, sku: e.target.value }))}
+                      placeholder="optional"
+                      className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Einzelpreis (€)</label>
+                    <input type="number" step="0.01" min="0" value={itemForm.unit_price}
+                      onChange={e => setItemForm(f => ({ ...f, unit_price: e.target.value }))}
+                      placeholder="0.00"
+                      className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Menge</label>
+                    <input type="number" min="1" value={itemForm.quantity}
+                      onChange={e => setItemForm(f => ({ ...f, quantity: e.target.value }))}
+                      className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 block mb-1">Notiz</label>
+                    <input type="text" value={itemForm.notes}
+                      onChange={e => setItemForm(f => ({ ...f, notes: e.target.value }))}
+                      placeholder="z.B. Größe L"
+                      className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <button
+                  disabled={!itemForm.product_name.trim() || itemSaving}
+                  onClick={async () => {
+                    setItemSaving(true);
+                    await fetch(`/api/auftraege/${id}/positionen`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        product_name: itemForm.product_name.trim(),
+                        sku: itemForm.sku || null,
+                        quantity: parseInt(itemForm.quantity) || 1,
+                        unit_price: parseFloat(itemForm.unit_price) || 0,
+                        notes: itemForm.notes || null,
+                      }),
+                    });
+                    setItemForm({ product_name: "", sku: "", quantity: "1", unit_price: "", notes: "" });
+                    setShowAddItem(false);
+                    await reload();
+                    setItemSaving(false);
+                  }}
+                  className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {itemSaving ? "…" : "Hinzufügen"}
+                </button>
+              </div>
+            )}
+
+            {orderItems.length === 0 && !showAddItem ? (
+              <p className="text-xs text-gray-400">Noch keine Positionen erfasst.</p>
+            ) : (
+              <div className="space-y-0">
+                {orderItems.map((item, idx) => {
+                  const total = item.quantity * item.unit_price;
+                  return (
+                    <div key={item.id} className={`flex items-center justify-between gap-3 py-2 ${idx < orderItems.length - 1 ? "border-b border-gray-100" : ""}`}>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-gray-800 font-medium">{item.product_name}</p>
+                        <div className="flex gap-3 text-xs text-gray-400 mt-0.5">
+                          {item.sku && <span>SKU: {item.sku}</span>}
+                          <span>{item.quantity} × {Number(item.unit_price).toFixed(2).replace(".", ",")} €</span>
+                          {item.notes && <span>— {item.notes}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-sm font-semibold text-gray-700 font-mono tabular-nums">
+                          {total.toFixed(2).replace(".", ",")} €
+                        </span>
+                        <button
+                          onClick={async () => {
+                            if (!confirm("Position entfernen?")) return;
+                            await fetch(`/api/auftraege/${id}/positionen`, {
+                              method: "DELETE",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ item_id: item.id }),
+                            });
+                            await reload();
+                          }}
+                          className="text-xs text-red-400 hover:text-red-600"
+                        >×</button>
+                      </div>
+                    </div>
+                  );
+                })}
+                {orderItems.length > 0 && (
+                  <div className="pt-2 border-t border-gray-200 flex justify-between text-sm font-semibold text-gray-900">
+                    <span>Gesamt</span>
+                    <span className="font-mono tabular-nums">
+                      {orderItems.reduce((s, i) => s + i.quantity * i.unit_price, 0).toFixed(2).replace(".", ",")} €
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Notizen */}
@@ -620,11 +862,32 @@ export default function AuftragDetailPage() {
             {/* Status */}
             {!invoiceEdit && order.invoice_number && (
               <div className="mb-3 text-xs text-gray-500 space-y-0.5">
-                <p className="font-medium text-gray-700">{order.invoice_number}</p>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-gray-700">{order.invoice_number}</p>
+                  {order.invoice_html && (
+                    <button
+                      onClick={() => setShowInvoicePreview(v => !v)}
+                      className="text-xs text-blue-500 hover:underline"
+                    >
+                      {showInvoicePreview ? "Vorschau schließen" : "Vorschau"}
+                    </button>
+                  )}
+                </div>
                 {order.invoice_generated_at && (
                   <p>Erstellt: {new Date(order.invoice_generated_at).toLocaleDateString("de-DE")}</p>
                 )}
                 {order.invoice_sent && <p className="text-blue-600">✓ Versendet</p>}
+                {showInvoicePreview && order.invoice_html && (
+                  <div className="mt-2 border border-gray-100 rounded-md overflow-hidden">
+                    <iframe
+                      srcDoc={order.invoice_html}
+                      className="w-full"
+                      style={{ height: "500px", border: "none" }}
+                      sandbox="allow-same-origin"
+                      title="Rechnungsvorschau"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
