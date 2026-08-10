@@ -35,15 +35,6 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (tracking_carrier) updates.tracking_carrier = tracking_carrier;
 
   await supabaseAdmin.from("orders").update(updates).eq("id", id);
-  await supabaseAdmin.from("order_activities").insert({
-    order_id: id,
-    activity_type: "status_change",
-    from_status: order.status,
-    to_status: "versendet",
-    description: tracking_number
-      ? `Versandt — Sendungsnr. ${tracking_number}${tracking_carrier ? ` via ${tracking_carrier.toUpperCase()}` : ""}`
-      : "Als versendet markiert",
-  });
 
   if (!RESEND_API_KEY) return NextResponse.json({ success: true, warning: "Kein RESEND_API_KEY" });
 

@@ -20,13 +20,6 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   const prevStatus = order.status;
   await supabaseAdmin.from("orders").update({ status: "storniert" }).eq("id", id);
-  await supabaseAdmin.from("order_activities").insert({
-    order_id: id,
-    activity_type: "status_change",
-    from_status: prevStatus,
-    to_status: "storniert",
-    description: "Bestellung storniert",
-  });
 
   if (!RESEND_API_KEY) return NextResponse.json({ success: true, warning: "Kein RESEND_API_KEY" });
 
