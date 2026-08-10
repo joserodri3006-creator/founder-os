@@ -367,6 +367,17 @@ SERPER_API_KEY
 - [ ] `worknest` zum `venture` Enum hinzufügen (aktuell nicht in DB)
 - [ ] Vercel-URL in dieses Dokument eintragen sobald bekannt
 
+## Venture-spezifische Navigation (Itaba)
+
+Aktuell werden für `venture === "itaba"` einzelne Sidebar-Einträge per `&& venture !== "itaba"` ausgeblendet
+(KI-Drafts, Sync-Log, Team, Zahlungsmodelle). Das ist ein pragmatischer Quickfix.
+
+**TODO — Richtiges Konzept erarbeiten:** Venture-Profile mit expliziter Feature-Liste (welche Seiten/Module
+sind sichtbar/versteckt), konfigurierbar ohne Code-Änderung. Ansätze: `system_config` pro Venture mit
+`hidden_nav_items`, oder eine dedizierte `venture_features`-Tabelle. Bis dahin kein weiteres Hardcoding.
+
+---
+
 ## Nächste Phase (Phase 2 / Phase 3)
 
 - [ ] Schritt 3 — Operations Agent MVP (Brandary): Druckaufträge, Material, Rechnungs-Generierung → Google Drive

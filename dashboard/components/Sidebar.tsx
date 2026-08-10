@@ -42,7 +42,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
         { href: "/kunden", label: "Kunden", show: canView("customers") },
         { href: "/auftraege", label: "Aufträge", show: canView("orders") },
         { href: "/retouren", label: "Retouren", show: canView("orders") },
-        { href: "/drafts", label: "KI-Drafts", show: canView("drafts") },
+        { href: "/drafts", label: "KI-Drafts", show: canView("drafts") && venture !== "itaba" },
       ],
     },
     {
@@ -50,15 +50,15 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       items: [
         { href: "/produkte", label: "Produkte", show: canView("products") },
         { href: "/produkte/kategorien", label: "Kategorien", show: canView("products") },
-        { href: "/produkte/sync-log", label: "Sync-Log", show: canView("products") },
+        { href: "/produkte/sync-log", label: "Sync-Log", show: canView("products") && venture !== "itaba" },
       ],
     },
     {
       label: "Einstellungen",
       items: [
         { href: "/einstellungen", label: "Einstellungen", show: canEdit("settings") },
-        { href: "/einstellungen/team", label: "Team", show: canEdit("settings") },
-        { href: "/einstellungen/zahlungsmodelle", label: "Zahlungsmodelle", show: canEdit("settings") },
+        { href: "/einstellungen/team", label: "Team", show: canEdit("settings") && venture !== "itaba" },
+        { href: "/einstellungen/zahlungsmodelle", label: "Zahlungsmodelle", show: canEdit("settings") && venture !== "itaba" },
         { href: "/einstellungen/produkttypen", label: "Produkttypen", show: canEdit("settings") },
         { href: "/einstellungen/marken", label: "Marken", show: canEdit("settings") },
         { href: "/einstellungen/steuern", label: "Steuern", show: canEdit("settings") },
