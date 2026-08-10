@@ -89,6 +89,7 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 - `lead_tags` / `lead_tag_map` — Stichwörter für Leads (spiegelt `product_tags`-Muster)
 - `customer_tags` / `customer_tag_map` — Stichwörter für Kunden (spiegelt `product_tags`-Muster)
 - `jarvis_conversations` / `jarvis_messages` — Chat-Verlauf des KI-Assistenten Jarvis (founder-only, RLS)
+- `jarvis_pending_actions` — pausierte Jarvis-Tool-Aufrufe, die auf Bestätigung im Chat warten (kundenwirksame Aktionen, z.B. Auftragsstatus-Änderung)
 
 **orders-Spalten:**
 `invoice_number`, `invoice_generated_at`, `invoice_html`, `invoice_data` (JSONB),
@@ -146,7 +147,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 
 ### Seiten
 - `/dashboard` — KPI-Kacheln pro Venture, neueste Leads
-- `/jarvis` — KI-Chat-Assistent (Claude, `claude-opus-5`, direkt via Anthropic SDK, kein Orchestrator-Layer), founder-only, ventureübergreifender Lesezugriff auf Leads/Kunden/Aufträge + Schreibzugriff (Notiz hinzufügen, Lead-Status ändern), Streaming-Antworten, interaktive Tool-Call-Visualisierung, Spracheingabe (Web Speech API), Konversationsverlauf
+- `/jarvis` — KI-Chat-Assistent (Claude, `claude-opus-5`, direkt via Anthropic SDK, kein Orchestrator-Layer), founder-only, ventureübergreifender Lesezugriff auf Leads/Kunden/Aufträge + Schreibzugriff (Notiz hinzufügen, Lead-Status ändern, Google-Lead-Suche selbst ausführen, Lead importieren, Auftrag anlegen, Auftragsstatus ändern, E-Mail-Entwurf erstellen), Streaming-Antworten, interaktive Tool-Call-Visualisierung, Spracheingabe (Web Speech API), Konversationsverlauf. Kundenwirksame Aktionen (aktuell: Auftragsstatus ändern, da das automatisierte Kunden-E-Mails auslösen kann) pausieren den Tool-Aufruf und verlangen eine explizite Bestätigung im Chat (`jarvis_pending_actions`, `/api/jarvis/confirm`), bevor sie ausgeführt werden. Die Google-Lead-Suche liefert nie Kontaktperson/E-Mail — Jarvis muss diese vor `import_lead` aktiv beim Nutzer erfragen.
 - `/leads` — Pipeline, Status inline, Neuer Lead Modal, CSV Import, kontrollierte Google-Lead-Suche fuer Online First, Review-Felder fuer Potenzial/Kontaktweg/naechste Aktion, Duplikat-Markierung, Bearbeiten/Kopieren/Archivieren/Löschen
 - `/leads/[id]` — Lead-Detail mit Aktivitäten
 - `/drafts` — KI-Drafts reviewen, editieren, senden (per Venture gefiltert)
@@ -376,6 +377,7 @@ ANTHROPIC_API_KEY
 - [ ] pgvector Extension aktivieren (Supabase Dashboard → Extensions → vector)
 - [ ] `worknest` zum `venture` Enum hinzufügen (aktuell nicht in DB)
 - [ ] Vercel-URL in dieses Dokument eintragen sobald bekannt
+- [ ] `supabase/migrations/jarvis_pending_actions.sql` in Supabase ausfuehren (Jarvis-Bestätigungs-Gate für kundenwirksame Aktionen)
 
 ## Venture-spezifische Navigation (Itaba)
 

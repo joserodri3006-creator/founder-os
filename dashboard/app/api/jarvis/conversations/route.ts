@@ -26,7 +26,16 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: true });
     if (msgsError) return NextResponse.json({ error: msgsError.message }, { status: 500 });
 
-    return NextResponse.json({ conversation: conv, messages: msgs ?? [] });
+    const { data: pending } = await supabaseAdmin
+      .from("jarvis_pending_actions")
+      .select("summary,tool_queue")
+      .eq("conversation_id", conversationId)
+      .maybeSingle();
+    const pendingAction = pending
+      ? { summary: pending.summary, name: (pending.tool_queue as { name: string }[])[0]?.name }
+      : null;
+
+    return NextResponse.json({ conversation: conv, messages: msgs ?? [], pending_action: pendingAction });
   }
 
   const { data, error } = await supabaseAdmin

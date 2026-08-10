@@ -31,7 +31,17 @@ const TOOL_LABELS: Record<string, string> = {
   get_kpis: "Kennzahlen abrufen",
   add_note: "Notiz hinzufügen",
   update_lead_status: "Lead-Status ändern",
+  search_new_leads: "Google-Lead-Suche",
+  import_lead: "Lead importieren",
+  create_order: "Auftrag anlegen",
+  update_order_status: "Auftragsstatus ändern",
+  create_email_draft: "E-Mail-Entwurf erstellen",
 };
+
+interface PendingConfirmation {
+  name: string;
+  summary: string;
+}
 
 function newId() {
   return Math.random().toString(36).slice(2);
@@ -46,6 +56,8 @@ export default function JarvisPage() {
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
 
@@ -74,12 +86,15 @@ export default function JarvisPage() {
       tools: [],
     }));
     setMessages(loaded);
+    const pending = data.pending_action as { summary: string; name: string } | null;
+    setPendingConfirmation(pending ? { name: pending.name, summary: pending.summary } : null);
   }
 
   function startNewConversation() {
     setConversationId(null);
     setMessages([]);
     setError(null);
+    setPendingConfirmation(null);
   }
 
   async function deleteConversation(id: string) {
@@ -88,9 +103,58 @@ export default function JarvisPage() {
     loadConversations();
   }
 
+  async function consumeStream(res: Response, assistantMsgId: string) {
+    if (!res.ok || !res.body) {
+      const errText = await res.text().catch(() => "Fehler");
+      setError(errText || "Anfrage fehlgeschlagen");
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() ?? "";
+
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith("data:")) continue;
+        const jsonStr = line.slice(5).trim();
+        if (!jsonStr) continue;
+        let evt: Record<string, unknown>;
+        try { evt = JSON.parse(jsonStr); } catch { continue; }
+
+        if (evt.type === "conversation" && !conversationId) {
+          setConversationId(evt.conversation_id as string);
+        } else if (evt.type === "text") {
+          setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, text: m.text + (evt.delta as string) } : m));
+        } else if (evt.type === "tool_start") {
+          setMessages((prev) => prev.map((m) => m.id === assistantMsgId
+            ? { ...m, tools: [...m.tools, { id: evt.id as string, name: evt.name as string, input: evt.input, done: false }] }
+            : m));
+        } else if (evt.type === "tool_result") {
+          setMessages((prev) => prev.map((m) => m.id === assistantMsgId
+            ? { ...m, tools: m.tools.map((t) => t.id === evt.id ? { ...t, result: evt.result as string, done: true } : t) }
+            : m));
+        } else if (evt.type === "awaiting_confirmation") {
+          setPendingConfirmation({ name: evt.name as string, summary: evt.summary as string });
+        } else if (evt.type === "error") {
+          setError(evt.message as string);
+        } else if (evt.type === "done") {
+          loadConversations();
+        }
+      }
+    }
+  }
+
   async function sendMessage(text: string) {
     const trimmed = text.trim();
-    if (!trimmed || sending) return;
+    if (!trimmed || sending || pendingConfirmation) return;
     setError(null);
     setInput("");
 
@@ -105,56 +169,34 @@ export default function JarvisPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: trimmed, conversation_id: conversationId }),
       });
-
-      if (!res.ok || !res.body) {
-        const errText = await res.text().catch(() => "Fehler");
-        setError(errText || "Anfrage fehlgeschlagen");
-        setSending(false);
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() ?? "";
-
-        for (const part of parts) {
-          const line = part.trim();
-          if (!line.startsWith("data:")) continue;
-          const jsonStr = line.slice(5).trim();
-          if (!jsonStr) continue;
-          let evt: Record<string, unknown>;
-          try { evt = JSON.parse(jsonStr); } catch { continue; }
-
-          if (evt.type === "conversation" && !conversationId) {
-            setConversationId(evt.conversation_id as string);
-          } else if (evt.type === "text") {
-            setMessages((prev) => prev.map((m) => m.id === assistantMsg.id ? { ...m, text: m.text + (evt.delta as string) } : m));
-          } else if (evt.type === "tool_start") {
-            setMessages((prev) => prev.map((m) => m.id === assistantMsg.id
-              ? { ...m, tools: [...m.tools, { id: evt.id as string, name: evt.name as string, input: evt.input, done: false }] }
-              : m));
-          } else if (evt.type === "tool_result") {
-            setMessages((prev) => prev.map((m) => m.id === assistantMsg.id
-              ? { ...m, tools: m.tools.map((t) => t.id === evt.id ? { ...t, result: evt.result as string, done: true } : t) }
-              : m));
-          } else if (evt.type === "error") {
-            setError(evt.message as string);
-          } else if (evt.type === "done") {
-            loadConversations();
-          }
-        }
-      }
+      await consumeStream(res, assistantMsg.id);
     } catch {
       setError("Verbindung unterbrochen — bitte erneut versuchen.");
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleConfirm(approved: boolean) {
+    if (!conversationId || confirming) return;
+    setConfirming(true);
+    setError(null);
+    setPendingConfirmation(null);
+
+    const assistantMsg: ChatMessage = { id: newId(), role: "assistant", text: "", tools: [] };
+    setMessages((prev) => [...prev, assistantMsg]);
+
+    try {
+      const res = await fetch("/api/jarvis/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversation_id: conversationId, approved }),
+      });
+      await consumeStream(res, assistantMsg.id);
+    } catch {
+      setError("Verbindung unterbrochen — bitte erneut versuchen.");
+    } finally {
+      setConfirming(false);
     }
   }
 
@@ -269,6 +311,32 @@ export default function JarvisPage() {
           <div ref={bottomRef} />
         </div>
 
+        {pendingConfirmation && (
+          <div className="mx-4 sm:mx-8 mb-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+            <div className="text-xs font-medium text-amber-800 uppercase tracking-wide mb-1">
+              Bestätigung erforderlich — {TOOL_LABELS[pendingConfirmation.name] ?? pendingConfirmation.name}
+            </div>
+            <div className="text-sm text-amber-900 mb-3">{pendingConfirmation.summary}</div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleConfirm(true)}
+                disabled={confirming}
+                className="text-sm px-3 py-1.5 rounded-md text-white font-medium disabled:opacity-40"
+                style={{ background: "#1B2A5E" }}
+              >
+                Bestätigen
+              </button>
+              <button
+                onClick={() => handleConfirm(false)}
+                disabled={confirming}
+                className="text-sm px-3 py-1.5 rounded-md border border-amber-300 text-amber-800 hover:bg-amber-100 disabled:opacity-40"
+              >
+                Ablehnen
+              </button>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="mx-4 sm:mx-8 mb-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-2">
             {error}
@@ -286,9 +354,10 @@ export default function JarvisPage() {
                   sendMessage(input);
                 }
               }}
-              placeholder="Frag Jarvis…"
+              placeholder={pendingConfirmation ? "Bitte erst Bestätigung oben klären…" : "Frag Jarvis…"}
               rows={1}
-              className="flex-1 text-sm border border-gray-200 rounded-md px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+              disabled={Boolean(pendingConfirmation)}
+              className="flex-1 text-sm border border-gray-200 rounded-md px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none disabled:bg-gray-50 disabled:text-gray-400"
             />
             <button
               onClick={toggleVoiceInput}
@@ -299,7 +368,7 @@ export default function JarvisPage() {
             </button>
             <button
               onClick={() => sendMessage(input)}
-              disabled={sending || !input.trim()}
+              disabled={sending || !input.trim() || Boolean(pendingConfirmation)}
               className="text-sm px-4 py-2.5 rounded-md text-white font-medium disabled:opacity-40"
               style={{ background: "#1B2A5E" }}
             >
