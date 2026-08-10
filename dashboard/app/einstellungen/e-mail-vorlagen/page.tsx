@@ -17,13 +17,25 @@ interface EmailTemplate {
   updated_at: string;
 }
 
-const KEY_LABELS: Record<string, { label: string; vars: string[] }> = {
-  order_confirmation:            { label: "Bestellbestätigung",                vars: ["{{orderNumber}}"] },
-  contact_team_notification:     { label: "Kontaktformular → Team",            vars: ["{{name}}", "{{email}}", "{{betreff}}"] },
-  contact_customer_confirmation: { label: "Kontaktformular → Kundenbestätigung", vars: ["{{name}}", "{{email}}", "{{betreff}}"] },
-  newsletter_team_notification:  { label: "Newsletter-Anmeldung → Team",       vars: ["{{email}}"] },
-  retoure_team_notification:     { label: "Retoure-Anfrage → Team",            vars: ["{{orderRef}}", "{{email}}", "{{name}}"] },
-  retoure_customer_confirmation: { label: "Retoure-Anfrage → Kundenbestätigung", vars: ["{{orderRef}}", "{{email}}", "{{name}}"] },
+const KEY_LABELS: Record<string, { label: string; vars: string[]; group: string }> = {
+  // Founder OS — Aufträge
+  order_cancellation_customer:   { label: "Stornierung → Käufer",              group: "Aufträge", vars: ["{{orderRef}}", "{{orderTitle}}", "{{customerName}}"] },
+  order_cancellation_admin:      { label: "Stornierung → Admin",               group: "Aufträge", vars: ["{{orderRef}}", "{{orderTitle}}", "{{customerName}}", "{{customerEmail}}", "{{orderValue}}"] },
+  order_shipped_customer:        { label: "Versandbestätigung → Käufer",        group: "Aufträge", vars: ["{{orderRef}}", "{{orderTitle}}", "{{customerName}}", "{{trackingNumber}}", "{{trackingCarrier}}", "{{trackingUrl}}"] },
+  order_shipped_admin:           { label: "Versand-Info → Admin",               group: "Aufträge", vars: ["{{orderRef}}", "{{orderTitle}}", "{{customerName}}", "{{customerEmail}}", "{{trackingNumber}}"] },
+  invoice_send_customer:         { label: "Rechnung → Käufer",                  group: "Aufträge", vars: ["{{customerName}}", "{{invoiceNumber}}", "{{orderTitle}}", "{{orderRef}}"] },
+  // Founder OS — Retouren
+  return_approved_customer:      { label: "Retoure genehmigt → Käufer",         group: "Retouren", vars: ["{{customerName}}", "{{refundAmount}}", "{{refundMethod}}", "{{orderRef}}"] },
+  return_rejected_customer:      { label: "Retoure abgelehnt → Käufer",         group: "Retouren", vars: ["{{customerName}}", "{{reason}}", "{{orderRef}}"] },
+  return_completed_customer:     { label: "Retoure abgeschlossen → Käufer",     group: "Retouren", vars: ["{{customerName}}", "{{refundAmount}}", "{{refundMethod}}"] },
+  return_admin_notification:     { label: "Retoure-Bearbeitung → Admin",         group: "Retouren", vars: ["{{customerName}}", "{{customerEmail}}", "{{action}}", "{{refundAmount}}", "{{reason}}"] },
+  // Itaba — Shop
+  order_confirmation:            { label: "Bestellbestätigung (Itaba)",          group: "Itaba Shop", vars: ["{{orderNumber}}"] },
+  contact_team_notification:     { label: "Kontaktformular → Team (Itaba)",      group: "Itaba Shop", vars: ["{{name}}", "{{email}}", "{{betreff}}"] },
+  contact_customer_confirmation: { label: "Kontaktformular → Käufer (Itaba)",    group: "Itaba Shop", vars: ["{{name}}", "{{email}}", "{{betreff}}"] },
+  newsletter_team_notification:  { label: "Newsletter-Anmeldung → Team (Itaba)", group: "Itaba Shop", vars: ["{{email}}"] },
+  retoure_team_notification:     { label: "Retoure-Anfrage → Team (Itaba)",      group: "Itaba Shop", vars: ["{{orderRef}}", "{{email}}", "{{name}}"] },
+  retoure_customer_confirmation: { label: "Retoure-Anfrage → Käufer (Itaba)",    group: "Itaba Shop", vars: ["{{orderRef}}", "{{email}}", "{{name}}"] },
 };
 
 const EMPTY_FORM = {
@@ -87,14 +99,26 @@ export default function EmailVorlagenPage() {
     const info = KEY_LABELS[key];
     if (!info) { setPreviewVars({}); return; }
     const defaults: Record<string, string> = {
-      "{{orderNumber}}": "ORD-2026-001",
-      "{{name}}": "Max Mustermann",
-      "{{email}}": "kunde@beispiel.de",
-      "{{betreff}}": "Frage zu meiner Bestellung",
-      "{{orderRef}}": "ORD-2026-001",
+      "{{orderNumber}}":    "ORD-2026-001",
+      "{{name}}":           "Max Mustermann",
+      "{{email}}":          "kunde@beispiel.de",
+      "{{betreff}}":        "Frage zu meiner Bestellung",
+      "{{orderRef}}":       "RE-2026-042",
+      "{{orderTitle}}":     "Website Sprint",
+      "{{customerName}}":   "Maria Müller",
+      "{{customerEmail}}":  "maria@beispiel.de",
+      "{{orderValue}}":     "2.500,00 €",
+      "{{trackingNumber}}": "1234567890",
+      "{{trackingCarrier}}":"DHL",
+      "{{trackingUrl}}":    "https://www.dhl.de/track/1234567890",
+      "{{invoiceNumber}}":  "RE-2026-042",
+      "{{refundAmount}}":   "49,90 €",
+      "{{refundMethod}}":   "Banküberweisung",
+      "{{reason}}":         "Produkt beschädigt angekommen",
+      "{{action}}":         "APPROVED",
     };
     const vars: Record<string, string> = {};
-    info.vars.forEach(v => { vars[v] = defaults[v] ?? "..."; });
+    info.vars.forEach(v => { vars[v] = defaults[v] ?? "…"; });
     setPreviewVars(vars);
   }
 
@@ -134,7 +158,7 @@ export default function EmailVorlagenPage() {
   }
 
   async function del(id: string, key: string) {
-    if (!confirm(`Vorlage „${KEY_LABELS[key]?.label ?? key}" wirklich löschen? Itaba verwendet dann wieder die Standard-Texte.`)) return;
+    if (!confirm(`Vorlage „${KEY_LABELS[key]?.label ?? key}" wirklich löschen? Die App verwendet dann wieder die einprogrammierten Standardtexte.`)) return;
     await fetch(`/api/email-templates/${id}`, { method: "DELETE" });
     await load();
   }
@@ -197,9 +221,16 @@ export default function EmailVorlagenPage() {
                 className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
               >
                 <option value="">— Auswählen —</option>
-                {availableKeys.map(k => (
-                  <option key={k} value={k}>{KEY_LABELS[k]?.label ?? k}</option>
-                ))}
+                {Array.from(new Set(availableKeys.map(k => KEY_LABELS[k]?.group ?? "Sonstige"))).map(group => {
+                  const groupKeys = availableKeys.filter(k => (KEY_LABELS[k]?.group ?? "Sonstige") === group);
+                  return (
+                    <optgroup key={group} label={group}>
+                      {groupKeys.map(k => (
+                        <option key={k} value={k}>{KEY_LABELS[k]?.label ?? k}</option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
               </select>
               {form.template_key && KEY_LABELS[form.template_key] && (
                 <p className="text-xs text-gray-400 mt-1">
@@ -313,6 +344,9 @@ export default function EmailVorlagenPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="text-sm font-medium text-gray-900">{info?.label ?? t.template_key}</p>
+                      {info?.group && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">{info.group}</span>
+                      )}
                       <code className="text-xs text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{t.template_key}</code>
                       {!t.is_active && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Inaktiv</span>

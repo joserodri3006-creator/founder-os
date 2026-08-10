@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getSender, sendMail } from "@/lib/mail-helpers";
+import { getSender, sendMail, resolve, getTemplate } from "@/lib/mail-helpers";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -47,14 +47,23 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (!RESEND_API_KEY) return NextResponse.json({ success: true, warning: "Kein RESEND_API_KEY" });
 
-  const sender = getSender(order.venture);
+  const defaultSender = getSender(order.venture);
   const customer = order.customer;
   const ref = order.invoice_number ?? order.id.slice(0, 8).toUpperCase();
   const customerName = `${customer?.first_name ?? ""} ${customer?.last_name ?? ""}`.trim();
-
   const trackingUrl = tracking_number && tracking_carrier
     ? (CARRIER_URLS[tracking_carrier] ?? "") + tracking_number
-    : null;
+    : "";
+
+  const vars = {
+    orderRef:        ref,
+    orderTitle:      order.title ?? "",
+    customerName:    customerName,
+    customerEmail:   customer?.email ?? "—",
+    trackingNumber:  tracking_number ?? "—",
+    trackingCarrier: tracking_carrier ? tracking_carrier.toUpperCase() : "—",
+    trackingUrl:     trackingUrl,
+  };
 
   const trackingBlock = tracking_number
     ? `\nSendungsnummer: ${tracking_number}${tracking_carrier ? ` (${tracking_carrier.toUpperCase()})` : ""}${trackingUrl ? `\nTracking:       ${trackingUrl}` : ""}`
@@ -62,20 +71,30 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const mails = [];
 
+  // Mail an Käufer
   if (customer?.email) {
+    const tpl = await getTemplate(order.venture, "order_shipped_customer");
+    const sender = tpl ? { name: tpl.from_name, email: tpl.from_email } : defaultSender;
     mails.push(sendMail(RESEND_API_KEY, {
       from: `${sender.name} <${sender.email}>`,
       to: [`${customerName} <${customer.email}>`],
-      subject: `Ihre Bestellung ${ref} wurde versendet`,
-      text: `Hallo ${customerName},\n\nIhre Bestellung „${order.title}" (${ref}) ist auf dem Weg zu Ihnen!${trackingBlock}\n\nBei Fragen stehen wir Ihnen gerne zur Verfügung.\n\nViele Grüße\n${sender.name}`,
+      subject: tpl ? resolve(tpl.subject, vars) : `Ihre Bestellung ${ref} wurde versendet`,
+      text: tpl
+        ? `${resolve(tpl.intro_text, vars)}\n\n${resolve(tpl.footer_text, vars)}`
+        : `Hallo ${customerName},\n\nIhre Bestellung „${order.title}" (${ref}) ist auf dem Weg zu Ihnen!${trackingBlock}\n\nBei Fragen stehen wir Ihnen gerne zur Verfügung.\n\nViele Grüße\n${defaultSender.name}`,
     }));
   }
 
+  // Mail an Admin/Verkäufer
+  const tplAdmin = await getTemplate(order.venture, "order_shipped_admin");
+  const senderAdmin = tplAdmin ? { name: tplAdmin.from_name, email: tplAdmin.from_email } : defaultSender;
   mails.push(sendMail(RESEND_API_KEY, {
-    from: `${sender.name} <${sender.email}>`,
+    from: `${senderAdmin.name} <${senderAdmin.email}>`,
     to: [FOUNDER_EMAIL],
-    subject: `[Versendet] ${order.title} — ${ref}`,
-    text: `Bestellung als versendet markiert:\n\nTitel: ${order.title}\nRef:   ${ref}\nKunde: ${customerName} <${customer?.email ?? "—"}>${trackingBlock}\nVenture: ${order.venture}`,
+    subject: tplAdmin ? resolve(tplAdmin.subject, vars) : `[Versendet] ${order.title} — ${ref}`,
+    text: tplAdmin
+      ? `${resolve(tplAdmin.intro_text, vars)}\n\n${resolve(tplAdmin.footer_text, vars)}`
+      : `Bestellung als versendet markiert:\n\nTitel: ${order.title}\nRef:   ${ref}\nKunde: ${customerName} <${customer?.email ?? "—"}>${trackingBlock}\nVenture: ${order.venture}`,
   }));
 
   await Promise.allSettled(mails);

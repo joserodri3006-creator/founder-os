@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getSender, sendMail, resolve, getTemplate } from "@/lib/mail-helpers";
 
 type Params = { params: Promise<{ id: string }> };
-
-const VENTURE_SENDERS: Record<string, { name: string; email: string }> = {
-  online_first: { name: "Online First", email: "info@onlinefirst.eu" },
-  brandary: { name: "Brandary Print Studio", email: "info@brandary.de" },
-  droplane: { name: "Droplane", email: "info@droplane.de" },
-  blazed_outfitters: { name: "Blazed Outfitters", email: "info@blazedoutfitters.com" },
-  worknest: { name: "Worknest", email: "info@worknest.de" },
-};
 
 export async function POST(_req: NextRequest, { params }: Params) {
   const { id } = await params;
@@ -19,7 +12,6 @@ export async function POST(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "RESEND_API_KEY nicht konfiguriert" }, { status: 500 });
   }
 
-  // Load order with customer
   const { data: order, error } = await supabaseAdmin
     .from("orders")
     .select(`*, customer:customers(id, first_name, last_name, company_name, email)`)
@@ -32,43 +24,42 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const customer = order.customer;
   if (!customer?.email) return NextResponse.json({ error: "Kunde hat keine E-Mail-Adresse" }, { status: 400 });
 
-  const sender = VENTURE_SENDERS[order.venture] ?? VENTURE_SENDERS.online_first;
+  const defaultSender = getSender(order.venture);
   const invoiceNumber = order.invoice_number ?? id;
+  const customerName = `${customer.first_name} ${customer.last_name}`;
 
-  const subject = `Ihre Rechnung ${invoiceNumber} — ${order.title}`;
-  const text = `Sehr geehrte/r ${customer.first_name} ${customer.last_name},
+  const vars = {
+    customerName:  customerName,
+    invoiceNumber: invoiceNumber,
+    orderTitle:    order.title ?? "",
+    orderRef:      invoiceNumber,
+  };
 
-vielen Dank für Ihren Auftrag "${order.title}".
+  const tpl = await getTemplate(order.venture, "invoice_send_customer");
+  const sender = tpl ? { name: tpl.from_name, email: tpl.from_email } : defaultSender;
 
-Im Anhang finden Sie Ihre Rechnung mit der Nummer ${invoiceNumber}.
+  const subject = tpl
+    ? resolve(tpl.subject, vars)
+    : `Ihre Rechnung ${invoiceNumber} — ${order.title}`;
 
-Bitte überweisen Sie den Betrag innerhalb von 14 Tagen.
+  const text = tpl
+    ? `${resolve(tpl.intro_text, vars)}\n\n${resolve(tpl.footer_text, vars)}`
+    : `Sehr geehrte/r ${customerName},\n\nvielen Dank für Ihren Auftrag „${order.title}".\n\nIm Anhang finden Sie Ihre Rechnung mit der Nummer ${invoiceNumber}.\n\nBitte überweisen Sie den Betrag innerhalb von 14 Tagen.\n\nMit freundlichen Grüßen\n${defaultSender.name}`;
 
-Mit freundlichen Grüßen
-${sender.name}`;
-
-  // Convert HTML to base64 for attachment
   const htmlBase64 = Buffer.from(order.invoice_html, "utf-8").toString("base64");
 
-  const resendRes = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: `${sender.name} <${sender.email}>`,
-      to: [`${customer.first_name} ${customer.last_name} <${customer.email}>`],
-      subject,
-      text,
-      attachments: [
-        {
-          filename: `Rechnung-${invoiceNumber}.html`,
-          content: htmlBase64,
-          content_type: "text/html",
-        },
-      ],
-    }),
+  const resendRes = await sendMail(RESEND_API_KEY, {
+    from: `${sender.name} <${sender.email}>`,
+    to: [`${customerName} <${customer.email}>`],
+    subject,
+    text,
+    attachments: [
+      {
+        filename: `Rechnung-${invoiceNumber}.html`,
+        content: htmlBase64,
+        content_type: "text/html",
+      },
+    ],
   });
 
   if (!resendRes.ok) {
@@ -77,7 +68,6 @@ ${sender.name}`;
     return NextResponse.json({ error: `E-Mail-Versand fehlgeschlagen: ${errText}` }, { status: 500 });
   }
 
-  // Mark as sent + log
   await supabaseAdmin.from("orders").update({ invoice_sent: true }).eq("id", id);
   await supabaseAdmin.from("order_activities").insert({
     order_id: id,

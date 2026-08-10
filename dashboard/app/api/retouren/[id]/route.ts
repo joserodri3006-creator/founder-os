@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getSender, sendMail } from "@/lib/mail-helpers";
+import { getSender, sendMail, resolve, getTemplate } from "@/lib/mail-helpers";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -20,9 +20,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (error || !ret) return NextResponse.json({ error: "Retoure nicht gefunden" }, { status: 404 });
 
   let newStatus = ret.status;
-  if (action === "approve")   newStatus = "approved";
-  if (action === "reject")    newStatus = "rejected";
-  if (action === "complete")  newStatus = "completed";
+  if (action === "approve")  newStatus = "approved";
+  if (action === "reject")   newStatus = "rejected";
+  if (action === "complete") newStatus = "completed";
 
   await supabaseAdmin.from("returns").update({
     status: newStatus,
@@ -34,39 +34,72 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   if (!RESEND_API_KEY || !ret.customer_email) return NextResponse.json({ success: true });
 
-  const sender = getSender(ret.venture);
+  const defaultSender = getSender(ret.venture);
   const customerName = ret.customer_name ?? "Kunde";
+  const refundAmountFmt = refund_amount
+    ? `${Number(refund_amount).toFixed(2).replace(".", ",")} €`
+    : "—";
 
-  let subject = "";
-  let text = "";
+  const vars = {
+    customerName:  customerName,
+    customerEmail: ret.customer_email,
+    refundAmount:  refundAmountFmt,
+    refundMethod:  refund_method ?? ret.refund_method ?? "—",
+    reason:        notes ?? ret.reason ?? "—",
+    orderRef:      ret.order_id ? ret.order_id.slice(0, 8).toUpperCase() : "—",
+  };
 
-  if (action === "approve") {
-    subject = `Ihre Retoure wurde genehmigt`;
-    text = `Hallo ${customerName},\n\nIhre Rückgabeanfrage wurde genehmigt.${refund_amount ? `\n\nRückerstattungsbetrag: ${Number(refund_amount).toFixed(2).replace(".", ",")} €${refund_method ? ` (${refund_method})` : ""}` : ""}\n\nBitte senden Sie die Ware innerhalb von 14 Tagen zurück. Vielen Dank.\n\n${sender.name}`;
-  } else if (action === "reject") {
-    subject = `Zu Ihrer Rückgabeanfrage`;
-    text = `Hallo ${customerName},\n\nleider konnten wir Ihre Rückgabeanfrage nicht genehmigen.${notes ? `\n\nGrund: ${notes}` : ""}\n\nBei Fragen stehen wir Ihnen gerne zur Verfügung.\n\n${sender.name}`;
-  } else if (action === "complete") {
-    subject = `Rückerstattung veranlasst`;
-    text = `Hallo ${customerName},\n\nIhre Retoure ist abgeschlossen.${refund_amount ? ` Eine Rückerstattung von ${Number(refund_amount).toFixed(2).replace(".", ",")} €${refund_method ? ` via ${refund_method}` : ""} wird veranlasst.` : ""}\n\nVielen Dank.\n\n${sender.name}`;
-  }
+  // Template key per action
+  const tplKeyCustomer: Record<string, string> = {
+    approve:  "return_approved_customer",
+    reject:   "return_rejected_customer",
+    complete: "return_completed_customer",
+  };
 
-  if (subject) {
-    await Promise.allSettled([
-      sendMail(RESEND_API_KEY, {
-        from: `${sender.name} <${sender.email}>`,
-        to: [`${customerName} <${ret.customer_email}>`],
-        subject,
-        text,
-      }),
-      sendMail(RESEND_API_KEY, {
-        from: `${sender.name} <${sender.email}>`,
-        to: [FOUNDER_EMAIL],
-        subject: `[Retoure ${newStatus.toUpperCase()}] ${customerName} — ${ret.venture}`,
-        text: `Retoure bearbeitet:\n\nKunde: ${customerName} <${ret.customer_email}>\nAktion: ${action}\nGrund: ${ret.reason ?? "—"}\nRückerstattung: ${refund_amount ? Number(refund_amount).toFixed(2) + " €" : "—"}`,
-      }),
-    ]);
-  }
+  // Fallback texts
+  const fallbackSubject: Record<string, string> = {
+    approve:  "Ihre Retoure wurde genehmigt",
+    reject:   "Zu Ihrer Rückgabeanfrage",
+    complete: "Rückerstattung veranlasst",
+  };
+  const fallbackText: Record<string, string> = {
+    approve:  `Hallo ${customerName},\n\nIhre Rückgabeanfrage wurde genehmigt.${refund_amount ? `\n\nRückerstattungsbetrag: ${refundAmountFmt}${refund_method ? ` (${refund_method})` : ""}` : ""}\n\nBitte senden Sie die Ware innerhalb von 14 Tagen zurück. Vielen Dank.\n\n${defaultSender.name}`,
+    reject:   `Hallo ${customerName},\n\nleider konnten wir Ihre Rückgabeanfrage nicht genehmigen.${notes ? `\n\nGrund: ${notes}` : ""}\n\nBei Fragen stehen wir Ihnen gerne zur Verfügung.\n\n${defaultSender.name}`,
+    complete: `Hallo ${customerName},\n\nIhre Retoure ist abgeschlossen.${refund_amount ? ` Eine Rückerstattung von ${refundAmountFmt}${refund_method ? ` via ${refund_method}` : ""} wird veranlasst.` : ""}\n\nVielen Dank.\n\n${defaultSender.name}`,
+  };
+
+  if (!tplKeyCustomer[action]) return NextResponse.json({ success: true });
+
+  const [tplCustomer, tplAdmin] = await Promise.all([
+    getTemplate(ret.venture, tplKeyCustomer[action]),
+    getTemplate(ret.venture, "return_admin_notification"),
+  ]);
+
+  const senderCustomer = tplCustomer ? { name: tplCustomer.from_name, email: tplCustomer.from_email } : defaultSender;
+  const senderAdmin    = tplAdmin    ? { name: tplAdmin.from_name,    email: tplAdmin.from_email    } : defaultSender;
+
+  await Promise.allSettled([
+    // Kundenmail
+    sendMail(RESEND_API_KEY, {
+      from:    `${senderCustomer.name} <${senderCustomer.email}>`,
+      to:      [`${customerName} <${ret.customer_email}>`],
+      subject: tplCustomer ? resolve(tplCustomer.subject, vars) : fallbackSubject[action],
+      text:    tplCustomer
+        ? `${resolve(tplCustomer.intro_text, vars)}\n\n${resolve(tplCustomer.footer_text, vars)}`
+        : fallbackText[action],
+    }),
+    // Admin-Notification
+    sendMail(RESEND_API_KEY, {
+      from:    `${senderAdmin.name} <${senderAdmin.email}>`,
+      to:      [FOUNDER_EMAIL],
+      subject: tplAdmin
+        ? resolve(tplAdmin.subject, { ...vars, action: newStatus.toUpperCase() })
+        : `[Retoure ${newStatus.toUpperCase()}] ${customerName} — ${ret.venture}`,
+      text: tplAdmin
+        ? `${resolve(tplAdmin.intro_text, { ...vars, action: newStatus.toUpperCase() })}\n\n${resolve(tplAdmin.footer_text, { ...vars, action: newStatus.toUpperCase() })}`
+        : `Retoure bearbeitet:\n\nKunde: ${customerName} <${ret.customer_email}>\nAktion: ${action}\nGrund: ${ret.reason ?? "—"}\nRückerstattung: ${refund_amount ? `${Number(refund_amount).toFixed(2)} €` : "—"}`,
+    }),
+  ]);
 
   return NextResponse.json({ success: true });
 }
