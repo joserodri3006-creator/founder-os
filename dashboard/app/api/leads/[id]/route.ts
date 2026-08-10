@@ -18,14 +18,33 @@ function isMissingReviewColumnError(message: string | undefined) {
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const { id } = await params;
-  const { data, error } = await supabaseAdmin.from("leads").select("*").eq("id", id).single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-  return NextResponse.json(data);
+  const [leadRes, tagsRes] = await Promise.all([
+    supabaseAdmin.from("leads").select("*").eq("id", id).single(),
+    supabaseAdmin.from("lead_tag_map").select("tag:lead_tags(id, name)").eq("lead_id", id),
+  ]);
+  if (leadRes.error) return NextResponse.json({ error: leadRes.error.message }, { status: 404 });
+  return NextResponse.json({
+    ...leadRes.data,
+    tags: (tagsRes.data ?? []).map((r: any) => r.tag),
+  });
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
   const { id } = await params;
-  const body = await req.json();
+  const rawBody = await req.json();
+  const { tag_ids, ...body } = rawBody;
+
+  if (tag_ids !== undefined) {
+    await supabaseAdmin.from("lead_tag_map").delete().eq("lead_id", id);
+    if (tag_ids.length) {
+      await supabaseAdmin.from("lead_tag_map").insert(
+        tag_ids.map((tid: string) => ({ lead_id: id, tag_id: tid }))
+      );
+    }
+  }
+
+  if (Object.keys(body).length === 0) return NextResponse.json({ success: true });
+
   let { error } = await supabaseAdmin.from("leads").update(body).eq("id", id);
   if (isMissingReviewColumnError(error?.message)) {
     const {

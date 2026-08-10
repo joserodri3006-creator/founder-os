@@ -43,6 +43,8 @@ export default function LeadDetailPage() {
   const [lead, setLead] = useState<Lead | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTags, setSelectedTags] = useState<{ id: string; name: string }[]>([]);
+  const [tagInput, setTagInput] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -50,10 +52,19 @@ export default function LeadDetailPage() {
       fetch(`/api/leads/${id}/activities`).then((r) => r.json()),
     ]).then(([l, a]) => {
       setLead(l);
+      setSelectedTags(l.tags ?? []);
       setActivities(Array.isArray(a) ? a : []);
       setLoading(false);
     });
   }, [id]);
+
+  async function saveTagIds(tagIds: string[]) {
+    await fetch(`/api/leads/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tag_ids: tagIds }),
+    });
+  }
 
   if (loading) return <div className="p-8 text-sm text-gray-400">Laden...</div>;
   if (!lead) return <div className="p-8 text-sm text-red-500">Lead nicht gefunden.</div>;
@@ -115,6 +126,43 @@ export default function LeadDetailPage() {
             Bearbeiten
           </button>
         </div>
+      </div>
+
+      {/* Tags */}
+      <div className="bg-white rounded-lg border border-gray-200 mb-6 px-5 py-4">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Stichwörter</p>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {selectedTags.map(tag => (
+            <span key={tag.id} className="flex items-center gap-1 text-xs bg-gray-100 rounded-full px-2 py-0.5 text-gray-700">
+              {tag.name}
+              <button onClick={async () => {
+                const updated = selectedTags.filter(t => t.id !== tag.id);
+                setSelectedTags(updated);
+                await saveTagIds(updated.map(t => t.id));
+              }} className="text-gray-400 hover:text-gray-600">×</button>
+            </span>
+          ))}
+        </div>
+        <input type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
+          placeholder="Tag + Enter"
+          className="text-sm border border-gray-200 rounded-md px-2.5 py-1.5 w-full max-w-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+          onKeyDown={async e => {
+            if (e.key === "Enter" && tagInput.trim()) {
+              e.preventDefault();
+              const res = await fetch("/api/lead-tags", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ venture: lead.venture, name: tagInput.trim() }),
+              });
+              const tag = await res.json();
+              if (tag.id && !selectedTags.find(t => t.id === tag.id)) {
+                const updated = [...selectedTags, tag];
+                setSelectedTags(updated);
+                await saveTagIds(updated.map(t => t.id));
+              }
+              setTagInput("");
+            }
+          }} />
       </div>
 
       {/* Activity Feed */}

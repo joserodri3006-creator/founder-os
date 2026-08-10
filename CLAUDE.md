@@ -86,6 +86,8 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 - `product_tag_map` — Produkt ↔ Tag (n:m)
 - `user_venture_roles` — User-Permissions pro Venture
 - `user_invites` — Offene Team-Einladungen
+- `lead_tags` / `lead_tag_map` — Stichwörter für Leads (spiegelt `product_tags`-Muster)
+- `customer_tags` / `customer_tag_map` — Stichwörter für Kunden (spiegelt `product_tags`-Muster)
 
 **orders-Spalten:**
 `invoice_number`, `invoice_generated_at`, `invoice_html`, `invoice_data` (JSONB),
@@ -135,6 +137,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 | `daily-summary` | pg_cron 18:00 UTC | Tages-Zusammenfassung per Mail an Founder |
 | `sale-price-scheduler` | pg_cron 00:01 UTC | Aktionspreise aktivieren/deaktivieren (sync_status=pending) |
 | `product-sync` | DB Webhook (products UPDATE sync_status=pending) | Produkt zu WooCommerce REST API synchronisieren |
+| `reporting-query` | HTTP POST (nur Founder) | NL→SQL „Selektion": generiert Read-Only-SQL per Claude, führt sie über `execute_report_query`/`report_reader`-Rolle aus |
 
 ---
 
@@ -160,6 +163,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - `/einstellungen/produkttypen` — Produkttypen pro Venture konfigurieren
 - `/einstellungen/marken` — Marken/Brands pro Venture verwalten
 - `/einstellungen/steuern` — Steuerklassen + Steuersätze pro Venture (P1.4 ✅)
+- `/reporting` — NL→SQL „Selektion": Freitext-Frage → Claude generiert Read-Only-SQL über alle Ventures → sichere Ausführung; nur für Founder sichtbar/erreichbar (hartes Gate in `proxy.ts`, nicht über Section-Permissions steuerbar)
 - `/online-first` — oeffentliche Salespage fuer den produktisierten `Authority Website Sprint` als Anfrage-System (Referenzen, Problem/Loesung, Passungsfilter, Transformation, FAQ, spaetere Erweiterungen)
 - `/online-first/fit` — strukturierter Projekt-Fit mit Angebots-/Zielgruppen-/Budgetqualifizierung und Checkout-/Termin-Routing
 - `/online-first/erfolg`, `/online-first/briefing`, `/online-first/rechtliches` — Checkout-Uebergabe und Launch-Gate
@@ -176,6 +180,8 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - **Sales Funnel KPI** — Fit-Checks, Checkout-Starts und Stripe-Anzahlungen fuer Online First
 - **Google Lead Search** — In `/leads` unabhaengig vom aktiven Venture sichtbar; Region-/Zielgruppen-Suche via serverseitigem `SERPER_API_KEY`, Google Custom Search nur Legacy-Fallback, Import nach gepruefter Kontaktperson/E-Mail stets nach `online_first` und ohne automatische Ansprache. Bereits gespeicherte Website-Domains werden bei neuen Suchen ausgeblendet; importierte Leads starten im Review mit `review_status=unreviewed`, `contact_channel=unchecked` und `next_action=website_pruefen`.
 - **API-Zugriffsschutz** — `proxy.ts` verlangt Sitzungen und prueft Section-Permissions vor internen Service-Role-Routen
+- **Stichwörter (Tags)** — Leads und Kunden koennen wie Produkte mit freien Tags versehen werden (`lead_tags`/`customer_tags`, Detailseiten-UI identisch zum Produkt-Tagging)
+- **Reporting/Selektion** — Founder-only NL→SQL-Tool: `report_reader`-DB-Rolle mit reiner SELECT-Allowlist + Anwendungsvalidierung als zweite Verteidigungsebene, siehe `supabase/migrations/reporting.sql`
 
 ---
 
@@ -358,6 +364,7 @@ SERPER_API_KEY
 
 ## Offene Punkte (Phase 1)
 
+- [ ] `supabase/migrations/lead_customer_tags.sql` und `supabase/migrations/reporting.sql` in Supabase ausfuehren, danach Edge Function `reporting-query` deployen (`supabase functions deploy reporting-query`)
 - [ ] **KRITISCH:** geleaktes Supabase-DB-Passwort rotieren und Git-Historie bereinigen (siehe `SECURITY.md`)
 - [ ] `sales_funnel.sql` in Supabase ausfuehren und aktualisierte Edge Functions deployen
 - [ ] Stripe/Turnstile/Booking-Variablen konfigurieren und Webhook registrieren

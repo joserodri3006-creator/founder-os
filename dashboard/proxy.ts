@@ -9,7 +9,9 @@ type Section = "leads" | "customers" | "orders" | "products" | "drafts" | "invoi
 
 const API_SECTIONS: Array<{ prefix: string; section: Section }> = [
   { prefix: "/api/leads", section: "leads" },
+  { prefix: "/api/lead-tags", section: "leads" },
   { prefix: "/api/kunden", section: "customers" },
+  { prefix: "/api/customer-tags", section: "customers" },
   { prefix: "/api/auftraege", section: "orders" },
   { prefix: "/api/drafts", section: "drafts" },
   { prefix: "/api/produkte", section: "products" },
@@ -20,6 +22,10 @@ const API_SECTIONS: Array<{ prefix: string; section: Section }> = [
   { prefix: "/api/config", section: "settings" },
   { prefix: "/api/attachments", section: "orders" },
 ];
+// Diese Routen lesen ventureübergreifend (z.B. Reporting via generierter SQL) und
+// sind deshalb bewusst NICHT über API_SECTIONS/Permissions freigebbar — nur Founder.
+const FOUNDER_ONLY_API_PREFIXES = ["/api/reporting"];
+
 const VENTURE_SCOPED_LIST_PATHS = new Set([
   "/api/dashboard",
   "/api/leads",
@@ -77,6 +83,10 @@ export async function proxy(req: NextRequest) {
 
     if (role?.role === "founder" || user.email === "jose.rodri3006@gmail.com") {
       return response;
+    }
+
+    if (startsWithAny(pathname, FOUNDER_ONLY_API_PREFIXES)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const requestedVenture = req.nextUrl.searchParams.get("venture");

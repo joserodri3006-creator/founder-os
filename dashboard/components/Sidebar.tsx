@@ -54,6 +54,12 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       ],
     },
     {
+      label: "Reporting",
+      items: [
+        { href: "/reporting", label: "Selektion", show: user?.role === "founder" },
+      ],
+    },
+    {
       label: "Einstellungen",
       items: [
         { href: "/einstellungen", label: "Einstellungen", show: canEdit("settings") },

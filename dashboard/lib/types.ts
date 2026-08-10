@@ -62,6 +62,7 @@ export interface Lead {
   archived_at: string | null;
   created_at: string;
   updated_at: string;
+  tags?: { id: string; name: string }[];
 }
 
 export const STATUS_LABELS: Record<LeadStatus, string> = {

@@ -30,6 +30,8 @@ interface ProductDiscount {
   products: { id: string; name: string; sku: string | null } | null;
 }
 
+interface Tag { id: string; name: string; }
+
 interface Customer {
   id: string;
   first_name: string;
@@ -48,6 +50,7 @@ interface Customer {
   discount_rate: number | null;
   created_at: string;
   orders: Order[];
+  tags?: Tag[];
 }
 
 interface Category { id: string; name: string; path: string; level: number; }
@@ -110,11 +113,16 @@ export default function KundeDetailPage() {
   const [newProdRate, setNewProdRate]     = useState("10");
   const [discountSaving, setDiscountSaving] = useState(false);
 
+  // Tags
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [tagInput, setTagInput]         = useState("");
+
   async function load() {
     const res = await fetch(`/api/kunden/${id}`);
     if (!res.ok) { setLoading(false); return; }
     const data: Customer = await res.json();
     setCustomer(data);
+    setSelectedTags(data.tags ?? []);
     setEditFirst(data.first_name ?? "");
     setEditLast(data.last_name ?? "");
     setEditCompany(data.company_name ?? "");
@@ -222,6 +230,14 @@ export default function KundeDetailPage() {
       body: JSON.stringify({ type, discount_id }),
     });
     await loadDiscounts();
+  }
+
+  async function saveTagIds(tagIds: string[]) {
+    await fetch(`/api/kunden/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag_ids: tagIds }),
+    });
   }
 
   async function saveNotes(notes: string) {
@@ -483,6 +499,41 @@ export default function KundeDetailPage() {
               {customer.email && <MetaRow label="E-Mail"><a href={`mailto:${customer.email}`} style={{ fontSize: '13px', color: '#3A5BA0', textDecoration: 'none' }}>{customer.email}</a></MetaRow>}
               {customer.phone && <MetaRow label="Telefon" value={customer.phone} />}
             </div>
+          </Card>
+
+          {/* Tags */}
+          <Card title="Stichwörter">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+              {selectedTags.map(tag => (
+                <span key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', background: '#F3F4F6', borderRadius: '999px', padding: '2px 10px', color: '#374151' }}>
+                  {tag.name}
+                  <button onClick={async () => {
+                    const updated = selectedTags.filter(t => t.id !== tag.id);
+                    setSelectedTags(updated);
+                    await saveTagIds(updated.map(t => t.id));
+                  }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', fontSize: '13px', lineHeight: 1, padding: 0 }}>×</button>
+                </span>
+              ))}
+            </div>
+            <input type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
+              placeholder="Tag + Enter" style={inputStyle}
+              onKeyDown={async e => {
+                if (e.key === "Enter" && tagInput.trim()) {
+                  e.preventDefault();
+                  const res = await fetch("/api/customer-tags", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ venture: customer.venture, name: tagInput.trim() }),
+                  });
+                  const tag = await res.json();
+                  if (tag.id && !selectedTags.find(t => t.id === tag.id)) {
+                    const updated = [...selectedTags, tag];
+                    setSelectedTags(updated);
+                    await saveTagIds(updated.map(t => t.id));
+                  }
+                  setTagInput("");
+                }
+              }} />
           </Card>
 
           <NotesField value={customer.notes} onSave={saveNotes} />
