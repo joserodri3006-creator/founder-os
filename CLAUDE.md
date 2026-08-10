@@ -88,6 +88,7 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 - `user_invites` — Offene Team-Einladungen
 - `lead_tags` / `lead_tag_map` — Stichwörter für Leads (spiegelt `product_tags`-Muster)
 - `customer_tags` / `customer_tag_map` — Stichwörter für Kunden (spiegelt `product_tags`-Muster)
+- `jarvis_conversations` / `jarvis_messages` — Chat-Verlauf des KI-Assistenten Jarvis (founder-only, RLS)
 
 **orders-Spalten:**
 `invoice_number`, `invoice_generated_at`, `invoice_html`, `invoice_data` (JSONB),
@@ -145,6 +146,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 
 ### Seiten
 - `/dashboard` — KPI-Kacheln pro Venture, neueste Leads
+- `/jarvis` — KI-Chat-Assistent (Claude, `claude-opus-5`, direkt via Anthropic SDK, kein Orchestrator-Layer), founder-only, ventureübergreifender Lesezugriff auf Leads/Kunden/Aufträge + Schreibzugriff (Notiz hinzufügen, Lead-Status ändern), Streaming-Antworten, interaktive Tool-Call-Visualisierung, Spracheingabe (Web Speech API), Konversationsverlauf
 - `/leads` — Pipeline, Status inline, Neuer Lead Modal, CSV Import, kontrollierte Google-Lead-Suche fuer Online First, Review-Felder fuer Potenzial/Kontaktweg/naechste Aktion, Duplikat-Markierung, Bearbeiten/Kopieren/Archivieren/Löschen
 - `/leads/[id]` — Lead-Detail mit Aktivitäten
 - `/drafts` — KI-Drafts reviewen, editieren, senden (per Venture gefiltert)
@@ -358,6 +360,7 @@ STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 ONLINE_FIRST_LEGAL_APPROVED
 SERPER_API_KEY
+ANTHROPIC_API_KEY
 ```
 
 ---

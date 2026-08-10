@@ -33,7 +33,10 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
 
   const navSections = [
     {
-      items: [{ href: "/dashboard", label: "Dashboard", show: true }],
+      items: [
+        { href: "/dashboard", label: "Dashboard", show: true },
+        { href: "/jarvis", label: "Jarvis", show: user?.role === "founder" },
+      ],
     },
     {
       label: "CRM",

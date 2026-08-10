@@ -24,7 +24,7 @@ const API_SECTIONS: Array<{ prefix: string; section: Section }> = [
 ];
 // Diese Routen lesen ventureübergreifend (z.B. Reporting via generierter SQL) und
 // sind deshalb bewusst NICHT über API_SECTIONS/Permissions freigebbar — nur Founder.
-const FOUNDER_ONLY_API_PREFIXES = ["/api/reporting"];
+const FOUNDER_ONLY_API_PREFIXES = ["/api/reporting", "/api/jarvis"];
 
 const VENTURE_SCOPED_LIST_PATHS = new Set([
   "/api/dashboard",
