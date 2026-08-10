@@ -19,6 +19,7 @@ const API_SECTIONS: Array<{ prefix: string; section: Section }> = [
   { prefix: "/api/steuerklassen", section: "settings" },
   { prefix: "/api/payment-models", section: "settings" },
   { prefix: "/api/team", section: "settings" },
+  { prefix: "/api/outreach-templates", section: "settings" },
   { prefix: "/api/config", section: "settings" },
   { prefix: "/api/attachments", section: "orders" },
 ];

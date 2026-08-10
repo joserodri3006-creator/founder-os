@@ -88,6 +88,7 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 - `user_invites` — Offene Team-Einladungen
 - `lead_tags` / `lead_tag_map` — Stichwörter für Leads (spiegelt `product_tags`-Muster)
 - `customer_tags` / `customer_tag_map` — Stichwörter für Kunden (spiegelt `product_tags`-Muster)
+- `outreach_templates` — frei benennbare E-Mail-Vorlagen für manuellen Versand aus Lead-/Kunden-Detail (getrennt von `email_templates`, das feste System-Events bedient)
 - `jarvis_conversations` / `jarvis_messages` — Chat-Verlauf des KI-Assistenten Jarvis (founder-only, RLS)
 - `jarvis_pending_actions` — pausierte Jarvis-Tool-Aufrufe, die auf Bestätigung im Chat warten (kundenwirksame Aktionen, z.B. Auftragsstatus-Änderung)
 
@@ -164,6 +165,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - `/einstellungen/zahlungsmodelle` — Zahlungsmodelle pro Venture verwalten
 - `/einstellungen/team` — Teammitglieder einladen + Rollen/Permissions verwalten
 - `/einstellungen/produkttypen` — Produkttypen pro Venture konfigurieren
+- `/einstellungen/anschreiben-vorlagen` — frei benennbare E-Mail-Vorlagen für den manuellen Versand aus Lead-/Kunden-Detail verwalten
 - `/einstellungen/marken` — Marken/Brands pro Venture verwalten
 - `/einstellungen/steuern` — Steuerklassen + Steuersätze pro Venture (P1.4 ✅)
 - `/reporting` — NL→SQL „Selektion": Freitext-Frage → Claude generiert Read-Only-SQL über alle Ventures → sichere Ausführung; nur für Founder sichtbar/erreichbar (hartes Gate in `proxy.ts`, nicht über Section-Permissions steuerbar)
@@ -184,6 +186,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - **Google Lead Search** — In `/leads` unabhaengig vom aktiven Venture sichtbar; Region-/Zielgruppen-Suche via serverseitigem `SERPER_API_KEY`, Google Custom Search nur Legacy-Fallback, Import nach gepruefter Kontaktperson/E-Mail stets nach `online_first` und ohne automatische Ansprache. Bereits gespeicherte Website-Domains werden bei neuen Suchen ausgeblendet; importierte Leads starten im Review mit `review_status=unreviewed`, `contact_channel=unchecked` und `next_action=website_pruefen`.
 - **API-Zugriffsschutz** — `proxy.ts` verlangt Sitzungen und prueft Section-Permissions vor internen Service-Role-Routen
 - **Stichwörter (Tags)** — Leads und Kunden koennen wie Produkte mit freien Tags versehen werden (`lead_tags`/`customer_tags`, Detailseiten-UI identisch zum Produkt-Tagging)
+- **Manueller E-Mail-Versand aus Lead-/Kunden-Detail** — Button „E-Mail schreiben" öffnet `SendMailModal` mit Vorlagen-Dropdown (`outreach_templates`, Platzhalter `{{vorname}}`/`{{nachname}}`/`{{firma}}`/`{{email}}`), editierbarem Betreff/Text, Versand über Resend; bei Leads wird zusätzlich eine `lead_activities`-Aktivität (`email_sent`) protokolliert. Vorlagen verwaltbar unter `/einstellungen/anschreiben-vorlagen`
 - **Reporting/Selektion** — Founder-only NL→SQL-Tool: `report_reader`-DB-Rolle mit reiner SELECT-Allowlist + Anwendungsvalidierung als zweite Verteidigungsebene, siehe `supabase/migrations/reporting.sql`
 
 ---
@@ -369,6 +372,7 @@ ANTHROPIC_API_KEY
 ## Offene Punkte (Phase 1)
 
 - [ ] `supabase/migrations/lead_customer_tags.sql` und `supabase/migrations/reporting.sql` in Supabase ausfuehren, danach Edge Function `reporting-query` deployen (`supabase functions deploy reporting-query`)
+- [ ] `supabase/migrations/outreach_templates.sql` in Supabase ausfuehren
 - [ ] **KRITISCH:** geleaktes Supabase-DB-Passwort rotieren und Git-Historie bereinigen (siehe `SECURITY.md`)
 - [ ] `sales_funnel.sql` in Supabase ausfuehren und aktualisierte Edge Functions deployen
 - [ ] Stripe/Turnstile/Booking-Variablen konfigurieren und Webhook registrieren

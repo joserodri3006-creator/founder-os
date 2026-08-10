@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import NotesField from "@/components/NotesField";
 import AttachmentsPanel from "@/components/AttachmentsPanel";
+import SendMailModal from "@/components/SendMailModal";
 import { CustomerTypeBadge, CustomerStatusBadge } from "@/app/kunden/page";
 
 interface Order {
@@ -116,6 +117,8 @@ export default function KundeDetailPage() {
   // Tags
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [tagInput, setTagInput]         = useState("");
+
+  const [showMailModal, setShowMailModal] = useState(false);
 
   async function load() {
     const res = await fetch(`/api/kunden/${id}`);
@@ -270,8 +273,29 @@ export default function KundeDetailPage() {
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           <CustomerTypeBadge type={editType} />
           <CustomerStatusBadge status={editStatus} />
+          <button onClick={() => setShowMailModal(true)}
+            style={{ fontSize: '13px', padding: '7px 14px', border: '1px solid #D1D5E8', borderRadius: '8px', color: '#14193A', background: '#FFFFFF', cursor: 'pointer' }}>
+            E-Mail schreiben
+          </button>
         </div>
       </div>
+
+      {showMailModal && (
+        <SendMailModal
+          entityType="customer"
+          entityId={id}
+          venture={customer.venture ?? "online_first"}
+          recipientEmail={customer.email}
+          recipientName={`${customer.first_name} ${customer.last_name}`.trim()}
+          vars={{
+            vorname: customer.first_name ?? "",
+            nachname: customer.last_name ?? "",
+            firma: customer.company_name ?? "",
+            email: customer.email ?? "",
+          }}
+          onClose={() => setShowMailModal(false)}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left */}

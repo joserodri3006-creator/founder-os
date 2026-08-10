@@ -74,6 +74,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
         { href: "/einstellungen/retoureklassen", label: "Retoureklassen", show: canEdit("settings") },
         { href: "/einstellungen/lieferanten", label: "Lieferanten", show: canEdit("settings") },
         { href: "/einstellungen/e-mail-vorlagen", label: "E-Mail-Vorlagen", show: canEdit("settings") },
+        { href: "/einstellungen/anschreiben-vorlagen", label: "Anschreiben-Vorlagen", show: canEdit("settings") },
         { href: "/einstellungen/benachrichtigungen", label: "Benachrichtigungen", show: true },
       ],
     },

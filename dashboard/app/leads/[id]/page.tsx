@@ -12,6 +12,7 @@ import {
   STATUS_COLORS,
 } from "@/lib/types";
 import Link from "next/link";
+import SendMailModal from "@/components/SendMailModal";
 
 interface Activity {
   id: string;
@@ -45,9 +46,10 @@ export default function LeadDetailPage() {
   const [loading, setLoading] = useState(true);
   const [selectedTags, setSelectedTags] = useState<{ id: string; name: string }[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [showMailModal, setShowMailModal] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
+  function load() {
+    return Promise.all([
       fetch(`/api/leads/${id}`).then((r) => r.json()),
       fetch(`/api/leads/${id}/activities`).then((r) => r.json()),
     ]).then(([l, a]) => {
@@ -56,7 +58,9 @@ export default function LeadDetailPage() {
       setActivities(Array.isArray(a) ? a : []);
       setLoading(false);
     });
-  }, [id]);
+  }
+
+  useEffect(() => { load(); }, [id]);
 
   async function saveTagIds(tagIds: string[]) {
     await fetch(`/api/leads/${id}`, {
@@ -125,8 +129,30 @@ export default function LeadDetailPage() {
             className="text-sm px-3 py-1.5 border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50">
             Bearbeiten
           </button>
+          <button onClick={() => setShowMailModal(true)}
+            className="text-sm px-3 py-1.5 border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50">
+            E-Mail schreiben
+          </button>
         </div>
       </div>
+
+      {showMailModal && (
+        <SendMailModal
+          entityType="lead"
+          entityId={id}
+          venture={lead.venture}
+          recipientEmail={lead.email}
+          recipientName={`${lead.first_name} ${lead.last_name}`.trim()}
+          vars={{
+            vorname: lead.first_name ?? "",
+            nachname: lead.last_name ?? "",
+            firma: lead.company_name ?? "",
+            email: lead.email ?? "",
+          }}
+          onClose={() => setShowMailModal(false)}
+          onSent={load}
+        />
+      )}
 
       {/* Tags */}
       <div className="bg-white rounded-lg border border-gray-200 mb-6 px-5 py-4">
