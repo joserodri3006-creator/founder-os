@@ -23,6 +23,10 @@ const API_SECTIONS: Array<{ prefix: string; section: Section }> = [
   { prefix: "/api/config", section: "settings" },
   { prefix: "/api/attachments", section: "orders" },
 ];
+// /api/tasks bedient sowohl Leads als auch Kunden (polymorph) — bewusst nicht auf
+// eine einzelne Section gemappt (wie attachments), stattdessen nur Venture-scoped
+// via VENTURE_SCOPED_LIST_PATHS. Zugriff ist damit wie /api/dashboard: jeder
+// authentifizierte Nutzer, aber strikt auf das eigene Venture beschränkt.
 // Diese Routen lesen ventureübergreifend (z.B. Reporting via generierter SQL) und
 // sind deshalb bewusst NICHT über API_SECTIONS/Permissions freigebbar — nur Founder.
 const FOUNDER_ONLY_API_PREFIXES = ["/api/reporting", "/api/jarvis"];
@@ -34,6 +38,7 @@ const VENTURE_SCOPED_LIST_PATHS = new Set([
   "/api/auftraege",
   "/api/drafts",
   "/api/produkte",
+  "/api/tasks",
 ]);
 
 function startsWithAny(pathname: string, prefixes: string[]) {

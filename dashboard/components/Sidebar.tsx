@@ -45,6 +45,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
         { href: "/kunden", label: "Kunden", show: canView("customers") },
         { href: "/auftraege", label: "Aufträge", show: canView("orders") },
         { href: "/retouren", label: "Retouren", show: canView("orders") },
+        { href: "/aufgaben", label: "Aufgaben", show: canView("leads") || canView("customers") },
         { href: "/drafts", label: "KI-Drafts", show: canView("drafts") && venture !== "itaba" },
       ],
     },

@@ -89,6 +89,7 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 - `lead_tags` / `lead_tag_map` — Stichwörter für Leads (spiegelt `product_tags`-Muster)
 - `customer_tags` / `customer_tag_map` — Stichwörter für Kunden (spiegelt `product_tags`-Muster)
 - `outreach_templates` — frei benennbare E-Mail-Vorlagen für manuellen Versand aus Lead-/Kunden-Detail (getrennt von `email_templates`, das feste System-Events bedient)
+- `tasks` — Aufgabenverwaltung pro Lead/Kunde (polymorph `entity_type`/`entity_id` analog `attachments`), Status/Priorität/Fälligkeit/Zuweisung an Teammitglied
 - `jarvis_conversations` / `jarvis_messages` — Chat-Verlauf des KI-Assistenten Jarvis (founder-only, RLS)
 - `jarvis_pending_actions` — pausierte Jarvis-Tool-Aufrufe, die auf Bestätigung im Chat warten (kundenwirksame Aktionen, z.B. Auftragsstatus-Änderung)
 
@@ -150,10 +151,11 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - `/dashboard` — KPI-Kacheln pro Venture, neueste Leads
 - `/jarvis` — KI-Chat-Assistent (Claude, `claude-opus-5`, direkt via Anthropic SDK, kein Orchestrator-Layer), founder-only, ventureübergreifender Lesezugriff auf Leads/Kunden/Aufträge + Schreibzugriff (Notiz hinzufügen, Lead-Status ändern, Google-Lead-Suche selbst ausführen, Lead importieren, Auftrag anlegen, Auftragsstatus ändern, E-Mail-Entwurf erstellen), Streaming-Antworten, interaktive Tool-Call-Visualisierung, Spracheingabe (Web Speech API), Konversationsverlauf. Kundenwirksame Aktionen (aktuell: Auftragsstatus ändern, da das automatisierte Kunden-E-Mails auslösen kann) pausieren den Tool-Aufruf und verlangen eine explizite Bestätigung im Chat (`jarvis_pending_actions`, `/api/jarvis/confirm`), bevor sie ausgeführt werden. Die Google-Lead-Suche liefert nie Kontaktperson/E-Mail — Jarvis muss diese vor `import_lead` aktiv beim Nutzer erfragen.
 - `/leads` — Pipeline, Status inline, Neuer Lead Modal, CSV Import, kontrollierte Google-Lead-Suche fuer Online First, Review-Felder fuer Potenzial/Kontaktweg/naechste Aktion, Duplikat-Markierung, Bearbeiten/Kopieren/Archivieren/Löschen
-- `/leads/[id]` — Lead-Detail mit Aktivitäten
+- `/leads/[id]` — Lead-Detail: Kontaktdaten und Review-Felder vollständig inline editierbar (analog Kunden/Produkte), Pipeline-Status/Quelle/Follow-up/KI-Automation, Stichwörter, Aufgaben, Notizen, Aktivitäten
 - `/drafts` — KI-Drafts reviewen, editieren, senden (per Venture gefiltert)
 - `/kunden` — Kundenliste, Bearbeiten/Kopieren/Archivieren/Löschen, Archiv-Toggle
-- `/kunden/[id]` — Kundendetail: Felder editierbar, Aufträge, Notizen, Anhänge
+- `/kunden/[id]` — Kundendetail: Felder editierbar, Aufträge, Stichwörter, Aufgaben, Notizen, Anhänge
+- `/aufgaben` — globale Aufgabenübersicht über Leads/Kunden im aktiven Venture, Filter Status/Priorität/Überfällig
 - `/auftraege` — Auftragsliste mit Status + Wert, Bearbeiten/Kopieren/Archivieren/Löschen, Archiv-Toggle
 - `/auftraege/[id]` — Auftragsdetail: Status-Timeline, Zahlungsschritte, Rechnung, Aktivitäten, Notizen, Anhänge
 - `/produkte` — Produktliste, Kopieren/Archivieren/Löschen (→ siehe Produktverwaltung unten)
@@ -187,6 +189,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - **API-Zugriffsschutz** — `proxy.ts` verlangt Sitzungen und prueft Section-Permissions vor internen Service-Role-Routen
 - **Stichwörter (Tags)** — Leads und Kunden koennen wie Produkte mit freien Tags versehen werden (`lead_tags`/`customer_tags`, Detailseiten-UI identisch zum Produkt-Tagging)
 - **Manueller E-Mail-Versand aus Lead-/Kunden-Detail** — Button „E-Mail schreiben" öffnet `SendMailModal` mit Vorlagen-Dropdown (`outreach_templates`, Platzhalter `{{vorname}}`/`{{nachname}}`/`{{firma}}`/`{{email}}`), editierbarem Betreff/Text, Versand über Resend; bei Leads wird zusätzlich eine `lead_activities`-Aktivität (`email_sent`) protokolliert. Vorlagen verwaltbar unter `/einstellungen/anschreiben-vorlagen`
+- **Aufgabenverwaltung** — `TasksPanel` auf Lead-/Kundendetail (Titel, Priorität, Fälligkeitsdatum, optionale Zuweisung an Teammitglied aus `/api/team`, Erledigt-Toggle), plus globale Übersicht unter `/aufgaben`. `/api/tasks` ist bewusst nicht auf eine einzelne Section gemappt (bedient Leads UND Kunden polymorph), sondern wie `/api/dashboard` nur venture-scoped für Nicht-Founder (`VENTURE_SCOPED_LIST_PATHS` in `proxy.ts`)
 - **Reporting/Selektion** — Founder-only NL→SQL-Tool: `report_reader`-DB-Rolle mit reiner SELECT-Allowlist + Anwendungsvalidierung als zweite Verteidigungsebene, siehe `supabase/migrations/reporting.sql`
 
 ---
@@ -373,6 +376,7 @@ ANTHROPIC_API_KEY
 
 - [ ] `supabase/migrations/lead_customer_tags.sql` und `supabase/migrations/reporting.sql` in Supabase ausfuehren, danach Edge Function `reporting-query` deployen (`supabase functions deploy reporting-query`)
 - [ ] `supabase/migrations/outreach_templates.sql` in Supabase ausfuehren
+- [ ] `supabase/migrations/tasks.sql` in Supabase ausfuehren (Feature-Branch `feature/kontakt-bearbeitung-aufgaben`, noch nicht gegen Produktion ausgefuehrt — bewusst offen gelassen bis nach dem Test durch den Founder)
 - [ ] **KRITISCH:** geleaktes Supabase-DB-Passwort rotieren und Git-Historie bereinigen (siehe `SECURITY.md`)
 - [ ] `sales_funnel.sql` in Supabase ausfuehren und aktualisierte Edge Functions deployen
 - [ ] Stripe/Turnstile/Booking-Variablen konfigurieren und Webhook registrieren
