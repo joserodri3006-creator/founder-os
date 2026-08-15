@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { searchGoogleLeads } from "@/lib/google-lead-search";
+import { upsertMemory, MemoryType } from "@/lib/jarvis-memory";
 
 // Sicherheitsgrenze: venture kommt IMMER vom eingeloggten User (JarvisScope),
 // niemals aus dem von Claude gelieferten Tool-Input. Ein Tool-Input-Feld "venture"
@@ -162,6 +163,24 @@ export const JARVIS_TOOLS: Anthropic.Tool[] = [
       required: ["lead_id", "subject", "body"],
     },
   },
+  {
+    name: "remember",
+    description: "Speichert einen Fakt dauerhaft im Gedächtnis, das über alle zukünftigen Konversationen hinweg verfügbar ist. Nutze dieses Tool explizit, wenn der Nutzer sagt 'merk dir das' o.ä., oder wenn du selbst auf eine dauerhaft wichtige Information stößt (z.B. eine Präferenz, eine Entscheidungsregel, ein recherchiertes Fachwissen). Automatische Extraktion läuft zusätzlich im Hintergrund — dieses Tool ist für Fälle, in denen sofortige, explizite Bestätigung sinnvoll ist.",
+    input_schema: {
+      type: "object",
+      properties: {
+        memory_type: { type: "string", enum: ["personal", "venture", "knowledge"], description: "personal = Founder-Präferenz/Arbeitsweise, venture = Kunden-/Projektwissen zu einer Venture, knowledge = wiederverwendbares Fachwissen" },
+        content: { type: "string", description: "Kurzer, in sich verständlicher Satz mit dem zu merkenden Fakt" },
+        venture: { type: "string", description: "Nur bei memory_type=venture: welche Venture betroffen ist. Sonst leer lassen." },
+      },
+      required: ["memory_type", "content"],
+    },
+  },
+  {
+    type: "web_search_20260209",
+    name: "web_search",
+    max_uses: 5,
+  } as unknown as Anthropic.Tool,
 ];
 
 // Tools mit kundenwirksamen Nebenwirkungen (z.B. automatisierte E-Mails via order-workflow) —
@@ -456,6 +475,25 @@ export async function executeJarvisTool(
         .eq("id", leadId);
       if (error) return JSON.stringify({ error: error.message });
       return JSON.stringify({ success: true });
+    }
+
+    case "remember": {
+      const memoryType = input.memory_type as string;
+      const content = (input.content as string ?? "").trim();
+      if (!["personal", "venture", "knowledge"].includes(memoryType)) {
+        return JSON.stringify({ error: "memory_type muss 'personal', 'venture' oder 'knowledge' sein" });
+      }
+      if (!content) return JSON.stringify({ error: "content ist leer" });
+
+      const venture = memoryType === "venture" ? resolveVenture(scope, input.venture as string | undefined) : null;
+      const result = await upsertMemory(scope, {
+        memory_type: memoryType as MemoryType,
+        content,
+        venture,
+        source: "explicit",
+      });
+      if (!result) return JSON.stringify({ error: "Speichern fehlgeschlagen (VOYAGE_API_KEY konfiguriert?)" });
+      return JSON.stringify({ success: true, ...result });
     }
 
     default:

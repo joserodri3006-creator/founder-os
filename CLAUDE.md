@@ -92,6 +92,9 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 - `tasks` — Aufgabenverwaltung pro Lead/Kunde (polymorph `entity_type`/`entity_id` analog `attachments`), Status/Priorität/Fälligkeit/Zuweisung an Teammitglied
 - `jarvis_conversations` / `jarvis_messages` — Chat-Verlauf des KI-Assistenten Jarvis (founder-only, RLS)
 - `jarvis_pending_actions` — pausierte Jarvis-Tool-Aufrufe, die auf Bestätigung im Chat warten (kundenwirksame Aktionen, z.B. Auftragsstatus-Änderung)
+- `jarvis_memory` — persistentes semantisches Gedächtnis (pgvector, Voyage-Embeddings 1024 dim), Typen `personal`/`venture`/`knowledge`, Quelle `explicit`/`extracted`/`research`; Suche via SQL-Funktion `match_jarvis_memory`, Dedup-Suche via `find_similar_jarvis_memory`
+- `sop_definitions` — Standard-Fälle pro Venture+Aktionstyp, die Jarvis im Autonomie-Modus `live` eigenständig ausführen darf (SOP-Konformität = Kernbedingung für automatische Ausführung)
+- `jarvis_autonomous_actions` — Warteschlange für Vorschläge/Ausführungen des täglichen autonomen Cron-Checks (`jarvis-autonomous-check`), unabhängig vom Chat — NICHT zu verwechseln mit `jarvis_pending_actions` (anderer Mechanismus: Chat-Turn-Pause vs. Cron-Vorschlagsliste)
 
 **orders-Spalten:**
 `invoice_number`, `invoice_generated_at`, `invoice_html`, `invoice_data` (JSONB),
@@ -142,6 +145,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 | `sale-price-scheduler` | pg_cron 00:01 UTC | Aktionspreise aktivieren/deaktivieren (sync_status=pending) |
 | `product-sync` | DB Webhook (products UPDATE sync_status=pending) | Produkt zu WooCommerce REST API synchronisieren |
 | `reporting-query` | HTTP POST (nur Founder) | NL→SQL „Selektion": generiert Read-Only-SQL per Claude, führt sie über `execute_report_query`/`report_reader`-Rolle aus |
+| `jarvis-autonomous-check` | pg_cron (noch nicht angelegt, siehe Offene Punkte) | Täglicher unbeaufsichtigter Check pro Venture: schlägt fällige Standard-Follow-up-Mails vor (`jarvis_autonomous_actions`, Status `pending`), führt SOP-konforme Fälle nur im Modus `live` automatisch aus. Standardmäßig komplett deaktiviert (`system_config.jarvis_autonomy_enabled` muss explizit `true` sein), pro Venture defaultet der Modus auf `shadow` (nur vorschlagen). |
 
 ---
 
@@ -149,7 +153,9 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 
 ### Seiten
 - `/dashboard` — KPI-Kacheln pro Venture, neueste Leads
-- `/jarvis` — KI-Chat-Assistent (Claude, `claude-opus-5`, direkt via Anthropic SDK, kein Orchestrator-Layer), founder-only, ventureübergreifender Lesezugriff auf Leads/Kunden/Aufträge + Schreibzugriff (Notiz hinzufügen, Lead-Status ändern, Google-Lead-Suche selbst ausführen, Lead importieren, Auftrag anlegen, Auftragsstatus ändern, E-Mail-Entwurf erstellen), Streaming-Antworten, interaktive Tool-Call-Visualisierung, Spracheingabe (Web Speech API), Konversationsverlauf. Kundenwirksame Aktionen (aktuell: Auftragsstatus ändern, da das automatisierte Kunden-E-Mails auslösen kann) pausieren den Tool-Aufruf und verlangen eine explizite Bestätigung im Chat (`jarvis_pending_actions`, `/api/jarvis/confirm`), bevor sie ausgeführt werden. Die Google-Lead-Suche liefert nie Kontaktperson/E-Mail — Jarvis muss diese vor `import_lead` aktiv beim Nutzer erfragen.
+- `/jarvis` — KI-Chat-Assistent (Claude, `claude-opus-5`, direkt via Anthropic SDK, kein Orchestrator-Layer), founder-only, ventureübergreifender Lesezugriff auf Leads/Kunden/Aufträge + Schreibzugriff (Notiz hinzufügen, Lead-Status ändern, Google-Lead-Suche selbst ausführen, Lead importieren, Auftrag anlegen, Auftragsstatus ändern, E-Mail-Entwurf erstellen, dauerhaft etwas merken via `remember`, Websuche via serverseitigem `web_search`-Tool), Streaming-Antworten, interaktive Tool-Call-Visualisierung, Spracheingabe (Web Speech API), Konversationsverlauf. Kundenwirksame Aktionen (aktuell: Auftragsstatus ändern, da das automatisierte Kunden-E-Mails auslösen kann) pausieren den Tool-Aufruf und verlangen eine explizite Bestätigung im Chat (`jarvis_pending_actions`, `/api/jarvis/confirm`), bevor sie ausgeführt werden. Die Google-Lead-Suche liefert nie Kontaktperson/E-Mail — Jarvis muss diese vor `import_lead` aktiv beim Nutzer erfragen. Vor jedem Turn wird eine semantische Suche über `jarvis_memory` (Voyage-Embeddings) durchgeführt und relevante Treffer in den System-Prompt injiziert; nach jedem abgeschlossenen Turn extrahiert eine Haiku-Klassifizierung dauerhaft merkenswerte Fakten automatisch (`source='extracted'`/`'research'`) — zusätzlich zum expliziten `remember`-Tool (`source='explicit'`).
+- `/jarvis/memory` — Verwaltung des Jarvis-Gedächtnisses: Liste aller `jarvis_memory`-Einträge, Filter nach Typ (`personal`/`venture`/`knowledge`) + Volltextsuche, editierbar (re-embedded bei Änderung) und löschbar, Herkunft sichtbar (explizit/automatisch/Recherche). Founder-only.
+- `/jarvis/aktionen` — Inbox für Vorschläge aus dem täglichen autonomen Cron-Check (`jarvis_autonomous_actions`), unabhängig von einer offenen Chat-Konversation. Zeigt Begründung + E-Mail-Entwurf, Genehmigen führt die Aktion sofort aus (aktuell nur `send_followup_email` unterstützt), Ablehnen markiert sie als `rejected`. Founder-only.
 - `/leads` — Pipeline, Status inline, Neuer Lead Modal, CSV Import, kontrollierte Google-Lead-Suche fuer Online First, Review-Felder fuer Potenzial/Kontaktweg/naechste Aktion, Duplikat-Markierung, Bearbeiten/Kopieren/Archivieren/Löschen
 - `/leads/[id]` — Lead-Detail: Kontaktdaten und Review-Felder vollständig inline editierbar (analog Kunden/Produkte), Pipeline-Status/Quelle/Follow-up/KI-Automation, Stichwörter, Aufgaben, Notizen, Aktivitäten
 - `/drafts` — KI-Drafts reviewen, editieren, senden (per Venture gefiltert)
@@ -368,6 +374,7 @@ STRIPE_WEBHOOK_SECRET
 ONLINE_FIRST_LEGAL_APPROVED
 SERPER_API_KEY
 ANTHROPIC_API_KEY
+VOYAGE_API_KEY
 ```
 
 ---
@@ -386,6 +393,12 @@ ANTHROPIC_API_KEY
 - [ ] `worknest` zum `venture` Enum hinzufügen (aktuell nicht in DB)
 - [ ] Vercel-URL in dieses Dokument eintragen sobald bekannt
 - [ ] `supabase/migrations/jarvis_pending_actions.sql` in Supabase ausfuehren (Jarvis-Bestätigungs-Gate für kundenwirksame Aktionen)
+- [ ] `supabase/migrations/jarvis_memory.sql` in Supabase ausfuehren (aktiviert dabei erstmalig die `pgvector`-Extension — bisher offener Punkt, wird durch diese Migration miterledigt)
+- [ ] `supabase/migrations/jarvis_autonomy.sql` in Supabase ausfuehren (`sop_definitions` + `jarvis_autonomous_actions`)
+- [ ] `VOYAGE_API_KEY` beschaffen (voyageai.com) und in `.env.local` + Vercel setzen (fuer Jarvis-Gedächtnis-Embeddings)
+- [ ] Edge Function `jarvis-autonomous-check` deployen (`supabase functions deploy jarvis-autonomous-check`), `ANTHROPIC_API_KEY`/`RESEND_API_KEY` als Function-Secrets sicherstellen
+- [ ] pg_cron fuer `jarvis-autonomous-check` anlegen — SQL-Vorlage steht als Kommentar am Ende von `supabase/migrations/jarvis_autonomy.sql`
+- [ ] Autonomie bleibt bis auf Weiteres bewusst AUS (`system_config.jarvis_autonomy_enabled` fehlt = false). Erst nach Pruefung mehrerer Tage im Shadow-Modus (`/jarvis/aktionen` beobachten) und ggf. Anlegen erster `sop_definitions`-Eintraege gezielt aktivieren
 
 ## Venture-spezifische Navigation (Itaba)
 

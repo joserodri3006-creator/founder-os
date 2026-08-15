@@ -22,3 +22,6 @@ verify_jwt = false
 
 [functions.notification-digest]
 verify_jwt = false
+
+[functions.jarvis-autonomous-check]
+verify_jwt = false

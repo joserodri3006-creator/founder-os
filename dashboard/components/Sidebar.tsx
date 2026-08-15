@@ -36,6 +36,8 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       items: [
         { href: "/dashboard", label: "Dashboard", show: true },
         { href: "/jarvis", label: "Jarvis", show: user?.role === "founder" },
+        { href: "/jarvis/memory", label: "Jarvis-Gedächtnis", show: user?.role === "founder" },
+        { href: "/jarvis/aktionen", label: "Jarvis-Aktionen", show: user?.role === "founder" },
       ],
     },
     {

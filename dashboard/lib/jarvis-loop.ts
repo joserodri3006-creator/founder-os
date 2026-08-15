@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { JARVIS_TOOLS, executeJarvisTool, JarvisScope, CONFIRM_REQUIRED_TOOLS, describeAction } from "@/lib/jarvis-tools";
+import { searchMemory, formatMemoryContext, extractAndStoreMemories } from "@/lib/jarvis-memory";
 
 export const JARVIS_SYSTEM_PROMPT = `Du bist Jarvis, der KI-Assistent im Founder OS Dashboard von Jose. Du hilfst ihm,
 Leads, Kunden und Aufträge über alle Ventures (Online First, Blazed Outfitters, Droplane, Brandary,
@@ -37,6 +38,28 @@ export function createSseStream(run: (send: SendFn) => Promise<void>) {
   });
 }
 
+function extractText(content: string | Array<{ type: string; text?: string }>): string {
+  if (typeof content === "string") return content;
+  return content
+    .filter((b) => b.type === "text" && typeof b.text === "string")
+    .map((b) => b.text as string)
+    .join("\n");
+}
+
+function lastUserText(messages: Anthropic.MessageParam[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role !== "user") continue;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const text = extractText(messages[i].content as any);
+    if (text.trim()) return text;
+  }
+  return "";
+}
+
+function usedWebSearchInContent(content: Array<{ type: string }>): boolean {
+  return content.some((b) => b.type === "server_tool_use" || b.type === "web_search_tool_result");
+}
+
 interface ToolBatchResult {
   results: Anthropic.ToolResultBlockParam[];
   paused: { queue: Anthropic.ToolUseBlock[] } | null;
@@ -66,11 +89,16 @@ export async function runJarvisTurn(opts: {
 }) {
   const { client, scope, conversationId, messages, send } = opts;
 
+  const userText = lastUserText(messages);
+  const memoryHits = await searchMemory(scope, userText);
+  const system = JARVIS_SYSTEM_PROMPT + formatMemoryContext(memoryHits);
+  let usedWebSearch = false;
+
   while (true) {
     const anthropicStream = client.messages.stream({
       model: "claude-opus-5",
       max_tokens: 4096,
-      system: JARVIS_SYSTEM_PROMPT,
+      system,
       tools: JARVIS_TOOLS,
       messages,
     });
@@ -79,6 +107,7 @@ export async function runJarvisTurn(opts: {
 
     const message = await anthropicStream.finalMessage();
     messages.push({ role: "assistant", content: message.content });
+    if (usedWebSearchInContent(message.content)) usedWebSearch = true;
 
     if (message.stop_reason === "pause_turn") continue;
 
@@ -93,6 +122,11 @@ export async function runJarvisTurn(opts: {
         content: message.content,
       });
       send({ type: "done", conversation_id: conversationId });
+      await extractAndStoreMemories(
+        scope,
+        { userText, assistantText: extractText(message.content), usedWebSearch },
+        conversationId
+      );
       return;
     }
 
