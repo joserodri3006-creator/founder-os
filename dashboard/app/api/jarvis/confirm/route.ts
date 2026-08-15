@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const { data: conversation } = await supabaseAdmin
     .from("jarvis_conversations")
-    .select("id")
+    .select("id,container_id")
     .eq("id", conversationId)
     .eq("user_id", user.id)
     .maybeSingle();
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY fehlt");
     const client = new Anthropic({ apiKey });
 
-    await runJarvisTurn({ client, scope, conversationId, messages, send });
+    await runJarvisTurn({ client, scope, conversationId, messages, send, containerId: conversation.container_id });
   });
 
   return new Response(stream, {

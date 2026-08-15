@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
   if (!userMessage) return new Response("message fehlt", { status: 400 });
 
   let conversationId = body?.conversation_id;
+  let containerId: string | null = null;
   if (!conversationId) {
     const { data: conv, error } = await supabaseAdmin
       .from("jarvis_conversations")
@@ -51,6 +52,12 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
+    const { data: conv } = await supabaseAdmin
+      .from("jarvis_conversations")
+      .select("container_id")
+      .eq("id", conversationId)
+      .maybeSingle();
+    containerId = conv?.container_id ?? null;
   }
 
   const { data: history } = await supabaseAdmin
@@ -77,7 +84,7 @@ export async function POST(req: NextRequest) {
 
   const stream = createSseStream(async (send) => {
     send({ type: "conversation", conversation_id: conversationId });
-    await runJarvisTurn({ client, scope, conversationId: conversationId as string, messages, send });
+    await runJarvisTurn({ client, scope, conversationId: conversationId as string, messages, send, containerId });
   });
 
   return new Response(stream, {

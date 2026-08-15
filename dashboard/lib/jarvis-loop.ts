@@ -86,6 +86,7 @@ export async function runJarvisTurn(opts: {
   conversationId: string;
   messages: Anthropic.MessageParam[];
   send: SendFn;
+  containerId?: string | null;
 }) {
   const { client, scope, conversationId, messages, send } = opts;
 
@@ -93,11 +94,13 @@ export async function runJarvisTurn(opts: {
   const memoryHits = await searchMemory(scope, userText);
   const system = JARVIS_SYSTEM_PROMPT + formatMemoryContext(memoryHits);
   let usedWebSearch = false;
-  // web_search fuehrt intern Code-Ausfuehrung in einem Sandbox-Container aus. Bei einem
-  // pause_turn (oder generell einem Folge-Request innerhalb desselben Turns) muss die
-  // Container-ID der vorherigen Antwort mitgegeben werden, sonst kann die Recherche-Session
-  // nicht fortgesetzt werden ("container_id is required when there are pending tool uses...").
-  let containerId: string | undefined;
+  // web_search fuehrt intern Code-Ausfuehrung in einem Sandbox-Container aus. Die
+  // Konversation kann ueber mehrere HTTP-Requests laufen (neue User-Nachricht, Bestaetigung
+  // einer pausierten Aktion) — solange die gespeicherte Historie noch unaufgeloeste
+  // Code-Execution-Bloecke enthaelt, muss dieselbe Container-ID bei JEDEM Folge-Request
+  // mitgegeben werden, sonst: "container_id is required when there are pending tool uses...".
+  // Wird daher aus der DB geladen (siehe Aufrufer) und nach dem Turn dort aktualisiert.
+  let containerId: string | undefined = opts.containerId ?? undefined;
 
   while (true) {
     const anthropicStream = client.messages.stream({
@@ -128,6 +131,9 @@ export async function runJarvisTurn(opts: {
         role: "assistant",
         content: message.content,
       });
+      if (containerId) {
+        await supabaseAdmin.from("jarvis_conversations").update({ container_id: containerId }).eq("id", conversationId);
+      }
       send({ type: "done", conversation_id: conversationId });
       await extractAndStoreMemories(
         scope,
@@ -145,6 +151,9 @@ export async function runJarvisTurn(opts: {
         role: "assistant",
         content: message.content,
       });
+      if (containerId) {
+        await supabaseAdmin.from("jarvis_conversations").update({ container_id: containerId }).eq("id", conversationId);
+      }
       const nextTool = batch.paused.queue[0];
       const summary = describeAction(nextTool.name, nextTool.input as Record<string, unknown>);
       await supabaseAdmin.from("jarvis_pending_actions").insert({
