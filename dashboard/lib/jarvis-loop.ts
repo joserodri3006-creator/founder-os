@@ -93,6 +93,11 @@ export async function runJarvisTurn(opts: {
   const memoryHits = await searchMemory(scope, userText);
   const system = JARVIS_SYSTEM_PROMPT + formatMemoryContext(memoryHits);
   let usedWebSearch = false;
+  // web_search fuehrt intern Code-Ausfuehrung in einem Sandbox-Container aus. Bei einem
+  // pause_turn (oder generell einem Folge-Request innerhalb desselben Turns) muss die
+  // Container-ID der vorherigen Antwort mitgegeben werden, sonst kann die Recherche-Session
+  // nicht fortgesetzt werden ("container_id is required when there are pending tool uses...").
+  let containerId: string | undefined;
 
   while (true) {
     const anthropicStream = client.messages.stream({
@@ -101,6 +106,7 @@ export async function runJarvisTurn(opts: {
       system,
       tools: JARVIS_TOOLS,
       messages,
+      ...(containerId ? { container: containerId } : {}),
     });
 
     anthropicStream.on("text", (delta) => send({ type: "text", delta }));
@@ -108,6 +114,7 @@ export async function runJarvisTurn(opts: {
     const message = await anthropicStream.finalMessage();
     messages.push({ role: "assistant", content: message.content });
     if (usedWebSearchInContent(message.content)) usedWebSearch = true;
+    if (message.container?.id) containerId = message.container.id;
 
     if (message.stop_reason === "pause_turn") continue;
 
