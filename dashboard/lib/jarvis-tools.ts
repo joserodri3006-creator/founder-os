@@ -180,6 +180,13 @@ export const JARVIS_TOOLS: Anthropic.Tool[] = [
     type: "web_search_20260209",
     name: "web_search",
     max_uses: 5,
+    // "direct" statt Dynamic Filtering: Dynamic Filtering laesst web_search intern immer
+    // ueber einen Code-Execution-Container laufen (auch fuer einfache Suchen), was bei
+    // mehrstufigen Turns/Konversationen (Bestaetigungs-Gate, DB-persistierte Historie)
+    // "container_id is required..."-Fehler produziert, weil die Container-ID exakt
+    // ueber jeden Folge-Request mitgegeben werden muss. "direct" macht web_search zu
+    // einem einfachen, in sich abgeschlossenen Server-Tool-Aufruf ohne Container.
+    allowed_callers: ["direct"],
   } as unknown as Anthropic.Tool,
 ];
 
