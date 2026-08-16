@@ -58,12 +58,20 @@ export default function JarvisPage() {
   const [error, setError] = useState<string | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (user?.role === "founder") loadConversations();
   }, [user]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("jarvis-voice-enabled");
+    if (stored) setVoiceEnabled(stored === "true");
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -103,6 +111,34 @@ export default function JarvisPage() {
     loadConversations();
   }
 
+  async function speak(text: string) {
+    if (!voiceEnabled || !text.trim()) return;
+    try {
+      const res = await fetch("/api/jarvis/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      audioRef.current?.pause();
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      setSpeaking(true);
+      audio.onended = () => setSpeaking(false);
+      audio.onerror = () => setSpeaking(false);
+      await audio.play();
+    } catch {
+      setSpeaking(false);
+    }
+  }
+
+  function stopSpeaking() {
+    audioRef.current?.pause();
+    setSpeaking(false);
+  }
+
   async function consumeStream(res: Response, assistantMsgId: string) {
     if (!res.ok || !res.body) {
       const errText = await res.text().catch(() => "Fehler");
@@ -113,6 +149,7 @@ export default function JarvisPage() {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    let fullText = "";
 
     while (true) {
       const { done, value } = await reader.read();
@@ -132,6 +169,7 @@ export default function JarvisPage() {
         if (evt.type === "conversation" && !conversationId) {
           setConversationId(evt.conversation_id as string);
         } else if (evt.type === "text") {
+          fullText += evt.delta as string;
           setMessages((prev) => prev.map((m) => m.id === assistantMsgId ? { ...m, text: m.text + (evt.delta as string) } : m));
         } else if (evt.type === "tool_start") {
           setMessages((prev) => prev.map((m) => m.id === assistantMsgId
@@ -147,6 +185,7 @@ export default function JarvisPage() {
           setError(evt.message as string);
         } else if (evt.type === "done") {
           loadConversations();
+          speak(fullText);
         }
       }
     }
@@ -157,6 +196,7 @@ export default function JarvisPage() {
     if (!trimmed || sending || pendingConfirmation) return;
     setError(null);
     setInput("");
+    stopSpeaking();
 
     const userMsg: ChatMessage = { id: newId(), role: "user", text: trimmed, tools: [] };
     const assistantMsg: ChatMessage = { id: newId(), role: "assistant", text: "", tools: [] };
@@ -182,6 +222,7 @@ export default function JarvisPage() {
     setConfirming(true);
     setError(null);
     setPendingConfirmation(null);
+    stopSpeaking();
 
     const assistantMsg: ChatMessage = { id: newId(), role: "assistant", text: "", tools: [] };
     setMessages((prev) => [...prev, assistantMsg]);
@@ -271,9 +312,27 @@ export default function JarvisPage() {
       </aside>
 
       <div className="flex-1 flex flex-col">
-        <div className="px-4 sm:px-8 py-4 border-b border-gray-100">
-          <h1 className="text-lg font-semibold text-gray-900">Jarvis</h1>
-          <p className="text-xs text-gray-500 mt-0.5">KI-Assistent für alle Ventures — Leads, Kunden, Aufträge</p>
+        <div className="px-4 sm:px-8 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold text-gray-900">Jarvis</h1>
+            <p className="text-xs text-gray-500 mt-0.5">KI-Assistent für alle Ventures — Leads, Kunden, Aufträge</p>
+          </div>
+          <button
+            onClick={() => {
+              setVoiceEnabled((v) => {
+                const next = !v;
+                localStorage.setItem("jarvis-voice-enabled", String(next));
+                if (!next) stopSpeaking();
+                return next;
+              });
+            }}
+            className={`text-sm px-3 py-1.5 rounded-md border shrink-0 ${
+              voiceEnabled ? "border-blue-200 text-blue-700 bg-blue-50" : "border-gray-200 text-gray-500 hover:bg-gray-50"
+            }`}
+            title={voiceEnabled ? "Sprachausgabe an" : "Sprachausgabe aus"}
+          >
+            {voiceEnabled ? (speaking ? "🔊 spricht…" : "🔊 an") : "🔈 aus"}
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-5">
