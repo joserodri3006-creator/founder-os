@@ -89,7 +89,7 @@ Online First generiert jetzt Cashflow — alles andere wird parallel aufgebaut.
 - `lead_tags` / `lead_tag_map` — Stichwörter für Leads (spiegelt `product_tags`-Muster)
 - `customer_tags` / `customer_tag_map` — Stichwörter für Kunden (spiegelt `product_tags`-Muster)
 - `outreach_templates` — frei benennbare E-Mail-Vorlagen für manuellen Versand aus Lead-/Kunden-Detail (getrennt von `email_templates`, das feste System-Events bedient)
-- `tasks` — Aufgabenverwaltung pro Lead/Kunde (polymorph `entity_type`/`entity_id` analog `attachments`), Status/Priorität/Fälligkeit/Zuweisung an Teammitglied
+- `tasks` — Aufgabenverwaltung pro Lead/Kunde (polymorph `entity_type`/`entity_id` analog `attachments`), 3-stufiger Status (offen/in Bearbeitung/erledigt, Pipeline-Ansicht)/Priorität/Fälligkeit/Zuweisung an Teammitglied
 - `jarvis_conversations` / `jarvis_messages` — Chat-Verlauf des KI-Assistenten Jarvis (founder-only, RLS)
 - `jarvis_pending_actions` — pausierte Jarvis-Tool-Aufrufe, die auf Bestätigung im Chat warten (kundenwirksame Aktionen, z.B. Auftragsstatus-Änderung)
 - `jarvis_memory` — persistentes semantisches Gedächtnis (pgvector, Voyage-Embeddings 1024 dim), Typen `personal`/`venture`/`knowledge`, Quelle `explicit`/`extracted`/`research`; Suche via SQL-Funktion `match_jarvis_memory`, Dedup-Suche via `find_similar_jarvis_memory`
@@ -161,7 +161,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - `/drafts` — KI-Drafts reviewen, editieren, senden (per Venture gefiltert)
 - `/kunden` — Kundenliste, Bearbeiten/Kopieren/Archivieren/Löschen, Archiv-Toggle
 - `/kunden/[id]` — Kundendetail: Felder editierbar, Aufträge, Stichwörter, Aufgaben, Notizen, Anhänge
-- `/aufgaben` — globale Aufgabenübersicht über Leads/Kunden im aktiven Venture, Filter Status/Priorität/Überfällig
+- `/aufgaben` — globale Aufgabenübersicht über Leads/Kunden im aktiven Venture; Listen- und Pipeline-Ansicht (Kanban, Spalten Offen/In Bearbeitung/Erledigt, Drag-and-Drop via `@dnd-kit`) umschaltbar; Filter Status/Priorität/Überfällig/Zuweisung/Entity-Typ + Volltextsuche im Titel; Aufgaben direkt in der Übersicht bearbeiten/kopieren/löschen
 - `/auftraege` — Auftragsliste mit Status + Wert, Bearbeiten/Kopieren/Archivieren/Löschen, Archiv-Toggle
 - `/auftraege/[id]` — Auftragsdetail: Status-Timeline, Zahlungsschritte, Rechnung, Aktivitäten, Notizen, Anhänge
 - `/produkte` — Produktliste, Kopieren/Archivieren/Löschen (→ siehe Produktverwaltung unten)
@@ -195,7 +195,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - **API-Zugriffsschutz** — `proxy.ts` verlangt Sitzungen und prueft Section-Permissions vor internen Service-Role-Routen
 - **Stichwörter (Tags)** — Leads und Kunden koennen wie Produkte mit freien Tags versehen werden (`lead_tags`/`customer_tags`, Detailseiten-UI identisch zum Produkt-Tagging)
 - **Manueller E-Mail-Versand aus Lead-/Kunden-Detail** — Button „E-Mail schreiben" öffnet `SendMailModal` mit Vorlagen-Dropdown (`outreach_templates`, Platzhalter `{{vorname}}`/`{{nachname}}`/`{{firma}}`/`{{email}}`), editierbarem Betreff/Text, Versand über Resend; bei Leads wird zusätzlich eine `lead_activities`-Aktivität (`email_sent`) protokolliert. Vorlagen verwaltbar unter `/einstellungen/anschreiben-vorlagen`
-- **Aufgabenverwaltung** — `TasksPanel` auf Lead-/Kundendetail (Titel, Priorität, Fälligkeitsdatum, optionale Zuweisung an Teammitglied aus `/api/team`, Erledigt-Toggle), plus globale Übersicht unter `/aufgaben`. `/api/tasks` ist bewusst nicht auf eine einzelne Section gemappt (bedient Leads UND Kunden polymorph), sondern wie `/api/dashboard` nur venture-scoped für Nicht-Founder (`VENTURE_SCOPED_LIST_PATHS` in `proxy.ts`)
+- **Aufgabenverwaltung** — `TasksPanel` auf Lead-/Kundendetail (Titel, Beschreibung, Priorität, Fälligkeitsdatum, optionale Zuweisung an Teammitglied aus `/api/team`, 3-stufiger Status offen/in Bearbeitung/erledigt, editierbar, kopierbar), plus globale Übersicht unter `/aufgaben` mit Listen- und Pipeline/Kanban-Ansicht (Drag-and-Drop zwischen Status-Spalten via `@dnd-kit`), erweiterten Filtern (Zuweisung, Entity-Typ, Volltextsuche) sowie Bearbeiten/Kopieren/Löschen. `/api/tasks` ist bewusst nicht auf eine einzelne Section gemappt (bedient Leads UND Kunden polymorph), sondern wie `/api/dashboard` nur venture-scoped für Nicht-Founder (`VENTURE_SCOPED_LIST_PATHS` in `proxy.ts`); `/api/tasks/[id]/copy` folgt demselben ungegateten Muster wie PATCH/DELETE
 - **Reporting/Selektion** — Founder-only NL→SQL-Tool: `report_reader`-DB-Rolle mit reiner SELECT-Allowlist + Anwendungsvalidierung als zweite Verteidigungsebene, siehe `supabase/migrations/reporting.sql`
 
 ---
@@ -384,7 +384,8 @@ ELEVENLABS_API_KEY
 
 - [ ] `supabase/migrations/lead_customer_tags.sql` und `supabase/migrations/reporting.sql` in Supabase ausfuehren, danach Edge Function `reporting-query` deployen (`supabase functions deploy reporting-query`)
 - [ ] `supabase/migrations/outreach_templates.sql` in Supabase ausfuehren
-- [ ] `supabase/migrations/tasks.sql` in Supabase ausfuehren (Feature-Branch `feature/kontakt-bearbeitung-aufgaben`, noch nicht gegen Produktion ausgefuehrt — bewusst offen gelassen bis nach dem Test durch den Founder)
+- [ ] `supabase/migrations/tasks.sql` in Supabase ausfuehren, falls noch nicht geschehen (Code ist bereits in `main` gemergt — Commit `8d9303d` — die Migration selbst wurde in diesem Dokument aber noch nicht als ausgefuehrt bestaetigt)
+- [ ] `supabase/migrations/tasks_pipeline_status.sql` in Supabase ausfuehren (erweitert `tasks.status` CHECK-Constraint auf `open`/`in_progress`/`done` für die neue Pipeline-Ansicht unter `/aufgaben` — setzt voraus, dass `tasks.sql` bereits gelaufen ist)
 - [ ] **KRITISCH:** geleaktes Supabase-DB-Passwort rotieren und Git-Historie bereinigen (siehe `SECURITY.md`)
 - [ ] `sales_funnel.sql` in Supabase ausfuehren und aktualisierte Edge Functions deployen
 - [ ] Stripe/Turnstile/Booking-Variablen konfigurieren und Webhook registrieren
