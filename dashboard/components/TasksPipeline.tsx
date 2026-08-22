@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   DndContext, DragOverlay, PointerSensor, TouchSensor, KeyboardSensor,
-  useSensor, useSensors, useDraggable, useDroppable,
-  type DragEndEvent, type DragStartEvent,
+  useSensor, useSensors, useDroppable,
+  type DragEndEvent, type DragStartEvent, type DragOverEvent,
 } from "@dnd-kit/core";
+import {
+  SortableContext, useSortable, verticalListSortingStrategy,
+  sortableKeyboardCoordinates, arrayMove,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 export interface PipelineTask {
@@ -16,6 +20,7 @@ export interface PipelineTask {
   priority: "low" | "medium" | "high";
   due_date: string | null;
   assigned_to: string | null;
+  sort_order: number;
   entity_name: string | null;
   entity_company: string | null;
   entity_href: string | null;
@@ -41,55 +46,114 @@ function isOverdue(task: PipelineTask) {
   return new Date(task.due_date) < new Date(new Date().toDateString());
 }
 
+function groupByStatus(tasks: PipelineTask[]): Record<PipelineTask["status"], PipelineTask[]> {
+  const sorted = [...tasks].sort((a, b) => a.sort_order - b.sort_order);
+  return {
+    open: sorted.filter(t => t.status === "open"),
+    in_progress: sorted.filter(t => t.status === "in_progress"),
+    done: sorted.filter(t => t.status === "done"),
+  };
+}
+
 interface Props {
   tasks: PipelineTask[];
   members: TeamMember[];
-  onStatusChange: (task: PipelineTask, newStatus: PipelineTask["status"]) => void;
+  onReorder: (taskId: string, afterId: string | null, beforeId: string | null, newStatus?: PipelineTask["status"]) => void;
 }
 
-export default function TasksPipeline({ tasks, members, onStatusChange }: Props) {
+export default function TasksPipeline({ tasks, members, onReorder }: Props) {
+  const [columns, setColumns] = useState<Record<PipelineTask["status"], PipelineTask[]>>(() => groupByStatus(tasks));
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!activeId) setColumns(groupByStatus(tasks));
+  }, [tasks, activeId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
-    useSensor(KeyboardSensor)
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const memberName = (id: string | null) => members.find(m => m.user_id === id)?.name ?? null;
 
-  function sortByDue(list: PipelineTask[]) {
-    return [...list].sort((a, b) => {
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      return a.due_date.localeCompare(b.due_date);
-    });
+  function findContainer(id: string): PipelineTask["status"] | undefined {
+    if (id === "open" || id === "in_progress" || id === "done") return id;
+    for (const key of Object.keys(columns) as PipelineTask["status"][]) {
+      if (columns[key].some(t => t.id === id)) return key;
+    }
+    return undefined;
   }
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
   }
 
-  function handleDragEnd(event: DragEndEvent) {
-    setActiveId(null);
+  function handleDragOver(event: DragOverEvent) {
     const { active, over } = event;
     if (!over) return;
-    const newStatus = String(over.id).replace("column-", "") as PipelineTask["status"];
-    const task = tasks.find(t => t.id === active.id);
-    if (task && task.status !== newStatus) onStatusChange(task, newStatus);
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    const activeContainer = findContainer(activeId);
+    const overContainer = findContainer(overId);
+    if (!activeContainer || !overContainer || activeContainer === overContainer) return;
+
+    setColumns(prev => {
+      const activeItems = prev[activeContainer];
+      const overItems = prev[overContainer];
+      const activeIndex = activeItems.findIndex(t => t.id === activeId);
+      if (activeIndex === -1) return prev;
+      const overIndex = overItems.findIndex(t => t.id === overId);
+      const newIndex = overIndex >= 0 ? overIndex : overItems.length;
+      const moved = { ...activeItems[activeIndex], status: overContainer };
+      return {
+        ...prev,
+        [activeContainer]: activeItems.filter(t => t.id !== activeId),
+        [overContainer]: [...overItems.slice(0, newIndex), moved, ...overItems.slice(newIndex)],
+      };
+    });
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    const activeId = String(active.id);
+    setActiveId(null);
+    if (!over) return;
+
+    const container = findContainer(activeId);
+    if (!container) return;
+    const items = columns[container];
+    const activeIndex = items.findIndex(t => t.id === activeId);
+    if (activeIndex === -1) return;
+    const overContainer = findContainer(String(over.id));
+    const overIndex = overContainer === container ? items.findIndex(t => t.id === String(over.id)) : items.length - 1;
+    const reordered = arrayMove(items, activeIndex, overIndex >= 0 ? overIndex : items.length - 1);
+    setColumns(prev => ({ ...prev, [container]: reordered }));
+
+    const idx = reordered.findIndex(t => t.id === activeId);
+    const afterId = idx > 0 ? reordered[idx - 1].id : null;
+    const beforeId = idx < reordered.length - 1 ? reordered[idx + 1].id : null;
+    const originalTask = tasks.find(t => t.id === activeId);
+    onReorder(activeId, afterId, beforeId, originalTask && container !== originalTask.status ? container : undefined);
   }
 
   const activeTask = activeId ? tasks.find(t => t.id === activeId) ?? null : null;
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveId(null)}>
+    <DndContext
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveId(null)}
+    >
       <div className="flex gap-4 overflow-x-auto pb-2">
         {COLUMNS.map(col => (
           <PipelineColumn
             key={col.key}
             statusKey={col.key}
             label={col.label}
-            tasks={sortByDue(tasks.filter(t => t.status === col.key))}
+            tasks={columns[col.key]}
             memberName={memberName}
           />
         ))}
@@ -105,7 +169,7 @@ function PipelineColumn({ statusKey, label, tasks, memberName }: {
   statusKey: PipelineTask["status"]; label: string; tasks: PipelineTask[];
   memberName: (id: string | null) => string | null;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `column-${statusKey}` });
+  const { setNodeRef, isOver } = useDroppable({ id: statusKey });
   return (
     <div className="flex-1 min-w-[260px]">
       <div className="text-sm font-medium text-gray-700 mb-2 px-1">
@@ -117,19 +181,19 @@ function PipelineColumn({ statusKey, label, tasks, memberName }: {
           isOver ? "border-blue-300 bg-blue-50" : "border-gray-100 bg-gray-50/50"
         }`}
       >
-        {tasks.map(task => (
-          <DraggableCard key={task.id} task={task} assigneeName={memberName(task.assigned_to)} />
-        ))}
+        <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+          {tasks.map(task => (
+            <SortableCard key={task.id} task={task} assigneeName={memberName(task.assigned_to)} />
+          ))}
+        </SortableContext>
       </div>
     </div>
   );
 }
 
-function DraggableCard({ task, assigneeName }: { task: PipelineTask; assigneeName: string | null }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id });
-  const style = transform
-    ? { transform: CSS.Translate.toString(transform), opacity: isDragging ? 0.4 : 1 }
-    : undefined;
+function SortableCard({ task, assigneeName }: { task: PipelineTask; assigneeName: string | null }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
       <PipelineCard task={task} assigneeName={assigneeName} />

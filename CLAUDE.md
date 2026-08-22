@@ -161,7 +161,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - `/drafts` — KI-Drafts reviewen, editieren, senden (per Venture gefiltert)
 - `/kunden` — Kundenliste, Bearbeiten/Kopieren/Archivieren/Löschen, Archiv-Toggle
 - `/kunden/[id]` — Kundendetail: Felder editierbar, Aufträge, Stichwörter, Aufgaben, Notizen, Anhänge
-- `/aufgaben` — globale Aufgabenübersicht über Leads/Kunden im aktiven Venture; Listen- und Pipeline-Ansicht (Kanban, Spalten Offen/In Bearbeitung/Erledigt, Drag-and-Drop via `@dnd-kit`) umschaltbar; Filter Status/Priorität/Überfällig/Zuweisung/Entity-Typ + Volltextsuche im Titel; Aufgaben direkt in der Übersicht bearbeiten/kopieren/löschen
+- `/aufgaben` — globale Aufgabenübersicht über Leads/Kunden im aktiven Venture; Listen- (einzeilig, kompakt) und Pipeline-Ansicht (Kanban, Spalten Offen/In Bearbeitung/Erledigt) umschaltbar; Aufgaben per Drag-and-Drop sowohl zwischen Status-Spalten (Pipeline) als auch in ihrer Reihenfolge verschiebbar (Liste und Pipeline, `sort_order`-Spalte, via `@dnd-kit/sortable`); Filter Status/Priorität/Überfällig/Zuweisung/Entity-Typ + Volltextsuche im Titel; Aufgaben direkt in der Übersicht bearbeiten/kopieren/löschen
 - `/auftraege` — Auftragsliste mit Status + Wert, Bearbeiten/Kopieren/Archivieren/Löschen, Archiv-Toggle
 - `/auftraege/[id]` — Auftragsdetail: Status-Timeline, Zahlungsschritte, Rechnung, Aktivitäten, Notizen, Anhänge
 - `/produkte` — Produktliste, Kopieren/Archivieren/Löschen (→ siehe Produktverwaltung unten)
@@ -386,6 +386,7 @@ ELEVENLABS_API_KEY
 - [ ] `supabase/migrations/outreach_templates.sql` in Supabase ausfuehren
 - [ ] `supabase/migrations/tasks.sql` in Supabase ausfuehren, falls noch nicht geschehen (Code ist bereits in `main` gemergt — Commit `8d9303d` — die Migration selbst wurde in diesem Dokument aber noch nicht als ausgefuehrt bestaetigt)
 - [ ] `supabase/migrations/tasks_pipeline_status.sql` in Supabase ausfuehren (erweitert `tasks.status` CHECK-Constraint auf `open`/`in_progress`/`done` für die neue Pipeline-Ansicht unter `/aufgaben` — setzt voraus, dass `tasks.sql` bereits gelaufen ist)
+- [ ] `supabase/migrations/tasks_sort_order.sql` in Supabase ausfuehren (neue `sort_order`-Spalte für Drag-and-Drop-Reihenfolge in Liste und Pipeline unter `/aufgaben` — setzt `tasks_pipeline_status.sql` voraus)
 - [ ] **KRITISCH:** geleaktes Supabase-DB-Passwort rotieren und Git-Historie bereinigen (siehe `SECURITY.md`)
 - [ ] `sales_funnel.sql` in Supabase ausfuehren und aktualisierte Edge Functions deployen
 - [ ] Stripe/Turnstile/Booking-Variablen konfigurieren und Webhook registrieren

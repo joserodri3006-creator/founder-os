@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useVenture } from "@/context/VentureContext";
 import TasksPipeline, { type PipelineTask } from "@/components/TasksPipeline";
+import TasksList, { type ListTask, STATUS_LABELS } from "@/components/TasksList";
 
 interface Task {
   id: string;
@@ -13,6 +13,7 @@ interface Task {
   priority: "low" | "medium" | "high";
   due_date: string | null;
   assigned_to: string | null;
+  sort_order: number;
   entity_type: "lead" | "customer";
   entity_id: string;
   entity_name: string | null;
@@ -23,13 +24,7 @@ interface Task {
 
 interface TeamMember { user_id: string; name: string; }
 
-const STATUS_LABELS: Record<Task["status"], string> = { open: "Offen", in_progress: "In Bearbeitung", done: "Erledigt" };
 const PRIORITY_LABELS: Record<Task["priority"], string> = { low: "Niedrig", medium: "Mittel", high: "Hoch" };
-const PRIORITY_COLORS: Record<Task["priority"], { bg: string; color: string }> = {
-  low: { bg: "#F3F4F6", color: "#4B5563" },
-  medium: { bg: "#FEF9C3", color: "#A16207" },
-  high: { bg: "#FEE2E2", color: "#B91C1C" },
-};
 
 function isOverdue(task: Task) {
   if (task.status === "done" || !task.due_date) return false;
@@ -105,7 +100,63 @@ export default function AufgabenPage() {
     }
   }
 
-  const memberName = (id: string | null) => members.find(m => m.user_id === id)?.name ?? null;
+  // Reihenfolge per Drag & Drop (Liste und Pipeline): kompletten Task-Array vor dem
+  // Drag snapshotten, betroffene Aufgabe neben ihre neuen Nachbarn einsortieren und
+  // den ganzen (im Client ohnehin geladenen) Array komplett neu durchnummerieren.
+  // Nur die tatsächlich geänderten Zeilen gehen an den Server; bei Fehlschlag wird
+  // der Snapshot zurückgesetzt (gleiches Prinzip wie bei updateTaskStatus, nur für
+  // den ganzen Array statt ein Feld).
+  function handleReorder(taskId: string, afterId: string | null, beforeId: string | null, newStatus?: Task["status"]) {
+    const previousTasks = tasks;
+    const moved = tasks.find(t => t.id === taskId);
+    if (!moved) return;
+    const rest = tasks.filter(t => t.id !== taskId);
+
+    let insertAt: number;
+    if (afterId) {
+      const idx = rest.findIndex(t => t.id === afterId);
+      insertAt = idx >= 0 ? idx + 1 : rest.length;
+    } else if (beforeId) {
+      const idx = rest.findIndex(t => t.id === beforeId);
+      insertAt = idx >= 0 ? idx : rest.length;
+    } else {
+      insertAt = 0;
+    }
+
+    const updatedMoved = newStatus ? { ...moved, status: newStatus } : moved;
+    const next = [...rest.slice(0, insertAt), updatedMoved, ...rest.slice(insertAt)]
+      .map((t, i) => ({ ...t, sort_order: i }));
+
+    setTasks(next);
+    persistReorder(previousTasks, next);
+  }
+
+  async function persistReorder(previousTasks: Task[], updatedTasks: Task[]) {
+    const prevById = new Map(previousTasks.map(t => [t.id, t]));
+    const changed = updatedTasks.filter(t => {
+      const prev = prevById.get(t.id);
+      return !prev || prev.sort_order !== t.sort_order || prev.status !== t.status;
+    });
+    if (changed.length === 0) return;
+
+    try {
+      const res = await fetch("/api/tasks/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          updates: changed.map(t => ({
+            id: t.id,
+            sort_order: t.sort_order,
+            ...(prevById.get(t.id)?.status !== t.status ? { status: t.status } : {}),
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setTasks(previousTasks);
+      alert("Reihenfolge konnte nicht gespeichert werden.");
+    }
+  }
 
   const baseFiltered = tasks
     .filter(t => priority === "alle" || t.priority === priority)
@@ -115,11 +166,7 @@ export default function AufgabenPage() {
 
   const listFiltered = baseFiltered
     .filter(t => status === "alle" || t.status === status)
-    .sort((a, b) => {
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      return a.due_date.localeCompare(b.due_date);
-    });
+    .sort((a, b) => a.sort_order - b.sort_order);
 
   return (
     <div className="px-4 py-5 sm:p-8 max-w-4xl mx-auto">
@@ -187,7 +234,7 @@ export default function AufgabenPage() {
           <TasksPipeline
             tasks={baseFiltered as PipelineTask[]}
             members={members}
-            onStatusChange={(t, s) => updateTaskStatus(t as Task, s)}
+            onReorder={(id, after, before, newStatus) => handleReorder(id, after, before, newStatus)}
           />
         )
       ) : listFiltered.length === 0 ? (
@@ -195,129 +242,19 @@ export default function AufgabenPage() {
           <p className="text-sm text-gray-400">Keine Aufgaben gefunden.</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {listFiltered.map(task => (
-            editingId === task.id ? (
-              <TaskEditForm key={task.id} task={task} members={members}
-                onDone={async () => { setEditingId(null); await load(); }}
-                onCancel={() => setEditingId(null)} />
-            ) : (
-              <TaskListRow key={task.id} task={task} assigneeName={memberName(task.assigned_to)}
-                onStatusChange={(s) => updateTaskStatus(task, s)}
-                onEdit={() => setEditingId(task.id)}
-                onCopy={() => copyTask(task.id)}
-                onDelete={() => removeTask(task.id)} />
-            )
-          ))}
-        </div>
+        <TasksList
+          tasks={listFiltered as ListTask[]}
+          members={members}
+          editingId={editingId}
+          onStatusChange={(t, s) => updateTaskStatus(t as Task, s)}
+          onReorder={(id, after, before) => handleReorder(id, after, before)}
+          onEdit={setEditingId}
+          onEditDone={async () => { setEditingId(null); await load(); }}
+          onEditCancel={() => setEditingId(null)}
+          onCopy={copyTask}
+          onDelete={removeTask}
+        />
       )}
-    </div>
-  );
-}
-
-function TaskListRow({ task, assigneeName, onStatusChange, onEdit, onCopy, onDelete }: {
-  task: Task; assigneeName: string | null;
-  onStatusChange: (status: Task["status"]) => void;
-  onEdit: () => void; onCopy: () => void; onDelete: () => void;
-}) {
-  const overdue = isOverdue(task);
-  const pc = PRIORITY_COLORS[task.priority];
-  return (
-    <div className={`bg-white rounded-lg border px-4 py-3 flex items-start gap-3 ${overdue ? "border-red-200" : "border-gray-200"}`}>
-      <select value={task.status} onChange={e => onStatusChange(e.target.value as Task["status"])}
-        className="text-xs border border-gray-200 rounded px-2 py-1 bg-white mt-0.5">
-        {(Object.keys(STATUS_LABELS) as Task["status"][]).map(s => (
-          <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-        ))}
-      </select>
-      <div className="min-w-0 flex-1">
-        <p className={`text-sm font-medium ${task.status === "done" ? "text-gray-400 line-through" : "text-gray-900"}`}>
-          {task.title}
-        </p>
-        <div className="flex items-center gap-2 mt-1 flex-wrap text-xs">
-          {task.entity_href && (
-            <Link href={task.entity_href} className="text-blue-600 hover:text-blue-700">
-              {task.entity_name}{task.entity_company ? ` (${task.entity_company})` : ""}
-            </Link>
-          )}
-          <span className="px-2 py-0.5 rounded-full font-medium" style={{ background: pc.bg, color: pc.color }}>
-            {PRIORITY_LABELS[task.priority]}
-          </span>
-          {task.due_date && (
-            <span className={overdue ? "text-red-600 font-medium" : "text-gray-500"}>
-              {overdue ? "Überfällig: " : ""}{new Date(task.due_date).toLocaleDateString("de-DE")}
-            </span>
-          )}
-          {assigneeName && <span className="text-gray-500">· {assigneeName}</span>}
-        </div>
-      </div>
-      <div className="flex items-center gap-2 shrink-0 text-xs">
-        <button onClick={onEdit} className="text-gray-400 hover:text-gray-700">Bearbeiten</button>
-        <button onClick={onCopy} className="text-gray-400 hover:text-gray-700">Kopieren</button>
-        <button onClick={onDelete} className="text-gray-400 hover:text-red-600">Löschen</button>
-      </div>
-    </div>
-  );
-}
-
-function TaskEditForm({ task, members, onDone, onCancel }: {
-  task: Task; members: TeamMember[]; onDone: () => Promise<void>; onCancel: () => void;
-}) {
-  const [title, setTitle] = useState(task.title);
-  const [description, setDescription] = useState(task.description ?? "");
-  const [priority, setPriority] = useState<Task["priority"]>(task.priority);
-  const [dueDate, setDueDate] = useState(task.due_date ?? "");
-  const [assignedTo, setAssignedTo] = useState(task.assigned_to ?? "");
-  const [saving, setSaving] = useState(false);
-
-  async function save() {
-    if (!title.trim()) return;
-    setSaving(true);
-    const res = await fetch(`/api/tasks/${task.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title, description: description || null, priority, due_date: dueDate || null, assigned_to: assignedTo || null,
-      }),
-    });
-    setSaving(false);
-    if (!res.ok) {
-      alert("Speichern fehlgeschlagen.");
-      return;
-    }
-    await onDone();
-  }
-
-  return (
-    <div className="bg-white rounded-lg border border-gray-200 px-4 py-3">
-      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Titel"
-        className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 mb-2" />
-      <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Beschreibung (optional)" rows={2}
-        className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 mb-2 resize-y" />
-      <div className="flex gap-2 flex-wrap mb-3">
-        <select value={priority} onChange={e => setPriority(e.target.value as Task["priority"])}
-          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white flex-1 min-w-[110px]">
-          {(Object.keys(PRIORITY_LABELS) as Task["priority"][]).map(p => (
-            <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
-          ))}
-        </select>
-        <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
-          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 flex-1 min-w-[130px]" />
-        <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
-          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white flex-1 min-w-[130px]">
-          <option value="">Nicht zugewiesen</option>
-          {members.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
-        </select>
-      </div>
-      <div className="flex gap-2">
-        <button onClick={save} disabled={saving || !title.trim()}
-          className="text-sm px-3 py-1.5 rounded-md text-white font-medium disabled:opacity-40" style={{ background: "#1B2A5E" }}>
-          {saving ? "Speichert…" : "Speichern"}
-        </button>
-        <button onClick={onCancel} className="text-sm px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50">
-          Abbrechen
-        </button>
-      </div>
     </div>
   );
 }

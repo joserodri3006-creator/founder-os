@@ -63,6 +63,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "entity_type muss lead oder customer sein" }, { status: 400 });
   }
 
+  const { data: maxRow } = await supabaseAdmin
+    .from("tasks")
+    .select("sort_order")
+    .eq("venture", venture)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextSortOrder = (maxRow?.sort_order ?? -1) + 1;
+
   const { data, error } = await supabaseAdmin
     .from("tasks")
     .insert({
@@ -74,6 +83,7 @@ export async function POST(req: NextRequest) {
       priority: priority || "medium",
       due_date: due_date || null,
       assigned_to: assigned_to || null,
+      sort_order: nextSortOrder,
     })
     .select()
     .single();
