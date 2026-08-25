@@ -63,6 +63,8 @@ export default function LeadsPage() {
   const [filterStatus, setFilterStatus] = useState<LeadStatus | "alle">("alle");
   const [filterSource, setFilterSource] = useState<string>("alle");
   const [showArchived, setShowArchived] = useState(false);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [showNewLead, setShowNewLead] = useState(false);
   const [showCsvImport, setShowCsvImport] = useState(false);
@@ -74,6 +76,7 @@ export default function LeadsPage() {
     if (filterStatus !== "alle") params.set("status", filterStatus);
     if (filterSource !== "alle") params.set("source", filterSource);
     if (showArchived) params.set("archived", "true");
+    if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
     params.set("venture", venture);
     const res = await fetch(`/api/leads?${params}`);
     const data = await res.json();
@@ -81,7 +84,12 @@ export default function LeadsPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [filterStatus, filterSource, showArchived, venture]);
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timeout);
+  }, [search]);
+
+  useEffect(() => { load(); }, [filterStatus, filterSource, showArchived, debouncedSearch, venture]);
 
   async function updateStatus(id: string, status: LeadStatus) {
     setUpdatingId(id);
@@ -187,6 +195,13 @@ export default function LeadsPage() {
           boxShadow: '0 2px 12px rgba(27,42,94,0.08)',
         }}
       >
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Suche — Name, Firma, E-Mail, Telefon, Ort, Notizen…"
+          style={{ ...selectStyle, flex: "1 1 260px", minWidth: "220px" }}
+        />
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value as LeadStatus | "alle")}

@@ -20,6 +20,16 @@ export async function GET(req: NextRequest) {
   const source = searchParams.get("source");
   const venture = searchParams.get("venture");
   const showArchived = searchParams.get("archived") === "true";
+  const search = searchParams.get("search")?.trim();
+
+  // Google-artige Volltextsuche über alle relevanten Freitext-/Kontaktfelder eines
+  // Leads (nicht nur Name/Firma). review_notes bewusst ausgeschlossen, da diese Spalte
+  // im Fallback-Pfad (fehlende Review-Migration) nicht existiert — sonst würde die
+  // Suche in genau dem Fall kaputtgehen, den der Fallback eigentlich abfangen soll.
+  const SEARCH_COLUMNS = [
+    "first_name", "last_name", "email", "company_name",
+    "phone", "website", "city", "region", "industry", "contact_reason", "notes",
+  ];
 
   const baseSelect = "id,first_name,last_name,email,company_name,status,source,city,industry,follow_up_date,ai_draft_approved,archived_at,created_at,venture,is_duplicate";
   const reviewSelect = `${baseSelect},review_status,lead_potential,contact_channel,next_action`;
@@ -39,6 +49,10 @@ export async function GET(req: NextRequest) {
     if (status && status !== "alle") query = query.eq("status", status);
     if (source && source !== "alle") query = query.eq("source", source);
     if (venture && venture !== "alle") query = query.eq("venture", venture);
+    if (search) {
+      const term = search.replace(/[%,]/g, "");
+      query = query.or(SEARCH_COLUMNS.map((col) => `${col}.ilike.%${term}%`).join(","));
+    }
 
     return query;
   }
