@@ -66,6 +66,8 @@ export default function ProduktDetailPage() {
   const [variantOptions, setVariantOptions] = useState<VariantOption[]>([]);
   const [variants, setVariants] = useState<Variant[]>([]);
   const [variantsDirty, setVariantsDirty] = useState(false);
+  const [newOptionValue, setNewOptionValue] = useState<Record<number, string>>({});
+  const [variantGenError, setVariantGenError] = useState<string | null>(null);
 
   // Tags
   const [tagInput, setTagInput] = useState("");
@@ -196,21 +198,65 @@ export default function ProduktDetailPage() {
     setSaving(null);
   }
 
-  async function saveVariants() {
-    setSaving("variants");
-    await fetch(`/api/produkte/${id}/varianten`, {
-      method: "POST",
+  async function saveAll() {
+    setSaving("all");
+    const fields = {
+      name: editName, sku: editSku || null, internal_number: editInternalNumber || null,
+      short_description: editShortDesc || null, description: editDescription || null,
+      weight: editWeight ? parseFloat(editWeight) : null,
+      is_featured: editFeatured, track_inventory: editTrackInventory,
+      price: editPrice ? parseFloat(editPrice) : null,
+      compare_at_price: editComparePrice ? parseFloat(editComparePrice) : null,
+      cost_price: editCostPrice ? parseFloat(editCostPrice) : null,
+      sale_price: editSalePrice ? parseFloat(editSalePrice) : null,
+      sale_from: editSaleFrom ? new Date(editSaleFrom).toISOString() : null,
+      sale_until: editSaleUntil ? new Date(editSaleUntil).toISOString() : null,
+      slug: editSlug || null, meta_title: editMetaTitle || null, meta_description: editMetaDesc || null,
+      og_title: editOgTitle || null, og_description: editOgDesc || null,
+      canonical_url: editCanonical || null, no_index: editNoIndex,
+    };
+
+    const res = await fetch(`/api/produkte/${id}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        variant_options: variantOptions,
-        variants: variants.map(v => ({
-          ...v,
-          price: v.price !== "" ? parseFloat(String(v.price)) : null,
-          compare_at_price: v.compare_at_price !== "" ? parseFloat(String(v.compare_at_price)) : null,
-        })),
-      }),
+      body: JSON.stringify(fields),
     });
-    setVariantsDirty(false);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error ?? "Speichern fehlgeschlagen.");
+      setSaving(null);
+      return;
+    }
+
+    if (hasVariants && variantsDirty) {
+      if (variants.length === 0) {
+        alert("Keine Varianten zum Speichern vorhanden. Bitte zuerst Optionen mit Werten anlegen und „Varianten generieren“ klicken.");
+        await load();
+        setSaving(null);
+        return;
+      }
+      const vRes = await fetch(`/api/produkte/${id}/varianten`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          variant_options: variantOptions,
+          variants: variants.map(v => ({
+            ...v,
+            price: v.price !== "" ? parseFloat(String(v.price)) : null,
+            compare_at_price: v.compare_at_price !== "" ? parseFloat(String(v.compare_at_price)) : null,
+          })),
+        }),
+      });
+      if (!vRes.ok) {
+        const err = await vRes.json().catch(() => ({}));
+        alert(err.error ?? "Varianten konnten nicht gespeichert werden.");
+        await load();
+        setSaving(null);
+        return;
+      }
+      setVariantsDirty(false);
+    }
+
     await load();
     setSaving(null);
   }
@@ -254,13 +300,51 @@ export default function ProduktDetailPage() {
     setSaving(null);
   }
 
+  async function addTag() {
+    if (!tagInput.trim()) return;
+    const name = tagInput.trim();
+    setTagInput("");
+    const res = await fetch("/api/produkt-tags", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ venture: product.venture, name }),
+    });
+    const tag = await res.json();
+    if (tag.id && !selectedTags.find(t => t.id === tag.id)) {
+      const updated = [...selectedTags, tag];
+      setSelectedTags(updated);
+      await patch({ tag_ids: updated.map(t => t.id) }, "tags");
+    }
+  }
+
   function addVariantOption() {
     setVariantOptions(prev => [...prev, { name: "", values: [], sort_order: prev.length }]);
     setVariantsDirty(true);
   }
 
+  function addOptionValue(oi: number) {
+    const val = (newOptionValue[oi] ?? "").trim();
+    if (!val) return;
+    setVariantOptions(prev => {
+      const updated = [...prev];
+      updated[oi] = { ...updated[oi], values: [...updated[oi].values, val] };
+      return updated;
+    });
+    setVariantsDirty(true);
+    setVariantGenError(null);
+    setNewOptionValue(prev => ({ ...prev, [oi]: "" }));
+  }
+
   function generateVariants() {
     if (!variantOptions.length) return;
+    const emptyOptions = variantOptions.filter(o => o.values.length === 0);
+    if (emptyOptions.length) {
+      setVariantGenError(
+        `Bitte mindestens einen Wert hinzufügen für: ${emptyOptions.map(o => o.name || "(unbenannte Option)").join(", ")}`
+      );
+      return;
+    }
+    setVariantGenError(null);
     const combos: Record<string, string>[] = [{}];
     for (const opt of variantOptions) {
       const newCombos: Record<string, string>[] = [];
@@ -269,10 +353,9 @@ export default function ProduktDetailPage() {
           newCombos.push({ ...combo, [opt.name]: val });
         }
       }
-      if (newCombos.length) combos.splice(0, combos.length, ...newCombos);
+      combos.splice(0, combos.length, ...newCombos);
     }
-    const filtered = combos.filter(c => Object.keys(c).length > 0);
-    setVariants(filtered.map((ov, i) => ({
+    setVariants(combos.map(ov => ({
       sku: "",
       price: editPrice,
       compare_at_price: "",
@@ -294,10 +377,16 @@ export default function ProduktDetailPage() {
   return (
     <div className="px-4 py-5 sm:p-8 max-w-4xl mx-auto">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/produkte" className="text-sm text-gray-400 hover:text-gray-600">← Produkte</Link>
-        <span className="text-gray-200">/</span>
-        <span className="text-sm text-gray-700 font-medium">{product.name}</span>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <Link href="/produkte" className="text-sm text-gray-400 hover:text-gray-600">← Produkte</Link>
+          <span className="text-gray-200">/</span>
+          <span className="text-sm text-gray-700 font-medium">{product.name}</span>
+        </div>
+        <button onClick={saveAll} disabled={saving === "all"}
+          className="text-sm px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors shrink-0">
+          {saving === "all" ? "Speichern..." : "Speichern"}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -346,16 +435,6 @@ export default function ProduktDetailPage() {
                 className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none" />
             </div>
             <div className="flex gap-3">
-              <button onClick={() => patch({
-                name: editName, sku: editSku || null,
-                internal_number: editInternalNumber || null,
-                short_description: editShortDesc || null, description: editDescription || null,
-                weight: editWeight ? parseFloat(editWeight) : null,
-                is_featured: editFeatured, track_inventory: editTrackInventory,
-              })} disabled={saving === "general"}
-                className="text-sm px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                {saving === "general" ? "..." : "Speichern"}
-              </button>
               <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                 <input type="checkbox" checked={editFeatured} onChange={e => setEditFeatured(e.target.checked)} className="rounded" />
                 Featured
@@ -453,18 +532,6 @@ export default function ProduktDetailPage() {
                 </div>
               )}
             </div>
-
-            <button onClick={() => patch({
-              price: editPrice ? parseFloat(editPrice) : null,
-              compare_at_price: editComparePrice ? parseFloat(editComparePrice) : null,
-              cost_price: editCostPrice ? parseFloat(editCostPrice) : null,
-              sale_price: editSalePrice ? parseFloat(editSalePrice) : null,
-              sale_from: editSaleFrom ? new Date(editSaleFrom).toISOString() : null,
-              sale_until: editSaleUntil ? new Date(editSaleUntil).toISOString() : null,
-            }, "prices")} disabled={saving === "prices"}
-              className="text-sm px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors">
-              {saving === "prices" ? "..." : "Preise speichern"}
-            </button>
           </div>
 
           {/* Händler / Lieferanten */}
@@ -752,29 +819,16 @@ export default function ProduktDetailPage() {
                 <span>Seite aus Suche ausschließen <span className="text-xs text-gray-400">(noindex)</span></span>
               </label>
             </div>
-
-            <button
-              onClick={() => patch({
-                slug: editSlug || null,
-                meta_title: editMetaTitle || null,
-                meta_description: editMetaDesc || null,
-                og_title: editOgTitle || null,
-                og_description: editOgDesc || null,
-                canonical_url: editCanonical || null,
-                no_index: editNoIndex,
-              }, "seo")}
-              disabled={saving === "seo"}
-              className="text-sm px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {saving === "seo" ? "..." : "SEO speichern"}
-            </button>
           </div>
 
           {/* Varianten */}
           {hasVariants && (
             <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Varianten</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Varianten</p>
+                  {variantsDirty && <span className="text-xs text-amber-600">● Nicht gespeichert</span>}
+                </div>
                 <button onClick={addVariantOption}
                   className="text-xs text-blue-600 hover:text-blue-700">+ Option hinzufügen</button>
               </div>
@@ -796,36 +850,45 @@ export default function ProduktDetailPage() {
                       setVariantsDirty(true);
                     }} className="text-xs text-red-400 hover:text-red-600">Löschen</button>
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1.5 items-center">
                     {opt.values.map((val, vi) => (
                       <span key={vi} className="flex items-center gap-1 text-xs bg-gray-100 rounded-full px-2 py-0.5">
                         {val}
                         <button onClick={() => {
-                          const updated = [...variantOptions];
-                          updated[oi].values = updated[oi].values.filter((_, i) => i !== vi);
-                          setVariantOptions(updated); setVariantsDirty(true);
+                          setVariantOptions(prev => {
+                            const updated = [...prev];
+                            updated[oi] = { ...updated[oi], values: updated[oi].values.filter((_, i) => i !== vi) };
+                            return updated;
+                          });
+                          setVariantsDirty(true);
                         }} className="text-gray-400 hover:text-gray-600">×</button>
                       </span>
                     ))}
                     <input type="text" placeholder="+ Wert"
+                      value={newOptionValue[oi] ?? ""}
+                      onChange={e => setNewOptionValue(prev => ({ ...prev, [oi]: e.target.value }))}
+                      enterKeyHint="done"
                       onKeyDown={e => {
-                        if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) {
-                          const updated = [...variantOptions];
-                          updated[oi].values = [...updated[oi].values, (e.target as HTMLInputElement).value.trim()];
-                          setVariantOptions(updated); setVariantsDirty(true);
-                          (e.target as HTMLInputElement).value = "";
-                        }
+                        if (e.key === "Enter") { e.preventDefault(); addOptionValue(oi); }
                       }}
-                      className="text-xs border border-dashed border-gray-300 rounded-full px-2 py-0.5 w-20 focus:outline-none focus:border-blue-400" />
+                      className="text-xs border border-dashed border-gray-300 rounded-full px-2 py-0.5 w-28 focus:outline-none focus:border-blue-400" />
+                    <button type="button" onClick={() => addOptionValue(oi)}
+                      disabled={!(newOptionValue[oi] ?? "").trim()}
+                      className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition-colors">
+                      +
+                    </button>
                   </div>
                 </div>
               ))}
 
               {variantOptions.length > 0 && (
-                <button onClick={generateVariants}
-                  className="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
-                  Varianten generieren
-                </button>
+                <div>
+                  <button onClick={generateVariants}
+                    className="text-xs px-3 py-1.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors">
+                    Varianten generieren
+                  </button>
+                  {variantGenError && <p className="text-xs text-red-500 mt-1.5">{variantGenError}</p>}
+                </div>
               )}
 
               {/* Variant rows */}
@@ -872,13 +935,6 @@ export default function ProduktDetailPage() {
                     </tbody>
                   </table>
                 </div>
-              )}
-
-              {variantsDirty && (
-                <button onClick={saveVariants} disabled={saving === "variants"}
-                  className="text-sm px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">
-                  {saving === "variants" ? "..." : "Varianten speichern"}
-                </button>
               )}
             </div>
           )}
@@ -1182,26 +1238,19 @@ export default function ProduktDetailPage() {
                 </span>
               ))}
             </div>
-            <input type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
-              placeholder="Tag + Enter"
-              onKeyDown={async e => {
-                if (e.key === "Enter" && tagInput.trim()) {
-                  e.preventDefault();
-                  const res = await fetch("/api/produkt-tags", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ venture: product.venture, name: tagInput.trim() }),
-                  });
-                  const tag = await res.json();
-                  if (tag.id && !selectedTags.find(t => t.id === tag.id)) {
-                    const updated = [...selectedTags, tag];
-                    setSelectedTags(updated);
-                    await patch({ tag_ids: updated.map(t => t.id) }, "tags");
-                  }
-                  setTagInput("");
-                }
-              }}
-              className="text-xs border border-gray-200 rounded-md px-2 py-1.5 w-full focus:outline-none focus:ring-1 focus:ring-blue-500" />
+            <div className="flex gap-1.5">
+              <input type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
+                placeholder="Tag + Enter"
+                enterKeyHint="done"
+                onKeyDown={e => {
+                  if (e.key === "Enter") { e.preventDefault(); addTag(); }
+                }}
+                className="flex-1 text-xs border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              <button type="button" onClick={addTag} disabled={!tagInput.trim()}
+                className="text-xs px-3 py-1.5 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition-colors">
+                +
+              </button>
+            </div>
           </div>
 
           {/* Notizen */}
@@ -1264,6 +1313,13 @@ export default function ProduktDetailPage() {
             Produkt löschen
           </button>
         </div>
+      </div>
+
+      <div className="mt-6 flex justify-end">
+        <button onClick={saveAll} disabled={saving === "all"}
+          className="text-sm px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors">
+          {saving === "all" ? "Speichern..." : "Speichern"}
+        </button>
       </div>
     </div>
   );

@@ -21,6 +21,13 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // Upsert variants
   if (body.variants) {
+    if (body.variants.length === 0 && !body.confirm_empty) {
+      return NextResponse.json(
+        { error: "Leere Variantenliste — Löschen aller Varianten wurde nicht bestätigt." },
+        { status: 400 }
+      );
+    }
+
     // Delete variants not in list
     const keepIds = body.variants.filter((v: any) => v.id).map((v: any) => v.id);
     if (keepIds.length) {

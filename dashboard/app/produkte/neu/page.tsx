@@ -63,12 +63,10 @@ export default function NeuesProduktPage() {
     setForm(prev => ({ ...prev, ...patch }));
   }
 
-  function addTag(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && tagInput.trim()) {
-      e.preventDefault();
-      if (!tags.includes(tagInput.trim())) setTags(prev => [...prev, tagInput.trim()]);
-      setTagInput("");
-    }
+  function addTag() {
+    if (!tagInput.trim()) return;
+    if (!tags.includes(tagInput.trim())) setTags(prev => [...prev, tagInput.trim()]);
+    setTagInput("");
   }
 
   async function save(status: "draft" | "active") {
@@ -264,9 +262,17 @@ export default function NeuesProduktPage() {
               </span>
             ))}
           </div>
-          <input type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
-            onKeyDown={addTag} placeholder="Tag eingeben + Enter"
-            className="text-sm border border-gray-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 w-64" />
+          <div className="flex gap-2">
+            <input type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
+              enterKeyHint="done"
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }}
+              placeholder="Tag eingeben + Enter"
+              className="text-sm border border-gray-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 w-64" />
+            <button type="button" onClick={addTag} disabled={!tagInput.trim()}
+              className="text-sm px-3 py-1.5 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 transition-colors">
+              +
+            </button>
+          </div>
         </div>
 
         {/* Fehler + Actions */}
