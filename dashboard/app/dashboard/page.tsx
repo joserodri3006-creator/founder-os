@@ -45,13 +45,26 @@ export default function DashboardPage() {
   const [data, setData]     = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!venture) return;
     setLoading(true);
+    setLoadError(null);
     setData(null);
     fetch(`/api/dashboard?venture=${venture}`)
-      .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); });
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) {
+          throw new Error(d?.error ?? `HTTP ${r.status}`);
+        }
+        return d;
+      })
+      .then((d) => { setData(d); setLoading(false); })
+      .catch((err) => {
+        setLoadError(err instanceof Error ? err.message : "Unbekannter Fehler");
+        setLoading(false);
+      });
   }, [venture]);
 
   const meta = getVenture(venture ?? "");
@@ -63,6 +76,13 @@ export default function DashboardPage() {
         style={{ borderColor: "#D1D5E8", borderTopColor: "#1B2A5E" }}
       />
       <span className="text-sm">Laden…</span>
+    </div>
+  );
+  if (loadError) return (
+    <div className="p-8">
+      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 max-w-md">
+        Dashboard konnte nicht geladen werden: {loadError}
+      </div>
     </div>
   );
   if (!data) return null;
