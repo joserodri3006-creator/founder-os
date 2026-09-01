@@ -128,42 +128,46 @@ function SortableTaskRow({ task, assigneeName, onStatusChange, onEdit, onCopy, o
 
   return (
     <div ref={setNodeRef} style={style}
-      className={`bg-white rounded-lg border px-3 py-2 flex items-center gap-2 ${overdue ? "border-red-200" : "border-gray-200"}`}>
-      <DragHandle {...listeners} {...attributes} />
-      <select value={task.status} onChange={e => onStatusChange(e.target.value as ListTask["status"])}
-        className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white shrink-0">
-        {(Object.keys(STATUS_LABELS) as ListTask["status"][]).map(s => (
-          <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-        ))}
-      </select>
+      className={`bg-white rounded-lg border px-3 py-3 md:py-2 flex flex-col md:flex-row md:items-center gap-2 ${overdue ? "border-red-200" : "border-gray-200"}`}>
+      <div className="flex items-center gap-2 md:contents">
+        <DragHandle {...listeners} {...attributes} />
+        <select value={task.status} onChange={e => onStatusChange(e.target.value as ListTask["status"])}
+          className="text-xs border border-gray-200 rounded px-1.5 py-1 bg-white shrink-0">
+          {(Object.keys(STATUS_LABELS) as ListTask["status"][]).map(s => (
+            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+          ))}
+        </select>
 
-      <p className={`text-sm font-medium min-w-0 truncate ${task.status === "done" ? "text-gray-400 line-through" : "text-gray-900"}`}>
-        {task.title}
-      </p>
+        <p className={`text-sm font-medium min-w-0 truncate flex-1 md:flex-initial ${task.status === "done" ? "text-gray-400 line-through" : "text-gray-900"}`}>
+          {task.title}
+        </p>
+      </div>
 
-      {task.entity_href && (
-        <Link href={task.entity_href} className="text-xs text-blue-600 hover:text-blue-700 shrink-0 truncate max-w-[160px]">
-          {task.entity_name}
-          <span className="hidden sm:inline">{task.entity_company ? ` (${task.entity_company})` : ""}</span>
-        </Link>
-      )}
+      <div className="flex items-center gap-2 flex-wrap md:contents">
+        {task.entity_href && (
+          <Link href={task.entity_href} className="text-xs text-blue-600 hover:text-blue-700 shrink-0 truncate max-w-[200px] md:max-w-[160px]">
+            {task.entity_name}
+            <span className="hidden sm:inline">{task.entity_company ? ` (${task.entity_company})` : ""}</span>
+          </Link>
+        )}
 
-      <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0" style={{ background: pc.bg, color: pc.color }}>
-        {PRIORITY_LABELS[task.priority]}
-      </span>
-
-      {task.due_date && (
-        <span className={`text-xs shrink-0 ${overdue ? "text-red-600 font-medium" : "text-gray-500"}`}>
-          {overdue ? "Überfällig: " : ""}{new Date(task.due_date).toLocaleDateString("de-DE")}
+        <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0" style={{ background: pc.bg, color: pc.color }}>
+          {PRIORITY_LABELS[task.priority]}
         </span>
-      )}
 
-      {assigneeName && <span className="hidden sm:inline text-xs text-gray-500 shrink-0">· {assigneeName}</span>}
+        {task.due_date && (
+          <span className={`text-xs shrink-0 ${overdue ? "text-red-600 font-medium" : "text-gray-500"}`}>
+            {overdue ? "Überfällig: " : ""}{new Date(task.due_date).toLocaleDateString("de-DE")}
+          </span>
+        )}
 
-      <div className="flex items-center gap-2 shrink-0 text-xs ml-auto pl-2">
-        <button onClick={onEdit} className="text-gray-400 hover:text-gray-700">Bearbeiten</button>
-        <button onClick={onCopy} className="text-gray-400 hover:text-gray-700">Kopieren</button>
-        <button onClick={onDelete} className="text-gray-400 hover:text-red-600">Löschen</button>
+        {assigneeName && <span className="text-xs text-gray-500 shrink-0">· {assigneeName}</span>}
+      </div>
+
+      <div className="flex items-center gap-1 -mx-1 pt-1 md:pt-0 border-t md:border-t-0 border-gray-100 md:contents">
+        <button onClick={onEdit} className="text-xs text-gray-400 hover:text-gray-700 min-h-[44px] md:min-h-0 px-2 md:px-0 md:ml-auto md:pl-2">Bearbeiten</button>
+        <button onClick={onCopy} className="text-xs text-gray-400 hover:text-gray-700 min-h-[44px] md:min-h-0 px-2 md:px-0">Kopieren</button>
+        <button onClick={onDelete} className="text-xs text-gray-400 hover:text-red-600 min-h-[44px] md:min-h-0 px-2 md:px-0">Löschen</button>
       </div>
     </div>
   );

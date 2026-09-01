@@ -26,6 +26,10 @@ interface TeamMember { user_id: string; name: string; }
 
 const PRIORITY_LABELS: Record<Task["priority"], string> = { low: "Niedrig", medium: "Mittel", high: "Hoch" };
 
+// Tasks ohne echten Lead-/Kunden-Bezug verwenden die Nil-UUID als Platzhalter-Entität
+// (bestehende Konvention in der tasks-Tabelle, siehe CLAUDE.md).
+const FREE_TASK_ENTITY_ID = "00000000-0000-0000-0000-000000000000";
+
 function isOverdue(task: Task) {
   if (task.status === "done" || !task.due_date) return false;
   return new Date(task.due_date) < new Date(new Date().toDateString());
@@ -37,13 +41,14 @@ export default function AufgabenPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"list" | "pipeline">("list");
-  const [status, setStatus] = useState<Task["status"] | "alle">("open");
+  const [status, setStatus] = useState<Task["status"] | "alle">("alle");
   const [priority, setPriority] = useState<"alle" | Task["priority"]>("alle");
   const [onlyOverdue, setOnlyOverdue] = useState(false);
   const [assignedTo, setAssignedTo] = useState("");
   const [entityTypeFilter, setEntityTypeFilter] = useState<"alle" | "lead" | "customer">("alle");
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showNewForm, setShowNewForm] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -170,22 +175,37 @@ export default function AufgabenPage() {
 
   return (
     <div className="px-4 py-5 sm:p-8 max-w-4xl mx-auto">
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">Aufgaben</h1>
           <p className="text-sm text-gray-500 mt-0.5">Alle Aufgaben zu Leads und Kunden im aktiven Venture</p>
         </div>
-        <div className="flex text-sm rounded-md border border-gray-200 overflow-hidden shrink-0">
-          <button onClick={() => setViewMode("list")}
-            className={`px-3 py-1.5 ${viewMode === "list" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
-            Liste
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => setShowNewForm(v => !v)}
+            className="text-sm px-3 py-1.5 rounded-md text-white font-medium shrink-0" style={{ background: "#1B2A5E" }}>
+            + Neue Aufgabe
           </button>
-          <button onClick={() => setViewMode("pipeline")}
-            className={`px-3 py-1.5 border-l border-gray-200 ${viewMode === "pipeline" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
-            Pipeline
-          </button>
+          <div className="flex text-sm rounded-md border border-gray-200 overflow-hidden shrink-0">
+            <button onClick={() => setViewMode("list")}
+              className={`px-3 py-1.5 ${viewMode === "list" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+              Liste
+            </button>
+            <button onClick={() => setViewMode("pipeline")}
+              className={`px-3 py-1.5 border-l border-gray-200 ${viewMode === "pipeline" ? "bg-blue-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
+              Pipeline
+            </button>
+          </div>
         </div>
       </div>
+
+      {showNewForm && (
+        <NewTaskForm
+          venture={venture}
+          members={members}
+          onDone={async () => { setShowNewForm(false); await load(); }}
+          onCancel={() => setShowNewForm(false)}
+        />
+      )}
 
       <div className="flex flex-wrap items-center gap-2 mb-5">
         {viewMode === "list" && (
@@ -255,6 +275,69 @@ export default function AufgabenPage() {
           onDelete={removeTask}
         />
       )}
+    </div>
+  );
+}
+
+function NewTaskForm({ venture, members, onDone, onCancel }: {
+  venture: string; members: TeamMember[]; onDone: () => Promise<void>; onCancel: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [priority, setPriority] = useState<Task["priority"]>("medium");
+  const [dueDate, setDueDate] = useState("");
+  const [assignedTo, setAssignedTo] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (!title.trim()) return;
+    setSaving(true);
+    const res = await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        venture, entity_type: "lead", entity_id: FREE_TASK_ENTITY_ID,
+        title, description: description || null, priority, due_date: dueDate || null, assigned_to: assignedTo || null,
+      }),
+    });
+    setSaving(false);
+    if (!res.ok) {
+      alert("Aufgabe konnte nicht angelegt werden.");
+      return;
+    }
+    await onDone();
+  }
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 px-4 py-3 mb-5">
+      <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Titel" autoFocus
+        className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 mb-2" />
+      <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Beschreibung (optional)" rows={2}
+        className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 mb-2 resize-y" />
+      <div className="flex gap-2 flex-wrap mb-3">
+        <select value={priority} onChange={e => setPriority(e.target.value as Task["priority"])}
+          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white flex-1 min-w-[110px]">
+          {(Object.keys(PRIORITY_LABELS) as Task["priority"][]).map(p => (
+            <option key={p} value={p}>{PRIORITY_LABELS[p]}</option>
+          ))}
+        </select>
+        <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)}
+          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 flex-1 min-w-[130px]" />
+        <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)}
+          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white flex-1 min-w-[130px]">
+          <option value="">Nicht zugewiesen</option>
+          {members.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
+        </select>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={save} disabled={saving || !title.trim()}
+          className="text-sm px-3 py-1.5 rounded-md text-white font-medium disabled:opacity-40" style={{ background: "#1B2A5E" }}>
+          {saving ? "Speichert…" : "Anlegen"}
+        </button>
+        <button onClick={onCancel} className="text-sm px-3 py-1.5 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50">
+          Abbrechen
+        </button>
+      </div>
     </div>
   );
 }
