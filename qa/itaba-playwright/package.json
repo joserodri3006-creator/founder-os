@@ -1,0 +1,19 @@
+{
+  "name": "itaba-playwright-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone Playwright acceptance tests for the Itaba shop and Founder OS data.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:smoke": "playwright test tests/public-shop.spec.ts",
+    "test:side-effects": "RUN_SIDE_EFFECTS=1 playwright test tests/b2c-checkout-side-effects.spec.ts tests/service-side-effects.spec.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}

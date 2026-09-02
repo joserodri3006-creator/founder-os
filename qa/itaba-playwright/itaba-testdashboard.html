@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Itaba Playwright Testdashboard</title>
+<style>
+:root { --bg:#f7f3ed; --paper:#fffdf9; --ink:#292420; --muted:#746b63; --line:#e2d8cc; --ok:#167a4a; --bad:#b42318; --skip:#8a6116; --accent:#9a5b39; --shadow:0 18px 50px rgba(60,45,32,.12); }
+*{box-sizing:border-box} body{margin:0;font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;background:linear-gradient(180deg,#fbf8f3,var(--bg));color:var(--ink)}
+header{padding:38px 40px 26px;border-bottom:1px solid var(--line);background:var(--paper);position:sticky;top:0;z-index:5}
+.kicker{font-size:12px;text-transform:uppercase;letter-spacing:.22em;color:var(--accent);font-weight:700} h1{font-family: Georgia, 'Times New Roman', serif;font-size:clamp(32px,4vw,54px);margin:8px 0 10px;line-height:1} .sub{max-width:980px;color:var(--muted);font-size:15px;line-height:1.55}
+.wrap{padding:26px 40px 60px;max-width:1500px;margin:0 auto} .metrics{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:14px;margin-bottom:22px} .metric{background:var(--paper);border:1px solid var(--line);padding:18px 20px;box-shadow:var(--shadow)} .metric span{display:block;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.14em} .metric strong{display:block;font-size:32px;margin-top:6px} .metric.ok strong{color:var(--ok)} .metric.bad strong{color:var(--bad)} .metric.skip strong{color:var(--skip)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:20px 0} .chip{border:1px solid var(--line);background:var(--paper);padding:9px 12px;border-radius:999px;cursor:pointer;color:var(--muted)} .chip.active{background:var(--ink);color:white;border-color:var(--ink)} .search{margin-left:auto;min-width:280px;border:1px solid var(--line);background:var(--paper);padding:10px 12px;border-radius:10px}
+.notice{display:grid;grid-template-columns:1.2fr .8fr;gap:16px;margin:18px 0 26px} .box{background:var(--paper);border:1px solid var(--line);padding:18px 20px;box-shadow:var(--shadow)} .box h3{margin:.1rem 0 .5rem;font-size:16px} .box p,.box li{color:var(--muted);line-height:1.5}
+.test-list{display:grid;gap:10px} .test-card{background:var(--paper);border:1px solid var(--line);box-shadow:0 8px 26px rgba(60,45,32,.07)} .test-card[hidden]{display:none} .test-head{width:100%;display:flex;align-items:center;gap:14px;padding:14px 16px;background:transparent;border:0;text-align:left;cursor:pointer;color:var(--ink)} .num{font-variant-numeric:tabular-nums;color:var(--accent);font-weight:800;width:56px} .grow{flex:1} .grow b{display:block;font-size:15px} .grow small{display:block;margin-top:3px;color:var(--muted);font-size:12px} .pill{font-size:12px;padding:6px 10px;border-radius:999px;font-weight:800;white-space:nowrap} .pill.passed{background:#e7f6ee;color:var(--ok)} .pill.failed{background:#ffe7e5;color:var(--bad)} .pill.skipped{background:#fff2d8;color:var(--skip)}
+.test-body{display:none;border-top:1px solid var(--line);padding:16px 18px 20px} .test-card.open .test-body{display:block} .cols{display:grid;grid-template-columns:1.05fr .95fr;gap:24px} h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.16em;color:var(--accent)} ol{margin:0;padding-left:20px} li{margin:5px 0;color:#4e463f} .actual{white-space:pre-wrap;background:#faf6ef;border:1px solid var(--line);padding:12px;border-radius:10px} .actual.failed{border-color:#ffc9c4;background:#fff7f6;color:var(--bad)} .actual.skipped{border-color:#ffe1a6;background:#fffaf0;color:var(--skip)}
+footer{padding:24px 40px;color:var(--muted);border-top:1px solid var(--line)} code{background:#efe7dd;padding:2px 5px;border-radius:5px} a{color:var(--accent)}
+@media(max-width:900px){header,.wrap,footer{padding-left:18px;padding-right:18px} .metrics{grid-template-columns:repeat(2,1fr)} .notice,.cols{grid-template-columns:1fr} .search{margin-left:0;width:100%}}
+</style>
+</head><body>
+<header>
+  <div class="kicker">Online First · Itaba Abnahmetest</div>
+  <h1>Playwright Testdashboard</h1>
+  <p class="sub">Monitor-Ansicht der automatisierten Testfälle inklusive Testschritten und Ergebnissen. Quelle: <code>/opt/data/projects/itaba-playwright-tests</code>. Letzter normaler Lauf: <b>2026-09-02T19:30:11.139Z</b>.</p>
+</header>
+<main class="wrap">
+  <section class="metrics"><article class="metric "><span>Testfälle</span><strong>25</strong></article>
+<article class="metric ok"><span>Bestanden</span><strong>19</strong></article>
+<article class="metric bad"><span>Fehlgeschlagen</span><strong>1</strong></article>
+<article class="metric skip"><span>Optional/skipped</span><strong>5</strong></article>
+<article class="metric "><span>Laufzeit</span><strong>65.8s</strong></article></section>
+  <section class="notice">
+    <div class="box"><h3>Aktueller Abnahmestatus</h3><p><b>1 harter Fail:</b> Rechnungserzeugung in Founder OS ist noch nicht vollständig: <code>invoice_generated_at</code> und <code>invoice_html</code> fehlen bei aktuellen Itaba-Orders. Das Dashboard zeigt diesen Punkt bewusst als Launch-Guard.</p></div>
+    <div class="box"><h3>Side-Effect Suite</h3><p>Separat mit <code>RUN_SIDE_EFFECTS=1</code> ausgeführt: <b>9/9 bestanden</b>. Diese Tests erzeugen echte markierte Testbestellungen/Retouren/Kontaktmails und stornieren Testorders automatisch.</p></div>
+  </section>
+  <div class="toolbar"><button class="chip active" data-filter="all">Alle</button><button class="chip" data-filter="B2B">B2B</button><button class="chip" data-filter="B2C Checkout">B2C Checkout</button><button class="chip" data-filter="Founder OS Daten">Founder OS Daten</button><button class="chip" data-filter="Shop &amp; Content">Shop &amp; Content</button><button class="chip" data-filter="Service-Flows">Service-Flows</button><input class="search" id="search" placeholder="Testfall suchen…" /></div>
+  <section class="test-list">
+    <section class="test-card" data-status="passed" data-area="B2B">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-01</span>
+        <span class="grow"><b>login page exposes email/password/password-reset/register and rejects missing credentials</b><small>B2B · b2b-auth.spec.ts:4 · 1.07s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Öffne /b2b/login mit Preview-Token</li><li>Prüfe B2B-Portal-Text</li><li>Prüfe E-Mail- und Passwortfeld</li><li>Prüfe Passwort-vergessen-Link, Anmelden-Button und Registrierung</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="B2B">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-02</span>
+        <span class="grow"><b>registration page exposes required business access fields</b><small>B2B · b2b-auth.spec.ts:14 · 0.97s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Öffne /b2b/register</li><li>Prüfe B2B-Zugang-anfragen-Text</li><li>Prüfe Pflichtfelder Vorname, Nachname, Unternehmen, E-Mail, Passwort</li><li>Prüfe Button „Zugang anfragen“</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="B2B">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-03</span>
+        <span class="grow"><b>dashboard is protected without session</b><small>B2B · b2b-auth.spec.ts:24 · 0.96s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Öffne /b2b/dashboard ohne Session</li><li>Erwarte Redirect auf /b2b/login</li><li>Prüfe Login/Partner-Portal sichtbar</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="B2C Checkout">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-04</span>
+        <span class="grow"><b>customer can add product to cart and reach checkout with correct totals</b><small>B2C Checkout · b2c-checkout-side-effects.spec.ts:5 · 7.59s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Öffne Preview-Shop</li><li>Öffne Produktseite Teller rund</li><li>Klicke „In den Warenkorb“</li><li>Öffne Warenkorb</li><li>Prüfe Produkt und Preis 29,90 €</li><li>Klicke „Zur Kasse“</li><li>Prüfe /kasse, Gesamt 34,80 € und Zahlungs-/PayPal-Hinweis</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="B2C Checkout">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-05</span>
+        <span class="grow"><b>pickup/bar checkout form is fillable and shows free pickup total before submit</b><small>B2C Checkout · b2c-checkout-side-effects.spec.ts:23 · 6.95s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Lege Produkt in Warenkorb</li><li>Öffne /kasse</li><li>Wähle Abholung</li><li>Fülle Testname und Test-E-Mail</li><li>Prüfe Versand kostenlos, Gesamt 29,90 €</li><li>Prüfe „Bestellung vormerken“ sichtbar, ohne Submit</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="skipped" data-area="B2C Checkout">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-06</span>
+        <span class="grow"><b>bar checkout API creates Founder OS order and cleanup can cancel it</b><small>B2C Checkout · b2c-checkout-side-effects.spec.ts:38 · 0.01s</small></span>
+        <span class="pill skipped">Optional/übersprungen</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Nur mit RUN_SIDE_EFFECTS=1</li><li>POST /api/checkout/bar mit markierten Testdaten</li><li>Erwarte 200 und order_id</li><li>Markiere Order als HERMES PLAYWRIGHT TEST</li><li>Storniere Testorder automatisch</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual skipped">Set RUN_SIDE_EFFECTS=1 to create a real marked test order.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="skipped" data-area="B2C Checkout">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-07</span>
+        <span class="grow"><b>pickup/bar UI redirects to order success page after creating order</b><small>B2C Checkout · b2c-checkout-side-effects.spec.ts:49 · 0.18s</small></span>
+        <span class="pill skipped">Optional/übersprungen</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Nur mit RUN_SIDE_EFFECTS=1</li><li>Lege Produkt in Warenkorb</li><li>Wähle Abholung und fülle Kontaktfelder</li><li>Klicke „Bestellung vormerken“</li><li>Erwarte Redirect /bestellung/abholung?id=...</li><li>Storniere Testorder automatisch</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual skipped">Set RUN_SIDE_EFFECTS=1 to create a real marked test order.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Founder OS Daten">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-08</span>
+        <span class="grow"><b>active Founder OS products match the visible B2C shop assortment</b><small>Founder OS Daten · founder-os-data.spec.ts:5 · 2.98s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Lese aktive Itaba-Produkte aus Supabase/Founder OS</li><li>Prüfe 6 aktive Produkte</li><li>Prüfe Slug, Preis, Gewicht und Bilder</li><li>Öffne Shop und vergleiche sichtbare Produktnamen</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Founder OS Daten">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-09</span>
+        <span class="grow"><b>categories exist and reveal empty live categories before launch</b><small>Founder OS Daten · founder-os-data.spec.ts:21 · 0.27s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Lese Itaba-Kategorien aus Founder OS</li><li>Lese Produkt-Kategorie-Zuordnungen</li><li>Berechne aktive Produkte je Kategorie</li><li>Dokumentiere Küche=0, Tisch=1, Wohnen=2, Accessoires=0, Lebensmittel=3</li></ol></div>
+          <div><h4>Erwartung</h4><p>Kategorien sind vorhanden; leere Live-Kategorien werden sichtbar dokumentiert.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="failed" data-area="Founder OS Daten">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-10</span>
+        <span class="grow"><b>recent Itaba orders have invoice numbers and expose current invoice generation gap</b><small>Founder OS Daten · founder-os-data.spec.ts:38 · 0.08s</small></span>
+        <span class="pill failed">Fehlgeschlagen</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Lese aktuelle Itaba-Orders aus Founder OS</li><li>Prüfe Rechnungsnummern beginnen mit IT-</li><li>Prüfe Order-Wert &gt; 0</li><li>Prüfe invoice_generated_at nicht leer</li><li>Prüfe invoice_html vorhanden</li></ol></div>
+          <div><h4>Erwartung</h4><p>Rechnungsnummern, invoice_generated_at und invoice_html sind vorhanden.</p><h4>Testergebnis</h4><p class="actual failed">Error: Invoice generation is not yet set on recent Itaba orders
+
+expect(received).not.toBeNull()
+
+Received: null
+
+  47 |     const newestNonTest = orders.find(o =&gt; !/HERMES/.test(`${o.notes ?? &#x27;&#x27;} ${o.invoice_data?.customer?.name ?? &#x27;&#x27;}`));
+  48 |     expect(newestNonTest, &#x27;Need at least one non-test order to audit invoice fields&#x27;).toBeTruthy();
+&gt; 49 |     expect(newestNonTest!.invoice_generated_at, &#x27;Invoice generation is not yet set on recent Itaba orders&#x27;).not.toBeNull();
+     |                                                                                                                 ^
+  50 |     expect(Boolean(newestNonTest!.invoice_html), &#x27;Invoice HTML/PDF payload should exist&#x27;).toBe(true);
+  51 |   });
+  52 |
+    at /opt/data/projects/itaba-playwright-tests/tests/founder-os-data.spec.ts:49:113</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Founder OS Daten">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-11</span>
+        <span class="grow"><b>returns table contains processable Itaba returns</b><small>Founder OS Daten · founder-os-data.spec.ts:53 · 0.22s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Lese Itaba-Retouren aus Founder OS</li><li>Prüfe order_id, customer_email, items</li><li>Prüfe Status in expected Workflow-Werten</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Shop &amp; Content">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-12</span>
+        <span class="grow"><b>preview shop loads, exposes expected active products, and has no JS errors</b><small>Shop &amp; Content · public-shop.spec.ts:22 · 3.02s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Öffne /shop mit Preview-Token</li><li>Akzeptiere notwendige Cookies</li><li>Prüfe Seitentitel Shop | iTABA</li><li>Prüfe 6 Produkte und alle erwarteten Produktnamen</li><li>Sammle/prüfe keine Console-Errors</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Shop &amp; Content">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-13</span>
+        <span class="grow"><b>category Küche exposes expected active product count</b><small>Shop &amp; Content · public-shop.spec.ts:37 · 2.04s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Öffne Kategorie Küche</li><li>Prüfe Heading Küche</li><li>Prüfe 0 Produkte</li><li>Prüfe „Keine Produkte gefunden“</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Shop &amp; Content">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-14</span>
+        <span class="grow"><b>category Tisch exposes expected active product count</b><small>Shop &amp; Content · public-shop.spec.ts:37 · 2.16s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Öffne Kategorie Tisch</li><li>Prüfe Heading Tisch</li><li>Prüfe 1 Produkt</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Shop &amp; Content">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-15</span>
+        <span class="grow"><b>category Wohnen exposes expected active product count</b><small>Shop &amp; Content · public-shop.spec.ts:37 · 2.36s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Öffne Kategorie Wohnen</li><li>Prüfe Heading Wohnen</li><li>Prüfe 2 Produkte</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Shop &amp; Content">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-16</span>
+        <span class="grow"><b>category Accessoires exposes expected active product count</b><small>Shop &amp; Content · public-shop.spec.ts:37 · 1.82s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Öffne Kategorie Accessoires</li><li>Prüfe Heading Accessoires</li><li>Prüfe 0 Produkte</li><li>Prüfe „Keine Produkte gefunden“</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Shop &amp; Content">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-17</span>
+        <span class="grow"><b>category Lebensmittel exposes expected active product count</b><small>Shop &amp; Content · public-shop.spec.ts:37 · 2.75s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Öffne Kategorie Lebensmittel</li><li>Prüfe Heading Lebensmittel</li><li>Prüfe 3 Produkte</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Shop &amp; Content">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-18</span>
+        <span class="grow"><b>all active product detail pages expose price, VAT, shipping, weight and add-to-cart</b><small>Shop &amp; Content · public-shop.spec.ts:45 · 14.55s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Sammle alle /shop/&lt;slug&gt;-Links aus Shop</li><li>Öffne jede Produktdetailseite</li><li>Prüfe MwSt.-Hinweis</li><li>Prüfe Versandhinweis</li><li>Prüfe Gewicht</li><li>Prüfe Warenkorb-Button</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Shop &amp; Content">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-19</span>
+        <span class="grow"><b>service and legal pages are reachable and contain core information</b><small>Shop &amp; Content · public-shop.spec.ts:61 · 10.73s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Öffne Versand, Sendungsverfolgung, Retoure, Kontakt</li><li>Öffne Impressum, Datenschutz, AGB, Widerruf</li><li>Prüfe Kerntexte, Kontaktdaten und Rechtshinweise</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Shop &amp; Content">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-20</span>
+        <span class="grow"><b>robots and sitemap contain expected public/private routes</b><small>Shop &amp; Content · public-shop.spec.ts:78 · 0.72s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>GET /robots.txt</li><li>Prüfe Disallow für /api, /cart, /kasse, /b2b</li><li>GET /sitemap.xml</li><li>Prüfe Shop- und Produkt-URLs</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Service-Flows">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-21</span>
+        <span class="grow"><b>tracking and return lookup reject unknown orders cleanly</b><small>Service-Flows · service-side-effects.spec.ts:7 · 0.79s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>GET /api/sendungsverfolgung mit Fake-Order</li><li>Erwarte 404 JSON „nicht gefunden“</li><li>GET /api/retoure mit Fake-Order</li><li>Erwarte 404 JSON „nicht gefunden“</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="skipped" data-area="Service-Flows">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-22</span>
+        <span class="grow"><b>tracking and return lookup find a real marked pickup order</b><small>Service-Flows · service-side-effects.spec.ts:17 · 0.01s</small></span>
+        <span class="pill skipped">Optional/übersprungen</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Nur mit RUN_SIDE_EFFECTS=1</li><li>Erzeuge markierte Pickup-Testorder</li><li>Prüfe Sendungsverfolgung per order_id</li><li>Prüfe Retoure-Lookup per Rechnungsnummer</li><li>Storniere Testorder</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual skipped">Set RUN_SIDE_EFFECTS=1 to create a real marked test order.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="skipped" data-area="Service-Flows">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-23</span>
+        <span class="grow"><b>return request can be created for a real marked order</b><small>Service-Flows · service-side-effects.spec.ts:35 · 0.0s</small></span>
+        <span class="pill skipped">Optional/übersprungen</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Nur mit RUN_SIDE_EFFECTS=1</li><li>Erzeuge markierte Pickup-Testorder</li><li>POST /api/retoure mit Testgrund</li><li>Erwarte ok=true</li><li>Storniere Testorder</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual skipped">Set RUN_SIDE_EFFECTS=1 to create a real marked test order and return.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="passed" data-area="Service-Flows">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-24</span>
+        <span class="grow"><b>contact form validates invalid input</b><small>Service-Flows · service-side-effects.spec.ts:57 · 1.91s</small></span>
+        <span class="pill passed">Bestanden</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Öffne /kontakt</li><li>Klicke Senden ohne Eingaben</li><li>Erwarte Browser/Formularvalidierung am Namensfeld</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual passed">Bestanden.</p></div>
+        </div>
+      </div>
+    </section>
+    <section class="test-card" data-status="skipped" data-area="Service-Flows">
+      <button class="test-head" type="button" aria-expanded="false">
+        <span class="num">TC-25</span>
+        <span class="grow"><b>contact form can send marked test message</b><small>Service-Flows · service-side-effects.spec.ts:63 · 0.19s</small></span>
+        <span class="pill skipped">Optional/übersprungen</span>
+      </button>
+      <div class="test-body">
+        <div class="cols">
+          <div><h4>Testschritte</h4><ol><li>Nur mit RUN_SIDE_EFFECTS=1</li><li>Öffne /kontakt</li><li>Fülle Name, E-Mail, Betreff, Nachricht mit HERMES-Testmarkierung</li><li>Sende Formular</li><li>Erwarte Erfolgsmeldung und Bestätigungshinweis</li></ol></div>
+          <div><h4>Erwartung</h4><p>Alle Assertions des Testfalls erfüllen die Akzeptanzkriterien.</p><h4>Testergebnis</h4><p class="actual skipped">Set RUN_SIDE_EFFECTS=1 to send a real marked test contact message.</p></div>
+        </div>
+      </div>
+    </section></section>
+</main>
+<footer>Generiert am 2026-09-02 19:33 UTC · HTML-Datei: <code>/opt/data/projects/itaba-playwright-tests/itaba-testdashboard.html</code></footer>
+<script>
+const cards=[...document.querySelectorAll('.test-card')];
+let filter='all';
+function apply(){const q=document.getElementById('search').value.toLowerCase();cards.forEach(c=>{const area=c.dataset.area;const txt=c.innerText.toLowerCase();c.hidden=!((filter==='all'||area===filter)&&txt.includes(q));})}
+document.querySelectorAll('.chip').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));b.classList.add('active');filter=b.dataset.filter;apply();}));
+document.getElementById('search').addEventListener('input',apply);
+document.querySelectorAll('.test-head').forEach(h=>h.addEventListener('click',()=>{const c=h.closest('.test-card');c.classList.toggle('open');h.setAttribute('aria-expanded',c.classList.contains('open'));}));
+document.querySelector('.test-card[data-status="failed"]')?.classList.add('open');
+</script>
+</body></html>

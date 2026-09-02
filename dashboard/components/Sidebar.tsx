@@ -63,6 +63,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       label: "Reporting",
       items: [
         { href: "/reporting", label: "Selektion", show: user?.role === "founder" },
+        { href: "/qa-tests", label: "QA Tests", show: venture === "online_first" && user?.role === "founder" },
       ],
     },
     {
