@@ -7,6 +7,7 @@ import NotesField from "@/components/NotesField";
 import AttachmentsPanel from "@/components/AttachmentsPanel";
 import SendMailModal from "@/components/SendMailModal";
 import TasksPanel from "@/components/TasksPanel";
+import InboxTimeline from "@/components/InboxTimeline";
 import { CustomerTypeBadge, CustomerStatusBadge } from "@/app/kunden/page";
 
 interface Order {
@@ -562,6 +563,8 @@ export default function KundeDetailPage() {
           </Card>
 
           <TasksPanel entityType="customer" entityId={id} venture={customer.venture ?? "online_first"} />
+
+          <InboxTimeline entityType="customer" entityId={id} venture={customer.venture ?? "online_first"} />
 
           <NotesField value={customer.notes} onSave={saveNotes} />
           <AttachmentsPanel entityType="customer" entityId={id} venture={customer.venture ?? undefined} />

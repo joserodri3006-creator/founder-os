@@ -20,6 +20,7 @@ import {
 } from "@/lib/types";
 import SendMailModal from "@/components/SendMailModal";
 import TasksPanel from "@/components/TasksPanel";
+import InboxTimeline from "@/components/InboxTimeline";
 import NotesField from "@/components/NotesField";
 
 interface Activity {
@@ -400,6 +401,8 @@ export default function LeadDetailPage() {
           </Card>
 
           <TasksPanel entityType="lead" entityId={id} venture={lead.venture} />
+
+          <InboxTimeline entityType="lead" entityId={id} venture={lead.venture} />
 
           <NotesField value={lead.notes} onSave={saveNotes} />
         </div>
