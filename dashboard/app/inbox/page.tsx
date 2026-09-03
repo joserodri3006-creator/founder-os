@@ -183,7 +183,11 @@ export default function InboxPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Aktion fehlgeschlagen");
       await loadInbox();
-      setActionMessage(data.duplicate ? `Bestehender Datensatz gefunden und ${data.affected ?? 1} Mail(s) verknüpft.` : `Aktion gespeichert (${data.affected ?? 1} Mail(s)).`);
+      setActionMessage(data.queued
+        ? "Mail-Aktion freigegeben und in die lokale Ausführung gelegt."
+        : data.duplicate
+          ? `Bestehender Datensatz gefunden und ${data.affected ?? 1} Mail(s) verknüpft.`
+          : `Aktion gespeichert (${data.affected ?? 1} Mail(s)).`);
     } catch (err) {
       setActionMessage(err instanceof Error ? err.message : "Aktion fehlgeschlagen");
     } finally {
