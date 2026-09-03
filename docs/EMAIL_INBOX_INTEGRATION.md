@@ -1,8 +1,9 @@
 # E-Mail-Inbox-Integration in Founder OS — Plan
 
-> Status: **Entwurf, wartet auf Freigabe.** Noch nicht implementiert.
-> Nach Freigabe: Phase 1 → 2 → 3 nacheinander umsetzen, dabei dieses
-> Dokument in "Umsetzungsstatus" je Phase abhaken.
+> Status: **MVP implementiert und deployed.**
+> Phase 1 Datenmodell, Phase 2 Sync/Cron und Phase 3 Dashboard sind umgesetzt.
+> Ergänzt: operative Inbox-Aktionen für Lead-Anlage, manuelle Lead-Verknüpfung
+> und Ignorieren/Ausblenden irrelevanter Nachrichten.
 
 **Goal:** Alle Venture-Postfächer (außer der privaten Jose-Gmail) werden
 automatisch alle 7 Stunden eingelesen, gegen bestehende Leads/Kunden gematcht
@@ -224,10 +225,13 @@ Jede Phase wird erst gestartet, nachdem die vorherige bestätigt lief — bei
 Problemen (z.B. IMAP-Login schlägt fehl, Gmail-Token abgelaufen) wird vor
 Phase 3 gestoppt und Rücksprache gehalten.
 
-## Offene Punkte / bewusst nicht in diesem Scope
+## Offene Punkte / Folgefeatures
 
-- Kein automatisches Anlegen neuer Leads aus unmatched-Mails (nur sichtbar,
-  manuelle Entscheidung bleibt beim Nutzer).
+- Direkte Kunden-/Lieferanten-Anlage aus einer Mail heraus ist noch nicht
+  umgesetzt; aktuell kann aus der Inbox direkt ein Lead angelegt oder mit einem
+  bestehenden Lead verknüpft werden.
+- Manuelle Verknüpfung zu bestehenden Kunden/Lieferanten kann analog zur
+  Lead-Verknüpfung ergänzt werden, sobald der operative Bedarf klar ist.
 - Keine Anhang-Speicherung in Phase 1 (nur Body-Text).
 - Kein Reply/Send aus dem Dashboard heraus (das deckt bereits
   `SendMailModal`/`outreach_templates` ab, hier geht es nur um Empfang).

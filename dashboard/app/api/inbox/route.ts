@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { parseIgnoredIds } from "@/lib/inbox-actions";
 
 type InboxMessage = {
   id: string;
@@ -56,7 +57,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const messages = (data ?? []) as InboxMessage[];
+  const rawMessages = (data ?? []) as InboxMessage[];
+  const ignoredIds = searchParams.get("include_ignored") === "true"
+    ? new Set<string>()
+    : new Set(parseIgnoredIds((await supabaseAdmin
+        .from("system_config")
+        .select("value")
+        .eq("key", "inbox_ignored_message_ids")
+        .maybeSingle()).data?.value));
+  const messages = rawMessages.filter((message) => !ignoredIds.has(message.id));
   if (entityType && entityId) return NextResponse.json(messages);
 
   const leadIds = [...new Set(messages.map((m) => m.lead_id).filter(Boolean))] as string[];

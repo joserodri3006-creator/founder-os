@@ -26,6 +26,19 @@ interface InboxMessage {
   entity_href: string | null;
 }
 
+interface LeadCandidate {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  company_name: string | null;
+  email: string | null;
+}
+
+function candidateLabel(lead: LeadCandidate) {
+  const name = `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim();
+  return [name || lead.company_name || "Lead", lead.company_name && name ? lead.company_name : null, lead.email].filter(Boolean).join(" · ");
+}
+
 const FILTERS: { key: MatchStatus; label: string; hint: string; icon: string }[] = [
   { key: "unmatched", label: "Unmatched", hint: "prüfen", icon: "?" },
   { key: "alle", label: "Alle Mails", hint: "gesamt", icon: "✉" },
@@ -76,24 +89,34 @@ export default function InboxPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [leadCandidates, setLeadCandidates] = useState<LeadCandidate[]>([]);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadInbox = async () => {
     setLoading(true);
     setError(null);
-    fetch(`/api/inbox?venture=${venture}&limit=200`)
-      .then(async (res) => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Inbox konnte nicht geladen werden.");
-        const list = Array.isArray(data) ? data : [];
-        setMessages(list);
-        setSelectedId((current) => current && list.some((m: InboxMessage) => m.id === current) ? current : (list[0]?.id ?? null));
-      })
+    const res = await fetch(`/api/inbox?venture=${venture}&limit=200`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "Inbox konnte nicht geladen werden.");
+    const list = Array.isArray(data) ? data : [];
+    setMessages(list);
+    setSelectedId((current) => current && list.some((m: InboxMessage) => m.id === current) ? current : (list[0]?.id ?? null));
+  };
+
+  useEffect(() => {
+    loadInbox()
       .catch((err: Error) => {
         setError(err.message);
         setMessages([]);
         setSelectedId(null);
       })
       .finally(() => setLoading(false));
+
+    fetch(`/api/leads?venture=${venture}`)
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => setLeadCandidates(Array.isArray(data) ? data : []))
+      .catch(() => setLeadCandidates([]));
   }, [venture]);
 
   const counts = useMemo(() => {
@@ -116,6 +139,27 @@ export default function InboxPage() {
 
   const selected = filtered.find((m) => m.id === selectedId) ?? filtered[0] ?? null;
   const currentVenture = VENTURES.find((v) => v.id === venture);
+
+  async function runInboxAction(messageId: string, payload: Record<string, unknown>, method: "PATCH" | "POST" = "PATCH") {
+    setActionLoading(true);
+    setActionMessage(null);
+    try {
+      const res = await fetch(`/api/inbox/${messageId}`, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Aktion fehlgeschlagen");
+      await loadInbox();
+      setActionMessage(data.duplicate ? "Bestehender Lead gefunden und verknüpft." : "Aktion gespeichert.");
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : "Aktion fehlgeschlagen");
+    } finally {
+      setActionLoading(false);
+      setLoading(false);
+    }
+  }
 
   return (
     <div style={{ minHeight: "calc(100vh - 1px)", padding: "22px", background: "linear-gradient(135deg, #F7F8FC 0%, #EEF3FA 100%)" }}>
@@ -205,7 +249,7 @@ export default function InboxPage() {
 
           {/* Right detail / conversation */}
           <main style={{ background: "#F2F5FB", minWidth: 0, display: "flex", flexDirection: "column" }}>
-            {selected ? <MessageDetail message={selected} /> : <EmptyDetail />}
+            {selected ? <MessageDetail message={selected} leads={leadCandidates} actionLoading={actionLoading} actionMessage={actionMessage} onAction={runInboxAction} /> : <EmptyDetail />}
           </main>
         </div>
       </div>
@@ -236,7 +280,10 @@ function MessageListItem({ message, active, onClick }: { message: InboxMessage; 
   );
 }
 
-function MessageDetail({ message }: { message: InboxMessage }) {
+function MessageDetail({ message, leads, actionLoading, actionMessage, onAction }: { message: InboxMessage; leads: LeadCandidate[]; actionLoading: boolean; actionMessage: string | null; onAction: (messageId: string, payload: Record<string, unknown>, method?: "PATCH" | "POST") => void }) {
+  const [leadId, setLeadId] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  useEffect(() => { setLeadId(""); setCompanyName(""); }, [message.id]);
   const colors = STATUS_STYLES[message.match_status] ?? STATUS_STYLES.unmatched;
   return (
     <>
@@ -285,9 +332,22 @@ function MessageDetail({ message }: { message: InboxMessage }) {
       </div>
 
       <footer style={{ padding: "18px 28px 24px", background: "#F2F5FB" }}>
-        <div style={{ background: "#FFFFFF", border: "1px solid #E1E5F0", borderRadius: "16px", padding: "12px 14px", display: "flex", alignItems: "center", gap: "12px", boxShadow: "0 10px 28px rgba(20,25,58,0.08)" }}>
-          <span style={{ flex: 1, color: "#A3A9B8", fontSize: "13px" }}>Antworten/Lead-Anlage ist bewusst noch nicht direkt aus der Inbox aktiv.</span>
-          <button disabled style={{ border: "none", background: "#1697F6", color: "#FFFFFF", borderRadius: "12px", padding: "9px 16px", fontSize: "13px", fontWeight: 800, opacity: 0.55 }}>Später</button>
+        <div style={{ background: "#FFFFFF", border: "1px solid #E1E5F0", borderRadius: "18px", padding: "14px", display: "grid", gap: "12px", boxShadow: "0 10px 28px rgba(20,25,58,0.08)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(160px, 1fr) 140px 120px", gap: "10px" }}>
+            <select value={leadId} onChange={(e) => setLeadId(e.target.value)} style={compactInput}>
+              <option value="">Mit bestehendem Lead verknüpfen…</option>
+              {leads.map((lead) => <option key={lead.id} value={lead.id}>{candidateLabel(lead)}</option>)}
+            </select>
+            <button disabled={!leadId || actionLoading} onClick={() => onAction(message.id, { action: "link", entity_type: "lead", entity_id: leadId })} style={secondaryButton}>Verknüpfen</button>
+            <button disabled={actionLoading} onClick={() => onAction(message.id, { action: "ignore" })} style={ghostButton}>Ignorieren</button>
+          </div>
+          {message.match_status === "unmatched" && (
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(160px, 1fr) 180px", gap: "10px" }}>
+              <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Firma optional" style={compactInput} />
+              <button disabled={actionLoading} onClick={() => onAction(message.id, { action: "create_lead", company_name: companyName }, "POST")} style={primaryButton}>Als Lead anlegen</button>
+            </div>
+          )}
+          {actionMessage && <p style={{ margin: 0, color: actionMessage.includes("fehl") || actionMessage.includes("nicht") ? "#BE123C" : "#15803D", fontSize: "12px", fontWeight: 700 }}>{actionMessage}</p>}
         </div>
       </footer>
     </>
@@ -338,4 +398,38 @@ const selectStyle: React.CSSProperties = {
   color: "#14193A",
   background: "#F9FAFD",
   outline: "none",
+};
+
+const compactInput: React.CSSProperties = {
+  width: "100%",
+  padding: "10px 11px",
+  border: "1px solid #DDE2EF",
+  borderRadius: "12px",
+  fontSize: "12px",
+  color: "#14193A",
+  background: "#F9FAFD",
+  outline: "none",
+};
+
+const primaryButton: React.CSSProperties = {
+  border: "none",
+  background: "linear-gradient(135deg,#1697F6,#087DE8)",
+  color: "#FFFFFF",
+  borderRadius: "12px",
+  padding: "10px 14px",
+  fontSize: "12px",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const secondaryButton: React.CSSProperties = {
+  ...primaryButton,
+  background: "#14193A",
+};
+
+const ghostButton: React.CSSProperties = {
+  ...primaryButton,
+  background: "#FFFFFF",
+  color: "#8A91A5",
+  border: "1px solid #DDE2EF",
 };
