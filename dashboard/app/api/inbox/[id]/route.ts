@@ -7,9 +7,9 @@ type Params = { params: Promise<{ id: string }> };
 type EntityType = "lead" | "customer" | "supplier";
 
 type ActionBody =
-  | { action: "link"; entity_type: EntityType; entity_id: string }
-  | { action: "ignore" }
-  | { action: "create"; entity_type: EntityType; company_name?: string; first_name?: string; last_name?: string; notes?: string };
+  | { action: "link"; entity_type: EntityType; entity_id: string; apply_to_sender?: boolean }
+  | { action: "ignore"; apply_to_sender?: boolean }
+  | { action: "create"; entity_type: EntityType; company_name?: string; first_name?: string; last_name?: string; notes?: string; apply_to_sender?: boolean };
 
 function missingMessage() {
   return NextResponse.json({ error: "Inbox-Nachricht nicht gefunden" }, { status: 404 });
@@ -22,11 +22,21 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (body.action === "ignore") {
     const { data: message, error: messageError } = await supabaseAdmin
       .from("inbox_messages")
-      .select("id")
+      .select("id,venture,from_email")
       .eq("id", id)
       .maybeSingle();
     if (messageError) return NextResponse.json({ error: messageError.message }, { status: 500 });
     if (!message) return missingMessage();
+
+    let ids = [message.id];
+    if (body.apply_to_sender) {
+      const { data: sameSender } = await supabaseAdmin
+        .from("inbox_messages")
+        .select("id")
+        .eq("venture", message.venture)
+        .eq("from_email", message.from_email);
+      ids = (sameSender ?? []).map((row) => row.id);
+    }
 
     const { data: config } = await supabaseAdmin
       .from("system_config")
@@ -34,14 +44,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       .eq("key", "inbox_ignored_message_ids")
       .maybeSingle();
 
+    const value = ids.reduce((current, messageId) => addIgnoredId(current, messageId), config?.value ?? "[]");
     const { error } = await supabaseAdmin.from("system_config").upsert({
       key: "inbox_ignored_message_ids",
-      value: addIgnoredId(config?.value, id),
+      value,
       description: "Founder OS Inbox: ausgeblendete/ignorierte Nachrichten-IDs",
       updated_at: new Date().toISOString(),
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, affected: ids.length });
   }
 
   if (body.action === "link") {
@@ -52,14 +63,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: err instanceof Error ? err.message : "Ungültige Verknüpfung" }, { status: 400 });
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data: sourceMessage, error: sourceError } = await supabaseAdmin
       .from("inbox_messages")
-      .update(update)
+      .select("id,venture,from_email")
       .eq("id", id)
-      .select("id")
       .maybeSingle();
+    if (sourceError) return NextResponse.json({ error: sourceError.message }, { status: 500 });
+    if (!sourceMessage) return missingMessage();
+
+    let updateQuery = supabaseAdmin.from("inbox_messages").update(update);
+    if (body.apply_to_sender) {
+      updateQuery = updateQuery.eq("venture", sourceMessage.venture).eq("from_email", sourceMessage.from_email);
+    } else {
+      updateQuery = updateQuery.eq("id", id);
+    }
+    const { data, error } = await updateQuery.select("id");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    if (!data) return missingMessage();
+    if (!data?.length) return missingMessage();
 
     if (body.entity_type === "lead") {
       await supabaseAdmin.from("lead_activities").insert({
@@ -69,7 +89,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, affected: data.length });
   }
 
   return NextResponse.json({ error: "action muss link oder ignore sein" }, { status: 400 });
@@ -113,12 +133,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     .maybeSingle();
 
   if (existing?.id) {
-    const { error: linkError } = await supabaseAdmin
-      .from("inbox_messages")
-      .update(linkUpdateForEntity(body.entity_type, existing.id))
-      .eq("id", id);
+    let linkQuery = supabaseAdmin.from("inbox_messages").update(linkUpdateForEntity(body.entity_type, existing.id));
+    linkQuery = body.apply_to_sender
+      ? linkQuery.eq("venture", message.venture).eq("from_email", message.from_email)
+      : linkQuery.eq("id", id);
+    const { data: linkedRows, error: linkError } = await linkQuery.select("id");
     if (linkError) return NextResponse.json({ error: linkError.message }, { status: 500 });
-    return NextResponse.json({ success: true, duplicate: true, entity_type: body.entity_type, entity_id: existing.id });
+    return NextResponse.json({ success: true, duplicate: true, entity_type: body.entity_type, entity_id: existing.id, affected: linkedRows?.length ?? 0 });
   }
 
   const { data: entity, error: entityError } = await supabaseAdmin
@@ -128,10 +149,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     .single();
   if (entityError || !entity) return NextResponse.json({ error: entityError?.message ?? "Datensatz konnte nicht angelegt werden" }, { status: 500 });
 
-  const { error: linkError } = await supabaseAdmin
-    .from("inbox_messages")
-    .update(linkUpdateForEntity(body.entity_type, entity.id))
-    .eq("id", id);
+  let linkQuery = supabaseAdmin.from("inbox_messages").update(linkUpdateForEntity(body.entity_type, entity.id));
+  linkQuery = body.apply_to_sender
+    ? linkQuery.eq("venture", message.venture).eq("from_email", message.from_email)
+    : linkQuery.eq("id", id);
+  const { data: linkedRows, error: linkError } = await linkQuery.select("id");
   if (linkError) return NextResponse.json({ error: linkError.message }, { status: 500 });
 
   if (body.entity_type === "lead") {
@@ -141,5 +163,5 @@ export async function POST(req: NextRequest, { params }: Params) {
       description: `Lead aus Inbox-Mail angelegt: ${message.subject || "(ohne Betreff)"}`,
     });
   }
-  return NextResponse.json({ success: true, duplicate: false, entity_type: body.entity_type, entity }, { status: 201 });
+  return NextResponse.json({ success: true, duplicate: false, entity_type: body.entity_type, entity, affected: linkedRows?.length ?? 0 }, { status: 201 });
 }

@@ -3,6 +3,8 @@ const assert = require("node:assert/strict");
 const {
   normalizeEmail,
   linkUpdateForEntity,
+  normalizeFolder,
+  bulkCandidateCount,
   parseIgnoredIds,
   addIgnoredId,
   payloadFromInboxMessage,
@@ -70,4 +72,20 @@ test("derives customer and partner payloads from an inbox message", () => {
   assert.equal(partner.name, "Textil Partner");
   assert.equal(partner.contact_name, "Mia Schneider");
   assert.equal(partner.email, "mia@example.com");
+});
+
+test("normalizes inbox folders for inbound sent and drafts views", () => {
+  assert.equal(normalizeFolder("INBOX"), "INBOX");
+  assert.equal(normalizeFolder("[Gmail]/Sent Mail"), "sent");
+  assert.equal(normalizeFolder("Entwürfe"), "drafts");
+});
+
+test("counts bulk candidates by same sender and venture", () => {
+  const selected = { from_email: "a@example.com", venture: "brandary" };
+  assert.equal(bulkCandidateCount([
+    selected,
+    { from_email: " A@Example.com ", venture: "brandary" },
+    { from_email: "a@example.com", venture: "online_first" },
+    { from_email: "b@example.com", venture: "brandary" },
+  ], selected), 2);
 });

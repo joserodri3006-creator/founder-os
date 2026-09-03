@@ -7,11 +7,13 @@ import { VENTURES } from "@/lib/ventures";
 
 type MatchStatus = "alle" | "matched_lead" | "matched_customer" | "matched_supplier" | "unmatched";
 type EntityType = "lead" | "customer" | "supplier";
+type FolderFilter = "alle" | "INBOX" | "sent" | "drafts";
 
 interface InboxMessage {
   id: string;
   venture: string;
   account_email: string;
+  folder: string;
   from_email: string;
   from_name: string | null;
   subject: string | null;
@@ -35,6 +37,7 @@ interface EntityCandidate {
 }
 
 const ENTITY_LABELS: Record<EntityType, string> = { lead: "Lead", customer: "Kunde", supplier: "Partner" };
+const FOLDER_LABELS: Record<FolderFilter, string> = { alle: "Alle", INBOX: "Eingang", sent: "Gesendet", drafts: "Entwürfe" };
 
 function candidateLabel(candidate: EntityCandidate) {
   return `${ENTITY_LABELS[candidate.type]} · ${candidate.label}${candidate.email ? ` · ${candidate.email}` : ""}`;
@@ -95,6 +98,7 @@ function senderName(message: InboxMessage) {
 export default function InboxPage() {
   const { venture, setVenture } = useVenture();
   const [status, setStatus] = useState<MatchStatus>("unmatched");
+  const [folder, setFolder] = useState<FolderFilter>("INBOX");
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,7 +110,9 @@ export default function InboxPage() {
   const loadInbox = async () => {
     setLoading(true);
     setError(null);
-    const res = await fetch(`/api/inbox?venture=${venture}&limit=200`);
+    const params = new URLSearchParams({ venture, limit: "200" });
+    if (folder !== "alle") params.set("folder", folder);
+    const res = await fetch(`/api/inbox?${params.toString()}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Inbox konnte nicht geladen werden.");
     const list = Array.isArray(data) ? data : [];
@@ -136,7 +142,7 @@ export default function InboxPage() {
         ]);
       })
       .catch(() => setEntityCandidates([]));
-  }, [venture]);
+  }, [venture, folder]);
 
   const counts = useMemo(() => {
     const base: Record<MatchStatus, number> = { alle: messages.length, unmatched: 0, matched_lead: 0, matched_customer: 0, matched_supplier: 0 };
@@ -160,6 +166,12 @@ export default function InboxPage() {
   const currentVenture = VENTURES.find((v) => v.id === venture);
 
   async function runInboxAction(messageId: string, payload: Record<string, unknown>, method: "PATCH" | "POST" = "PATCH") {
+    const source = messages.find((message) => message.id === messageId);
+    const sameSenderCount = source ? messages.filter((message) => message.venture === source.venture && message.from_email.toLowerCase() === source.from_email.toLowerCase()).length : 0;
+    if (source && sameSenderCount > 1 && !payload.apply_to_sender) {
+      const applyAll = window.confirm(`Es gibt ${sameSenderCount} Mails von ${source.from_email} in diesem Venture. Soll diese Aktion für alle diese Mails gelten?`);
+      payload = { ...payload, apply_to_sender: applyAll };
+    }
     setActionLoading(true);
     setActionMessage(null);
     try {
@@ -171,7 +183,7 @@ export default function InboxPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Aktion fehlgeschlagen");
       await loadInbox();
-      setActionMessage(data.duplicate ? "Bestehender Lead gefunden und verknüpft." : "Aktion gespeichert.");
+      setActionMessage(data.duplicate ? `Bestehender Datensatz gefunden und ${data.affected ?? 1} Mail(s) verknüpft.` : `Aktion gespeichert (${data.affected ?? 1} Mail(s)).`);
     } catch (err) {
       setActionMessage(err instanceof Error ? err.message : "Aktion fehlgeschlagen");
     } finally {
@@ -200,6 +212,18 @@ export default function InboxPage() {
                 <option key={v.id} value={v.id}>{v.label}</option>
               ))}
             </select>
+
+
+            <div style={{ marginTop: "22px" }}>
+              <label style={smallLabel}>Ordner</label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                {(["INBOX", "sent", "drafts", "alle"] as FolderFilter[]).map((f) => (
+                  <button key={f} onClick={() => { setFolder(f); if (f !== "INBOX") setStatus("alle"); }} style={{ ...folderButton, ...(folder === f ? folderButtonActive : {}) }}>
+                    {FOLDER_LABELS[f]}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div style={{ marginTop: "26px" }}>
               <label style={smallLabel}>Status</label>
@@ -291,6 +315,7 @@ function MessageListItem({ message, active, onClick }: { message: InboxMessage; 
           <p style={{ margin: "7px 0 0", fontSize: "12px", color: "#8A91A5", lineHeight: 1.45, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{message.body_preview || message.from_email}</p>
           <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "10px", flexWrap: "wrap" }}>
             <span style={{ fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "999px", background: colors.bg, color: colors.color, border: `1px solid ${colors.border}` }}>{STATUS_LABELS[message.match_status]}</span>
+            <span style={{ fontSize: "10px", color: "#9CA3AF", padding: "3px 7px", borderRadius: "999px", background: "#F3F5FA" }}>{message.folder === "INBOX" ? "Eingang" : FOLDER_LABELS[message.folder as FolderFilter] ?? message.folder}</span>
             <span style={{ fontSize: "10px", color: "#9CA3AF", padding: "3px 7px", borderRadius: "999px", background: "#F3F5FA" }}>{message.account_email}</span>
           </div>
         </div>
@@ -462,6 +487,23 @@ const selectStyle: React.CSSProperties = {
   color: "#14193A",
   background: "#F9FAFD",
   outline: "none",
+};
+
+const folderButton: React.CSSProperties = {
+  border: "1px solid #DDE2EF",
+  background: "#F9FAFD",
+  color: "#6B7280",
+  borderRadius: "11px",
+  padding: "8px 9px",
+  fontSize: "11px",
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const folderButtonActive: React.CSSProperties = {
+  background: "#14193A",
+  color: "#FFFFFF",
+  borderColor: "#14193A",
 };
 
 const compactInput: React.CSSProperties = {

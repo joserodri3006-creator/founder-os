@@ -2,6 +2,8 @@ type InboxEntityType = "lead" | "customer" | "supplier";
 
 export function normalizeEmail(value: unknown): string;
 export function splitName(value: unknown, fallbackEmail?: string): { first_name: string; last_name: string };
+export function normalizeFolder(value: unknown): "INBOX" | "sent" | "drafts";
+export function bulkCandidateCount(messages: Array<{ from_email?: string | null; venture?: string | null }>, selectedMessage: { from_email?: string | null; venture?: string | null }): number;
 export function linkUpdateForEntity(entityType: InboxEntityType, entityId: string): {
   lead_id: string | null;
   customer_id: string | null;

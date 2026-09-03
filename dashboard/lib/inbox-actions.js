@@ -19,6 +19,20 @@ function senderDisplayName(message) {
   return String(message?.from_name || normalizeEmail(message?.from_email).split("@")[0] || "Unbekannt").trim();
 }
 
+
+function normalizeFolder(value) {
+  const clean = String(value || "INBOX").toLowerCase();
+  if (["sent", "sent mail", "gesendet", "gesendete objekte", "gesendete elemente", "[gmail]/sent mail"].includes(clean)) return "sent";
+  if (["drafts", "draft", "entwürfe", "entwuerfe", "[gmail]/drafts"].includes(clean)) return "drafts";
+  return "INBOX";
+}
+
+function bulkCandidateCount(messages, selectedMessage) {
+  const sender = normalizeEmail(selectedMessage?.from_email);
+  if (!sender) return 0;
+  return messages.filter((message) => normalizeEmail(message?.from_email) === sender && message?.venture === selectedMessage?.venture).length;
+}
+
 function linkUpdateForEntity(entityType, entityId) {
   if (!VALID_LINK_TYPES.has(entityType)) throw new Error("entity_type muss lead, customer oder supplier sein");
   if (!entityId) throw new Error("entity_id ist erforderlich");
@@ -102,6 +116,8 @@ module.exports = {
   normalizeEmail,
   splitName,
   linkUpdateForEntity,
+  normalizeFolder,
+  bulkCandidateCount,
   parseIgnoredIds,
   addIgnoredId,
   payloadFromInboxMessage,

@@ -6,9 +6,11 @@
 > und Ignorieren/Ausblenden irrelevanter Nachrichten.
 
 **Goal:** Alle Venture-Postfächer (außer der privaten Jose-Gmail) werden
-automatisch alle 7 Stunden eingelesen, gegen bestehende Leads/Kunden gematcht
-und im Founder-OS-Dashboard sichtbar gemacht — als Aktivitäts-Zeitleiste am
-Lead/Kunden-Datensatz plus eine eigene "Unmatched"-Übersicht.
+automatisch alle 7 Stunden eingelesen — **Eingang, Gesendet und Entwürfe** —,
+gegen bestehende Leads/Kunden/Partner gematcht und im Founder-OS-Dashboard
+sichtbar gemacht. Nachrichten werden über `thread_key` als Conversation/Thread
+zusammenführbar gehalten, damit später vollständige Gesprächsverläufe je
+Kontakt sichtbar sind.
 
 **Architektur:** Neue Supabase-Tabelle `inbox_messages` als System-of-Record.
 Ein Python-Sync-Skript liest IMAP (Kasserver) und Gmail-API-Postfächer,
@@ -41,18 +43,21 @@ Hermes Cronjob.
 Sync-Skript niemals angesprochen, taucht in keiner Account-Liste auf.
 
 **Historie:** Initialer Lauf holt die letzten **3 Tage** rückwirkend pro
-Postfach. Danach nur noch inkrementell (neue Mails seit letztem Checkpoint).
+Postfach und pro Ordner (`INBOX`, `sent`, `drafts`). Danach nur noch
+inkrementell (neue Mails seit letztem Checkpoint).
 
 **Datentiefe:** Metadaten (Absender, Betreff, Datum) **plus vollständiger
 Body-Text** (Plaintext-Teil der Mail; bei reinen HTML-Mails wird HTML zu Text
 konvertiert). Anhänge werden in Phase 1 nicht gespeichert (nur Dateiname als
 Metadatum, falls trivial verfügbar — kein Anhang-Download).
 
-**Matching:** ausschließlich exakter Treffer auf `from_email` gegen
-`leads.email` / `customers.email` derselben `venture`. Kein Fuzzy-Matching,
-keine automatische Neuanlage von Leads bei fehlendem Treffer (Policy:
-"never_without_approval" bleibt gültig — die einzige Aktion bei
-Nicht-Treffer ist der `unmatched`-Status, sichtbar im Dashboard).
+**Matching:** eingehende Mails werden über den Absender gematcht; gesendete
+Mails und Entwürfe über den ersten externen Empfänger. Matching geht gegen
+`leads.email`, `customers.email` und `suppliers.email` derselben `venture`.
+Kein Fuzzy-Matching, keine automatische Neuanlage ohne explizite UI-Aktion.
+Wenn der Nutzer eine Mail verknüpft oder daraus einen Datensatz anlegt, fragt
+das UI, ob die Aktion für **alle Mails desselben Absenders im Venture** gelten
+soll — damit wiederkehrende Absender nicht einzeln abgearbeitet werden müssen.
 
 ---
 
@@ -183,12 +188,14 @@ anlegen und einen Testlauf via `cronjob action=run` auslösen.
 ## Phase 3 — Dashboard-Integration
 
 **Neue API-Route:** `dashboard/app/api/inbox/route.ts`
-- `GET /api/inbox?entity_type=lead&entity_id=<uuid>` → Nachrichten für einen
-  Lead (via `lead_id`).
-- `GET /api/inbox?entity_type=customer&entity_id=<uuid>` → Nachrichten für
-  einen Kunden (via `customer_id`).
-- `GET /api/inbox?match_status=unmatched&venture=<v>` → Liste für die neue
-  Unmatched-Übersicht, serverseitig paginiert (analog `/api/tasks`-Pattern).
+- `GET /api/inbox?folder=INBOX|sent|drafts&match_status=...&venture=<v>` →
+  Ordneransicht für Eingang, Gesendete Mails und Entwürfe.
+- `PATCH /api/inbox/[id]` mit `action=link|ignore` → einzelne Mail oder per
+  `apply_to_sender=true` alle Mails desselben Absenders im Venture verknüpfen
+  bzw. ausblenden.
+- `POST /api/inbox/[id]` mit `action=create`, `entity_type=lead|customer|supplier`
+  → Datensatz aus Mail anlegen und direkt verknüpfen; optional ebenfalls per
+  `apply_to_sender=true` auf alle Mails desselben Absenders anwenden.
 
 **Neue UI-Komponente:** `dashboard/components/InboxTimeline.tsx`
 - Analog zu `TasksPanel.tsx` (siehe

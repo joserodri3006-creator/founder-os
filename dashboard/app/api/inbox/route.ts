@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
   const entityType = searchParams.get("entity_type");
   const entityId = searchParams.get("entity_id");
   const matchStatus = searchParams.get("match_status");
+  const folder = searchParams.get("folder");
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "100", 10) || 100, 200);
 
   let query = supabaseAdmin
@@ -40,6 +41,7 @@ export async function GET(req: NextRequest) {
     .limit(limit);
 
   if (venture) query = query.eq("venture", venture);
+  if (folder && folder !== "alle") query = query.eq("folder", folder);
   if (matchStatus && matchStatus !== "alle") query = query.eq("match_status", matchStatus);
 
   if (entityType && entityId) {
