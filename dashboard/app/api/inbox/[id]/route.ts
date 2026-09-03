@@ -9,15 +9,75 @@ type EntityType = "lead" | "customer" | "supplier";
 type ActionBody =
   | { action: "link"; entity_type: EntityType; entity_id: string; apply_to_sender?: boolean }
   | { action: "ignore"; apply_to_sender?: boolean }
-  | { action: "create"; entity_type: EntityType; company_name?: string; first_name?: string; last_name?: string; notes?: string; apply_to_sender?: boolean };
+  | { action: "create"; entity_type: EntityType; company_name?: string; first_name?: string; last_name?: string; notes?: string; apply_to_sender?: boolean }
+  | { action: "mail_archive" | "mail_delete" | "mail_send" };
+
+const MAIL_ACTIONS_KEY = "inbox_pending_mail_actions";
 
 function missingMessage() {
   return NextResponse.json({ error: "Inbox-Nachricht nicht gefunden" }, { status: 404 });
 }
 
+function parseMailActions(value: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(value)) return value as Array<Record<string, unknown>>;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+async function queueMailAction(messageId: string, action: "mail_archive" | "mail_delete" | "mail_send") {
+  const { data: message, error: messageError } = await supabaseAdmin
+    .from("inbox_messages")
+    .select("id,venture,account_id,account_email,provider,folder,message_uid,subject,from_email,received_at")
+    .eq("id", messageId)
+    .maybeSingle();
+  if (messageError) return NextResponse.json({ error: messageError.message }, { status: 500 });
+  if (!message) return missingMessage();
+
+  if (action === "mail_send" && message.folder !== "drafts") {
+    return NextResponse.json({ error: "Senden ist nur für Entwürfe möglich." }, { status: 400 });
+  }
+  if (action === "mail_archive" && message.folder !== "INBOX") {
+    return NextResponse.json({ error: "Archivieren ist nur für Eingangsmails möglich." }, { status: 400 });
+  }
+
+  const { data: config } = await supabaseAdmin
+    .from("system_config")
+    .select("value")
+    .eq("key", MAIL_ACTIONS_KEY)
+    .maybeSingle();
+  const actions = parseMailActions(config?.value);
+  const queued = {
+    id: crypto.randomUUID(),
+    status: "queued",
+    action,
+    message,
+    queued_at: new Date().toISOString(),
+  };
+  actions.push(queued);
+  const { error } = await supabaseAdmin.from("system_config").upsert({
+    key: MAIL_ACTIONS_KEY,
+    value: JSON.stringify(actions),
+    description: "Founder OS Inbox: freigegebene Mailbox-Aktionen für lokalen Worker",
+    updated_at: new Date().toISOString(),
+  });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true, queued: true, action_id: queued.id });
+}
+
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const body = (await req.json()) as ActionBody;
+
+  if (["mail_archive", "mail_delete", "mail_send"].includes(body.action)) {
+    return queueMailAction(id, body.action as "mail_archive" | "mail_delete" | "mail_send");
+  }
 
   if (body.action === "ignore") {
     const { data: message, error: messageError } = await supabaseAdmin

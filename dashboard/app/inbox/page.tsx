@@ -464,6 +464,33 @@ function ActionPanel({ message, candidates, selectedCandidate, entityKey, setEnt
           <button disabled={actionLoading} onClick={() => onAction(message.id, { action: "create", entity_type: createType, company_name: companyName }, "POST")} style={primaryButton}>Anlegen + verknüpfen</button>
         </div>
       )}
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", paddingTop: "2px" }}>
+        {message.folder === "INBOX" && (
+          <button
+            disabled={actionLoading}
+            onClick={() => window.confirm("Diese Mail wirklich im Postfach archivieren?") && onAction(message.id, { action: "mail_archive" })}
+            style={secondaryButton}
+          >
+            Archivieren
+          </button>
+        )}
+        {message.folder === "drafts" && (
+          <button
+            disabled={actionLoading}
+            onClick={() => window.confirm("Diesen Entwurf wirklich senden?") && onAction(message.id, { action: "mail_send" })}
+            style={primaryButton}
+          >
+            Senden
+          </button>
+        )}
+        <button
+          disabled={actionLoading}
+          onClick={() => window.confirm("Diese Mail wirklich im Postfach löschen? Das ist nicht nur Ausblenden.") && onAction(message.id, { action: "mail_delete" })}
+          style={dangerButton}
+        >
+          Löschen
+        </button>
+      </div>
       {actionMessage && <p style={{ margin: 0, color: actionMessage.includes("fehl") || actionMessage.includes("nicht") ? "#BE123C" : "#15803D", fontSize: "12px", fontWeight: 700 }}>{actionMessage}</p>}
     </section>
   );
@@ -564,4 +591,11 @@ const ghostButton: React.CSSProperties = {
   background: "#FFFFFF",
   color: "#8A91A5",
   border: "1px solid #DDE2EF",
+};
+
+const dangerButton: React.CSSProperties = {
+  ...primaryButton,
+  background: "#FFF1F2",
+  color: "#BE123C",
+  border: "1px solid #FFC8D0",
 };
