@@ -32,13 +32,14 @@ export async function GET(req: NextRequest) {
   const entityId = searchParams.get("entity_id");
   const matchStatus = searchParams.get("match_status");
   const folder = searchParams.get("folder");
-  const limit = Math.min(parseInt(searchParams.get("limit") ?? "100", 10) || 100, 200);
+  const limit = Math.min(parseInt(searchParams.get("limit") ?? "100", 10) || 100, 500);
+  const offset = Math.max(parseInt(searchParams.get("offset") ?? "0", 10) || 0, 0);
 
   let query = supabaseAdmin
     .from("inbox_messages")
     .select("*")
     .order("received_at", { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
 
   if (venture) query = query.eq("venture", venture);
   if (folder && folder !== "alle") query = query.eq("folder", folder);

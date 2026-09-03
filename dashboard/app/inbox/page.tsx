@@ -92,18 +92,33 @@ export default function InboxPage() {
   const [entityCandidates, setEntityCandidates] = useState<EntityCandidate[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  async function loadInbox() {
-    setLoading(true);
+  const PAGE_SIZE = 200;
+
+  async function loadInbox(offset = 0, append = false) {
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     setError(null);
-    const params = new URLSearchParams({ venture, limit: "200" });
+    const params = new URLSearchParams({ venture, limit: String(PAGE_SIZE), offset: String(offset) });
     if (folder !== "alle") params.set("folder", folder);
     const res = await fetch(`/api/inbox?${params}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Inbox konnte nicht geladen werden.");
     const list = Array.isArray(data) ? data : [];
-    setMessages(list);
-    setSelectedId((current) => current && list.some((m: InboxMessage) => m.id === current) ? current : (list[0]?.id ?? null));
+    setHasMore(list.length === PAGE_SIZE);
+    setMessages((currentMessages) => {
+      const next = append ? [...currentMessages, ...list.filter((m: InboxMessage) => !currentMessages.some((existing) => existing.id === m.id))] : list;
+      setSelectedId((current) => current && next.some((m: InboxMessage) => m.id === current) ? current : (next[0]?.id ?? null));
+      return next;
+    });
+    if (append) setLoadingMore(false);
+  }
+
+  async function loadMore() {
+    if (loadingMore || loading || !hasMore) return;
+    await loadInbox(messages.length, true).finally(() => setLoadingMore(false));
   }
 
   useEffect(() => {
@@ -154,7 +169,7 @@ export default function InboxPage() {
       const res = await fetch(`/api/inbox/${messageId}`, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Aktion fehlgeschlagen");
-      await loadInbox();
+      await loadInbox(0, false);
       setActionMessage(data.queued
         ? (payload.action === "mail_update_draft" ? "Entwurf gespeichert und zur Mailbox-Synchronisierung vorgemerkt." : "Mail-Aktion freigegeben und in die lokale Ausführung gelegt.")
         : data.duplicate
@@ -193,14 +208,19 @@ export default function InboxPage() {
       </div>
 
       <div className="rounded-2xl overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #D1D5E8", boxShadow: "0 2px 12px rgba(27,42,94,0.08)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "360px minmax(0, 1fr)", minHeight: "68vh", maxHeight: "calc(100vh - 210px)" }}>
-          <section style={{ borderRight: "1px solid #D1D5E8", background: "#FFFFFF", minWidth: 0, overflowY: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "360px minmax(0, 1fr)", height: "calc(100vh - 210px)", minHeight: "560px" }}>
+          <section onScroll={(e) => {
+            const el = e.currentTarget;
+            if (el.scrollHeight - el.scrollTop - el.clientHeight < 160) void loadMore();
+          }} style={{ borderRight: "1px solid #D1D5E8", background: "#FFFFFF", minWidth: 0, minHeight: 0, overflowY: "auto" }}>
             {loading ? <EmptyState text="Laden…" /> : error ? <EmptyState text={error} /> : filtered.length === 0 ? <EmptyState text="Keine E-Mails für diesen Filter." /> : filtered.map((message) => (
               <MessageListItem key={message.id} message={message} active={selected?.id === message.id} onClick={() => setSelectedId(message.id)} />
             ))}
+            {loadingMore && <EmptyState text="Weitere Mails laden…" />}
+            {!loading && hasMore && !loadingMore && <button onClick={() => void loadMore()} style={{ ...ghostButton, width: "calc(100% - 24px)", margin: "12px" }}>Weitere Mails laden</button>}
           </section>
 
-          <main style={{ minWidth: 0, background: "#F7F8FC", overflowY: "auto" }}>
+          <main style={{ minWidth: 0, minHeight: 0, background: "#F7F8FC", overflowY: "auto" }}>
             {selected ? <MessageDetail message={selected} candidates={entityCandidates} actionLoading={actionLoading} actionMessage={actionMessage} onAction={runInboxAction} /> : <EmptyDetail />}
           </main>
         </div>
@@ -255,15 +275,22 @@ function MessageDetail({ message, candidates, actionLoading, actionMessage, onAc
 
   const colors = STATUS_STYLES[message.match_status] ?? STATUS_STYLES.unmatched;
   const isDraft = message.folder === "drafts";
+  const linkedLabel = message.entity_href && message.entity_name
+    ? `${message.entity_name}${message.entity_company ? ` · ${message.entity_company}` : ""}`
+    : null;
 
   return (
-    <div style={{ padding: "18px 20px 22px", display: "grid", gap: "14px" }}>
+    <div style={{ padding: "12px 14px 16px", display: "grid", gap: "10px" }}>
       <section style={detailCard}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-start" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start" }}>
           <div style={{ minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: "12px", color: "#6B7280" }}>{fmtFull(message.received_at)} · {message.account_email}</p>
-            <h2 style={{ margin: "6px 0 0", fontFamily: "var(--font-sans)", fontSize: "20px", fontWeight: 700, color: "#14193A", lineHeight: 1.3 }}>{message.subject || "(ohne Betreff)"}</h2>
-            <p style={{ margin: "6px 0 0", fontSize: "13px", color: "#6B7280" }}>{senderName(message)} · {message.from_email}</p>
+            <h2 style={{ margin: 0, fontFamily: "var(--font-sans)", fontSize: "16px", fontWeight: 700, color: "#14193A", lineHeight: 1.3 }}>{message.subject || "(ohne Betreff)"}</h2>
+            <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#6B7280" }}>
+              {senderName(message)} · {message.from_email} · {fmtFull(message.received_at)} · {message.account_email}
+            </p>
+            <p style={{ margin: "4px 0 0", fontSize: "12px", color: linkedLabel ? "#3A5BA0" : "#6B7280", fontWeight: linkedLabel ? 700 : 500 }}>
+              {linkedLabel && message.entity_href ? <Link href={message.entity_href} style={{ color: "#3A5BA0", textDecoration: "none" }}>Verknüpft: {linkedLabel}</Link> : "Noch nicht verknüpft"}
+            </p>
           </div>
           <span style={{ fontSize: "11px", fontWeight: 700, padding: "4px 9px", borderRadius: "999px", background: colors.bg, color: colors.color, border: `1px solid ${colors.border}`, whiteSpace: "nowrap" }}>{STATUS_LABELS[message.match_status]}</span>
         </div>
@@ -314,13 +341,6 @@ function MessageDetail({ message, candidates, actionLoading, actionMessage, onAc
           </div>
         </section>
       )}
-
-      <section style={detailCard}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
-          <p style={sectionTitle}>Founder OS Zuordnung</p>
-          {message.entity_href && message.entity_name ? <Link href={message.entity_href} style={{ fontSize: "13px", color: "#3A5BA0", fontWeight: 700 }}>{message.entity_name}{message.entity_company ? ` · ${message.entity_company}` : ""}</Link> : <span style={{ fontSize: "13px", color: "#6B7280" }}>Noch nicht verknüpft</span>}
-        </div>
-      </section>
 
       <section style={detailCard}>
         {message.has_attachments && <p style={{ margin: "0 0 10px", fontSize: "12px", color: "#A07840", fontWeight: 700 }}>Anhang: {(message.attachment_names ?? []).join(", ") || "vorhanden"}</p>}
