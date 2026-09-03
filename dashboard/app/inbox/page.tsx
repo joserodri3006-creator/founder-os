@@ -6,6 +6,7 @@ import { useVenture } from "@/context/VentureContext";
 import { VENTURES } from "@/lib/ventures";
 
 type MatchStatus = "alle" | "matched_lead" | "matched_customer" | "matched_supplier" | "unmatched";
+type EntityType = "lead" | "customer" | "supplier";
 
 interface InboxMessage {
   id: string;
@@ -26,17 +27,26 @@ interface InboxMessage {
   entity_href: string | null;
 }
 
-interface LeadCandidate {
+interface EntityCandidate {
   id: string;
-  first_name: string | null;
-  last_name: string | null;
-  company_name: string | null;
+  type: EntityType;
+  label: string;
   email: string | null;
 }
 
-function candidateLabel(lead: LeadCandidate) {
-  const name = `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim();
-  return [name || lead.company_name || "Lead", lead.company_name && name ? lead.company_name : null, lead.email].filter(Boolean).join(" · ");
+const ENTITY_LABELS: Record<EntityType, string> = { lead: "Lead", customer: "Kunde", supplier: "Partner" };
+
+function candidateLabel(candidate: EntityCandidate) {
+  return `${ENTITY_LABELS[candidate.type]} · ${candidate.label}${candidate.email ? ` · ${candidate.email}` : ""}`;
+}
+
+function mapPersonCandidate(type: "lead" | "customer", row: { id: string; first_name?: string | null; last_name?: string | null; company_name?: string | null; email?: string | null }): EntityCandidate {
+  const name = `${row.first_name ?? ""} ${row.last_name ?? ""}`.trim();
+  return { id: row.id, type, label: [name || row.company_name || "Ohne Name", row.company_name && name ? row.company_name : null].filter(Boolean).join(" · "), email: row.email ?? null };
+}
+
+function mapSupplierCandidate(row: { id: string; name?: string | null; contact_name?: string | null; email?: string | null }): EntityCandidate {
+  return { id: row.id, type: "supplier", label: [row.name || "Partner", row.contact_name].filter(Boolean).join(" · "), email: row.email ?? null };
 }
 
 const FILTERS: { key: MatchStatus; label: string; hint: string; icon: string }[] = [
@@ -89,7 +99,7 @@ export default function InboxPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [leadCandidates, setLeadCandidates] = useState<LeadCandidate[]>([]);
+  const [entityCandidates, setEntityCandidates] = useState<EntityCandidate[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -113,10 +123,19 @@ export default function InboxPage() {
       })
       .finally(() => setLoading(false));
 
-    fetch(`/api/leads?venture=${venture}`)
-      .then((res) => res.ok ? res.json() : [])
-      .then((data) => setLeadCandidates(Array.isArray(data) ? data : []))
-      .catch(() => setLeadCandidates([]));
+    Promise.all([
+      fetch(`/api/leads?venture=${venture}`).then((res) => res.ok ? res.json() : []),
+      fetch(`/api/kunden?venture=${venture}`).then((res) => res.ok ? res.json() : []),
+      fetch(`/api/lieferanten?venture=${venture}`).then((res) => res.ok ? res.json() : []),
+    ])
+      .then(([leads, customers, suppliers]) => {
+        setEntityCandidates([
+          ...(Array.isArray(leads) ? leads.map((row) => mapPersonCandidate("lead", row)) : []),
+          ...(Array.isArray(customers) ? customers.map((row) => mapPersonCandidate("customer", row)) : []),
+          ...(Array.isArray(suppliers) ? suppliers.map(mapSupplierCandidate) : []),
+        ]);
+      })
+      .catch(() => setEntityCandidates([]));
   }, [venture]);
 
   const counts = useMemo(() => {
@@ -249,7 +268,7 @@ export default function InboxPage() {
 
           {/* Right detail / conversation */}
           <main style={{ background: "#F2F5FB", minWidth: 0, display: "flex", flexDirection: "column" }}>
-            {selected ? <MessageDetail message={selected} leads={leadCandidates} actionLoading={actionLoading} actionMessage={actionMessage} onAction={runInboxAction} /> : <EmptyDetail />}
+            {selected ? <MessageDetail message={selected} candidates={entityCandidates} actionLoading={actionLoading} actionMessage={actionMessage} onAction={runInboxAction} /> : <EmptyDetail />}
           </main>
         </div>
       </div>
@@ -280,10 +299,12 @@ function MessageListItem({ message, active, onClick }: { message: InboxMessage; 
   );
 }
 
-function MessageDetail({ message, leads, actionLoading, actionMessage, onAction }: { message: InboxMessage; leads: LeadCandidate[]; actionLoading: boolean; actionMessage: string | null; onAction: (messageId: string, payload: Record<string, unknown>, method?: "PATCH" | "POST") => void }) {
-  const [leadId, setLeadId] = useState("");
+function MessageDetail({ message, candidates, actionLoading, actionMessage, onAction }: { message: InboxMessage; candidates: EntityCandidate[]; actionLoading: boolean; actionMessage: string | null; onAction: (messageId: string, payload: Record<string, unknown>, method?: "PATCH" | "POST") => void }) {
+  const [entityKey, setEntityKey] = useState("");
+  const [createType, setCreateType] = useState<EntityType>("lead");
   const [companyName, setCompanyName] = useState("");
-  useEffect(() => { setLeadId(""); setCompanyName(""); }, [message.id]);
+  useEffect(() => { setEntityKey(""); setCreateType("lead"); setCompanyName(""); }, [message.id]);
+  const selectedCandidate = candidates.find((candidate) => `${candidate.type}:${candidate.id}` === entityKey);
   const colors = STATUS_STYLES[message.match_status] ?? STATUS_STYLES.unmatched;
   return (
     <>
@@ -298,7 +319,22 @@ function MessageDetail({ message, leads, actionLoading, actionMessage, onAction 
         <span style={{ fontSize: "11px", fontWeight: 800, padding: "6px 10px", borderRadius: "999px", background: colors.bg, color: colors.color, border: `1px solid ${colors.border}` }}>{STATUS_LABELS[message.match_status]}</span>
       </header>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "38px 38px 28px" }}>
+      <ActionPanel
+        message={message}
+        candidates={candidates}
+        selectedCandidate={selectedCandidate}
+        entityKey={entityKey}
+        setEntityKey={setEntityKey}
+        createType={createType}
+        setCreateType={setCreateType}
+        companyName={companyName}
+        setCompanyName={setCompanyName}
+        actionLoading={actionLoading}
+        actionMessage={actionMessage}
+        onAction={onAction}
+      />
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "28px 38px 28px" }}>
         <div style={{ display: "flex", gap: "14px", alignItems: "flex-end", marginBottom: "30px" }}>
           <Avatar message={message} size={38} />
           <div style={{ maxWidth: "78%", background: "#E1E6EF", color: "#14193A", borderRadius: "24px 24px 24px 6px", padding: "22px 26px", boxShadow: "0 12px 32px rgba(20,25,58,0.06)" }}>
@@ -331,26 +367,54 @@ function MessageDetail({ message, leads, actionLoading, actionMessage, onAction 
         </div>
       </div>
 
-      <footer style={{ padding: "18px 28px 24px", background: "#F2F5FB" }}>
-        <div style={{ background: "#FFFFFF", border: "1px solid #E1E5F0", borderRadius: "18px", padding: "14px", display: "grid", gap: "12px", boxShadow: "0 10px 28px rgba(20,25,58,0.08)" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(160px, 1fr) 140px 120px", gap: "10px" }}>
-            <select value={leadId} onChange={(e) => setLeadId(e.target.value)} style={compactInput}>
-              <option value="">Mit bestehendem Lead verknüpfen…</option>
-              {leads.map((lead) => <option key={lead.id} value={lead.id}>{candidateLabel(lead)}</option>)}
-            </select>
-            <button disabled={!leadId || actionLoading} onClick={() => onAction(message.id, { action: "link", entity_type: "lead", entity_id: leadId })} style={secondaryButton}>Verknüpfen</button>
-            <button disabled={actionLoading} onClick={() => onAction(message.id, { action: "ignore" })} style={ghostButton}>Ignorieren</button>
-          </div>
-          {message.match_status === "unmatched" && (
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(160px, 1fr) 180px", gap: "10px" }}>
-              <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Firma optional" style={compactInput} />
-              <button disabled={actionLoading} onClick={() => onAction(message.id, { action: "create_lead", company_name: companyName }, "POST")} style={primaryButton}>Als Lead anlegen</button>
-            </div>
-          )}
-          {actionMessage && <p style={{ margin: 0, color: actionMessage.includes("fehl") || actionMessage.includes("nicht") ? "#BE123C" : "#15803D", fontSize: "12px", fontWeight: 700 }}>{actionMessage}</p>}
-        </div>
-      </footer>
+
     </>
+  );
+}
+
+function ActionPanel({ message, candidates, selectedCandidate, entityKey, setEntityKey, createType, setCreateType, companyName, setCompanyName, actionLoading, actionMessage, onAction }: {
+  message: InboxMessage;
+  candidates: EntityCandidate[];
+  selectedCandidate?: EntityCandidate;
+  entityKey: string;
+  setEntityKey: (value: string) => void;
+  createType: EntityType;
+  setCreateType: (value: EntityType) => void;
+  companyName: string;
+  setCompanyName: (value: string) => void;
+  actionLoading: boolean;
+  actionMessage: string | null;
+  onAction: (messageId: string, payload: Record<string, unknown>, method?: "PATCH" | "POST") => void;
+}) {
+  return (
+    <section style={{ padding: "16px 28px", background: "rgba(255,255,255,0.9)", borderBottom: "1px solid #E6E9F3", display: "grid", gap: "10px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1fr) 140px 112px", gap: "10px" }}>
+        <select value={entityKey} onChange={(e) => setEntityKey(e.target.value)} style={compactInput}>
+          <option value="">Mit Lead / Kunde / Partner verknüpfen…</option>
+          {candidates.map((candidate) => <option key={`${candidate.type}:${candidate.id}`} value={`${candidate.type}:${candidate.id}`}>{candidateLabel(candidate)}</option>)}
+        </select>
+        <button
+          disabled={!selectedCandidate || actionLoading}
+          onClick={() => selectedCandidate && onAction(message.id, { action: "link", entity_type: selectedCandidate.type, entity_id: selectedCandidate.id })}
+          style={secondaryButton}
+        >
+          Verknüpfen
+        </button>
+        <button disabled={actionLoading} onClick={() => onAction(message.id, { action: "ignore" })} style={ghostButton}>Ignorieren</button>
+      </div>
+      {message.match_status === "unmatched" && (
+        <div style={{ display: "grid", gridTemplateColumns: "160px minmax(160px, 1fr) 180px", gap: "10px" }}>
+          <select value={createType} onChange={(e) => setCreateType(e.target.value as EntityType)} style={compactInput}>
+            <option value="lead">Als Lead</option>
+            <option value="customer">Als Kunde</option>
+            <option value="supplier">Als Partner</option>
+          </select>
+          <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Firma / Partnername optional" style={compactInput} />
+          <button disabled={actionLoading} onClick={() => onAction(message.id, { action: "create", entity_type: createType, company_name: companyName }, "POST")} style={primaryButton}>Anlegen + verknüpfen</button>
+        </div>
+      )}
+      {actionMessage && <p style={{ margin: 0, color: actionMessage.includes("fehl") || actionMessage.includes("nicht") ? "#BE123C" : "#15803D", fontSize: "12px", fontWeight: 700 }}>{actionMessage}</p>}
+    </section>
   );
 }
 

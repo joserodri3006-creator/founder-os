@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { addIgnoredId, linkUpdateForEntity, leadPayloadFromInboxMessage } from "@/lib/inbox-actions";
+import { addIgnoredId, linkUpdateForEntity, payloadFromInboxMessage } from "@/lib/inbox-actions";
 
 type Params = { params: Promise<{ id: string }> };
 
+type EntityType = "lead" | "customer" | "supplier";
+
 type ActionBody =
-  | { action: "link"; entity_type: "lead" | "customer" | "supplier"; entity_id: string }
+  | { action: "link"; entity_type: EntityType; entity_id: string }
   | { action: "ignore" }
-  | { action: "create_lead"; company_name?: string; first_name?: string; last_name?: string; notes?: string };
+  | { action: "create"; entity_type: EntityType; company_name?: string; first_name?: string; last_name?: string; notes?: string };
 
 function missingMessage() {
   return NextResponse.json({ error: "Inbox-Nachricht nicht gefunden" }, { status: 404 });
@@ -76,8 +78,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const body = (await req.json()) as ActionBody;
-  if (body.action !== "create_lead") {
-    return NextResponse.json({ error: "action muss create_lead sein" }, { status: 400 });
+  if (body.action !== "create") {
+    return NextResponse.json({ error: "action muss create sein" }, { status: 400 });
   }
 
   const { data: message, error: messageError } = await supabaseAdmin
@@ -88,16 +90,23 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (messageError) return NextResponse.json({ error: messageError.message }, { status: 500 });
   if (!message) return missingMessage();
 
-  const payload = {
-    ...leadPayloadFromInboxMessage(message),
-    company_name: typeof body.company_name === "string" && body.company_name.trim() ? body.company_name.trim() : null,
-    first_name: typeof body.first_name === "string" && body.first_name.trim() ? body.first_name.trim() : leadPayloadFromInboxMessage(message).first_name,
-    last_name: typeof body.last_name === "string" && body.last_name.trim() ? body.last_name.trim() : leadPayloadFromInboxMessage(message).last_name,
-    notes: typeof body.notes === "string" && body.notes.trim() ? body.notes.trim() : leadPayloadFromInboxMessage(message).notes,
+  const tableByType: Record<EntityType, "leads" | "customers" | "suppliers"> = {
+    lead: "leads",
+    customer: "customers",
+    supplier: "suppliers",
   };
+  const table = tableByType[body.entity_type];
+  if (!table) return NextResponse.json({ error: "entity_type muss lead, customer oder supplier sein" }, { status: 400 });
+
+  const payload = payloadFromInboxMessage(body.entity_type, message, {
+    company_name: body.company_name,
+    first_name: body.first_name,
+    last_name: body.last_name,
+    notes: body.notes,
+  });
 
   const { data: existing } = await supabaseAdmin
-    .from("leads")
+    .from(table)
     .select("id")
     .eq("venture", payload.venture)
     .eq("email", payload.email)
@@ -106,28 +115,31 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (existing?.id) {
     const { error: linkError } = await supabaseAdmin
       .from("inbox_messages")
-      .update(linkUpdateForEntity("lead", existing.id))
+      .update(linkUpdateForEntity(body.entity_type, existing.id))
       .eq("id", id);
     if (linkError) return NextResponse.json({ error: linkError.message }, { status: 500 });
-    return NextResponse.json({ success: true, duplicate: true, lead_id: existing.id });
+    return NextResponse.json({ success: true, duplicate: true, entity_type: body.entity_type, entity_id: existing.id });
   }
 
-  const { data: lead, error: leadError } = await supabaseAdmin
-    .from("leads")
+  const { data: entity, error: entityError } = await supabaseAdmin
+    .from(table)
     .insert(payload)
-    .select("id,first_name,last_name,email,company_name,venture")
+    .select("*")
     .single();
-  if (leadError || !lead) return NextResponse.json({ error: leadError?.message ?? "Lead konnte nicht angelegt werden" }, { status: 500 });
+  if (entityError || !entity) return NextResponse.json({ error: entityError?.message ?? "Datensatz konnte nicht angelegt werden" }, { status: 500 });
 
-  const [{ error: linkError }] = await Promise.all([
-    supabaseAdmin.from("inbox_messages").update(linkUpdateForEntity("lead", lead.id)).eq("id", id),
-    supabaseAdmin.from("lead_activities").insert({
-      lead_id: lead.id,
+  const { error: linkError } = await supabaseAdmin
+    .from("inbox_messages")
+    .update(linkUpdateForEntity(body.entity_type, entity.id))
+    .eq("id", id);
+  if (linkError) return NextResponse.json({ error: linkError.message }, { status: 500 });
+
+  if (body.entity_type === "lead") {
+    await supabaseAdmin.from("lead_activities").insert({
+      lead_id: entity.id,
       activity_type: "email_received",
       description: `Lead aus Inbox-Mail angelegt: ${message.subject || "(ohne Betreff)"}`,
-    }),
-  ]);
-
-  if (linkError) return NextResponse.json({ error: linkError.message }, { status: 500 });
-  return NextResponse.json({ success: true, duplicate: false, lead }, { status: 201 });
+    });
+  }
+  return NextResponse.json({ success: true, duplicate: false, entity_type: body.entity_type, entity }, { status: 201 });
 }

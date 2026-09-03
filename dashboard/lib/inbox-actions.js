@@ -15,6 +15,10 @@ function splitName(value, fallbackEmail = "") {
   return { first_name: local, last_name: local };
 }
 
+function senderDisplayName(message) {
+  return String(message?.from_name || normalizeEmail(message?.from_email).split("@")[0] || "Unbekannt").trim();
+}
+
 function linkUpdateForEntity(entityType, entityId) {
   if (!VALID_LINK_TYPES.has(entityType)) throw new Error("entity_type muss lead, customer oder supplier sein");
   if (!entityId) throw new Error("entity_id ist erforderlich");
@@ -39,17 +43,54 @@ function addIgnoredId(existingValue, id) {
   return JSON.stringify([...new Set([...parseIgnoredIds(existingValue), id].filter(Boolean))]);
 }
 
-function leadPayloadFromInboxMessage(message) {
+function commonNote(message) {
+  return `Aus Founder-OS-Inbox angelegt. Ursprüngliche Mail: ${message?.subject || "(ohne Betreff)"}`;
+}
+
+function payloadFromInboxMessage(entityType, message, overrides = {}) {
+  if (!VALID_LINK_TYPES.has(entityType)) throw new Error("entity_type muss lead, customer oder supplier sein");
   const names = splitName(message?.from_name, message?.from_email);
+  const email = normalizeEmail(message?.from_email);
+  const venture = message?.venture || "online_first";
+  const company = typeof overrides.company_name === "string" && overrides.company_name.trim() ? overrides.company_name.trim() : null;
+  const notes = typeof overrides.notes === "string" && overrides.notes.trim() ? overrides.notes.trim() : commonNote(message);
+
+  if (entityType === "supplier") {
+    return {
+      venture,
+      name: company || senderDisplayName(message),
+      contact_name: senderDisplayName(message),
+      email,
+      phone: null,
+      website: null,
+      notes,
+    };
+  }
+
+  const basePerson = {
+    venture,
+    first_name: typeof overrides.first_name === "string" && overrides.first_name.trim() ? overrides.first_name.trim() : names.first_name,
+    last_name: typeof overrides.last_name === "string" && overrides.last_name.trim() ? overrides.last_name.trim() : names.last_name,
+    email,
+    company_name: company,
+    phone: null,
+    city: null,
+    notes,
+  };
+
+  if (entityType === "customer") {
+    return {
+      ...basePerson,
+      customer_type: "b2b",
+      status: "active",
+      discount_rate: 0,
+    };
+  }
+
   return {
-    venture: message?.venture || "online_first",
-    first_name: names.first_name,
-    last_name: names.last_name,
-    email: normalizeEmail(message?.from_email),
-    company_name: null,
+    ...basePerson,
     source: "website",
     status: "neu",
-    notes: `Aus Founder-OS-Inbox angelegt. Ursprüngliche Mail: ${message?.subject || "(ohne Betreff)"}`,
     contact_reason: message?.body_preview || message?.subject || null,
     review_status: "unreviewed",
     contact_channel: "email",
@@ -63,5 +104,6 @@ module.exports = {
   linkUpdateForEntity,
   parseIgnoredIds,
   addIgnoredId,
-  leadPayloadFromInboxMessage,
+  payloadFromInboxMessage,
+  leadPayloadFromInboxMessage: (message) => payloadFromInboxMessage("lead", message),
 };
