@@ -27,6 +27,16 @@ interface InboxMessage {
   entity_name: string | null;
   entity_company: string | null;
   entity_href: string | null;
+  mail_action: MailAction | null;
+}
+
+interface MailAction {
+  id: string | null;
+  type: string | null;
+  status: "queued" | "done" | "error" | string | null;
+  error: string | null;
+  queued_at: string | null;
+  processed_at: string | null;
 }
 
 interface EntityCandidate {
@@ -54,6 +64,35 @@ const STATUS_STYLES: Record<string, { bg: string; color: string; border: string 
   matched_supplier: { bg: "rgba(200,169,110,0.14)", color: "#A07840", border: "rgba(200,169,110,0.26)" },
   unmatched: { bg: "#FEF2F2", color: "#B91C1C", border: "#FECACA" },
 };
+
+const ACTION_LABELS: Record<string, string> = {
+  mail_archive: "Archivieren",
+  mail_delete: "Löschen",
+  mail_send: "Senden",
+  mail_update_draft: "Entwurf speichern",
+};
+
+const ACTION_STATUS_LABELS: Record<string, string> = {
+  queued: "wartet",
+  done: "erledigt",
+  error: "Fehler",
+};
+
+const ACTION_STATUS_STYLES: Record<string, { bg: string; color: string; border: string }> = {
+  queued: { bg: "rgba(200,169,110,0.14)", color: "#A07840", border: "rgba(200,169,110,0.26)" },
+  done: { bg: "rgba(22,163,74,0.10)", color: "#15803D", border: "rgba(22,163,74,0.18)" },
+  error: { bg: "#FEF2F2", color: "#B91C1C", border: "#FECACA" },
+};
+
+function actionLabel(action: MailAction | null) {
+  if (!action?.type) return null;
+  return ACTION_LABELS[action.type] ?? action.type;
+}
+
+function actionStatusLabel(action: MailAction | null) {
+  if (!action?.status) return null;
+  return ACTION_STATUS_LABELS[action.status] ?? action.status;
+}
 
 function candidateLabel(candidate: EntityCandidate) {
   return `${ENTITY_LABELS[candidate.type]} · ${candidate.label}${candidate.email ? ` · ${candidate.email}` : ""}`;
@@ -190,9 +229,12 @@ export default function InboxPage() {
           <h1 style={{ fontFamily: "var(--font-serif)", fontWeight: 300, fontSize: "28px", color: "#14193A", letterSpacing: "-0.02em", lineHeight: 1.2 }}>Inbox</h1>
           <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>{currentVenture?.label ?? venture} · {filtered.length} Nachrichten</p>
         </div>
-        <select value={venture} onChange={(e) => setVenture(e.target.value as typeof venture)} style={selectStyle}>
-          {VENTURES.filter((v) => ["online_first", "blazed_outfitters", "brandary"].includes(v.id)).map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-        </select>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <button onClick={() => void loadInbox(0, false).finally(() => setLoading(false))} style={ghostButton}>Status aktualisieren</button>
+          <select value={venture} onChange={(e) => setVenture(e.target.value as typeof venture)} style={selectStyle}>
+            {VENTURES.filter((v) => ["online_first", "blazed_outfitters", "brandary"].includes(v.id)).map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+          </select>
+        </div>
       </div>
 
       <div className="flex gap-2.5 mb-5 items-center flex-wrap p-3 rounded-xl" style={filterBarStyle}>
@@ -231,6 +273,9 @@ export default function InboxPage() {
 
 function MessageListItem({ message, active, onClick }: { message: InboxMessage; active: boolean; onClick: () => void }) {
   const colors = STATUS_STYLES[message.match_status] ?? STATUS_STYLES.unmatched;
+  const mailActionColors = message.mail_action?.status ? ACTION_STATUS_STYLES[message.mail_action.status] : null;
+  const mailActionLabel = actionLabel(message.mail_action);
+  const mailActionStatus = actionStatusLabel(message.mail_action);
   return (
     <button onClick={onClick} style={{ width: "100%", border: "none", borderBottom: "1px solid #EEF0F7", borderLeft: active ? "3px solid #1B2A5E" : "3px solid transparent", background: active ? "#F7F8FC" : "#FFFFFF", padding: "12px 14px", textAlign: "left", cursor: "pointer" }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "flex-start" }}>
@@ -243,6 +288,9 @@ function MessageListItem({ message, active, onClick }: { message: InboxMessage; 
       </div>
       <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "8px", flexWrap: "wrap" }}>
         <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "999px", background: colors.bg, color: colors.color, border: `1px solid ${colors.border}` }}>{STATUS_LABELS[message.match_status]}</span>
+        {mailActionColors && mailActionLabel && mailActionStatus && (
+          <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "999px", background: mailActionColors.bg, color: mailActionColors.color, border: `1px solid ${mailActionColors.border}` }}>{mailActionLabel}: {mailActionStatus}</span>
+        )}
         <span style={smallBadge}>{message.folder === "INBOX" ? "Eingang" : FOLDER_LABELS[message.folder as FolderFilter] ?? message.folder}</span>
         <span style={smallBadge}>{message.account_email}</span>
       </div>
@@ -278,6 +326,9 @@ function MessageDetail({ message, candidates, actionLoading, actionMessage, onAc
   const linkedLabel = message.entity_href && message.entity_name
     ? `${message.entity_name}${message.entity_company ? ` · ${message.entity_company}` : ""}`
     : null;
+  const mailActionColors = message.mail_action?.status ? ACTION_STATUS_STYLES[message.mail_action.status] : null;
+  const mailActionLabel = actionLabel(message.mail_action);
+  const mailActionStatus = actionStatusLabel(message.mail_action);
 
   return (
     <div style={{ padding: "12px 14px 16px", display: "grid", gap: "10px" }}>
@@ -294,6 +345,12 @@ function MessageDetail({ message, candidates, actionLoading, actionMessage, onAc
           </div>
           <span style={{ fontSize: "11px", fontWeight: 700, padding: "4px 9px", borderRadius: "999px", background: colors.bg, color: colors.color, border: `1px solid ${colors.border}`, whiteSpace: "nowrap" }}>{STATUS_LABELS[message.match_status]}</span>
         </div>
+        {mailActionColors && mailActionLabel && mailActionStatus && (
+          <div style={{ marginTop: "10px", padding: "8px 10px", borderRadius: "10px", background: mailActionColors.bg, border: `1px solid ${mailActionColors.border}`, color: mailActionColors.color, fontSize: "12px", display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center" }}>
+            <strong>{mailActionLabel}: {mailActionStatus}</strong>
+            {message.mail_action?.error ? <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{message.mail_action.error}</span> : <span>{message.mail_action?.status === "queued" ? "Wird vom lokalen Worker verarbeitet." : "Status aus dem lokalen Worker."}</span>}
+          </div>
+        )}
       </section>
 
       <section style={detailCard}>

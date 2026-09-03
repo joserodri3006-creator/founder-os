@@ -21,6 +21,40 @@ type InboxMessage = {
   attachment_names: string[];
 };
 
+const MAIL_ACTIONS_KEY = "inbox_pending_mail_actions";
+
+function parseMailActions(value: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(value)) return value as Array<Record<string, unknown>>;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function latestActionFor(messageId: string, actions: Array<Record<string, unknown>>) {
+  const matches = actions
+    .filter((action) => {
+      const message = action.message as Record<string, unknown> | undefined;
+      return message?.id === messageId;
+    })
+    .sort((a, b) => String(b.processed_at ?? b.queued_at ?? "").localeCompare(String(a.processed_at ?? a.queued_at ?? "")));
+  const action = matches[0];
+  if (!action) return null;
+  return {
+    id: action.id ?? null,
+    type: action.action ?? null,
+    status: action.status ?? null,
+    error: action.error ?? null,
+    queued_at: action.queued_at ?? null,
+    processed_at: action.processed_at ?? null,
+  };
+}
+
 function tableMissing(error: { message?: string; code?: string } | null) {
   return error?.code === "42P01" || error?.message?.includes("inbox_messages");
 }
@@ -69,6 +103,12 @@ export async function GET(req: NextRequest) {
         .eq("key", "inbox_ignored_message_ids")
         .maybeSingle()).data?.value));
   const messages = rawMessages.filter((message) => !ignoredIds.has(message.id));
+  const actionRows = (await supabaseAdmin
+    .from("system_config")
+    .select("value")
+    .eq("key", MAIL_ACTIONS_KEY)
+    .maybeSingle()).data;
+  const mailActions = parseMailActions(actionRows?.value);
   if (entityType && entityId) return NextResponse.json(messages);
 
   const leadIds = [...new Set(messages.map((m) => m.lead_id).filter(Boolean))] as string[];
@@ -100,6 +140,7 @@ export async function GET(req: NextRequest) {
         entity_name: lead ? `${lead.first_name ?? ""} ${lead.last_name ?? ""}`.trim() || lead.company_name : null,
         entity_company: lead?.company_name ?? null,
         entity_href: `/leads/${m.lead_id}`,
+        mail_action: latestActionFor(m.id, mailActions),
       };
     }
     if (m.customer_id) {
@@ -110,6 +151,7 @@ export async function GET(req: NextRequest) {
         entity_name: customer ? `${customer.first_name ?? ""} ${customer.last_name ?? ""}`.trim() || customer.company_name : null,
         entity_company: customer?.company_name ?? null,
         entity_href: `/kunden/${m.customer_id}`,
+        mail_action: latestActionFor(m.id, mailActions),
       };
     }
     if (m.supplier_id) {
@@ -120,9 +162,10 @@ export async function GET(req: NextRequest) {
         entity_name: supplier?.name ?? null,
         entity_company: supplier?.contact_name ?? null,
         entity_href: "/einstellungen/lieferanten",
+        mail_action: latestActionFor(m.id, mailActions),
       };
     }
-    return { ...m, entity_type: null, entity_name: null, entity_company: null, entity_href: null };
+    return { ...m, entity_type: null, entity_name: null, entity_company: null, entity_href: null, mail_action: latestActionFor(m.id, mailActions) };
   });
 
   return NextResponse.json(enriched);
