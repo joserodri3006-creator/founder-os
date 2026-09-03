@@ -54,6 +54,8 @@ Diese Suite ist als Abnahme-Guard formuliert. Aktuell schlägt noch dieser Test 
    Erwartung: Rechnung wurde generiert (`invoice_generated_at`, `invoice_html`).  
    Aktuell: Rechnungsnummer existiert, Rechnung/HTML/Versand fehlen bei aktuellen Itaba-Orders.
 
+   **Was zu tun ist:** Für Itaba-Bestellungen muss nach Order-Erstellung eine Rechnung erzeugt werden. Technisch existiert die Generierungslogik bereits in `dashboard/app/api/auftraege/[id]/rechnung/route.ts` (`POST` setzt `invoice_html`, `invoice_number`, `invoice_generated_at`, `invoice_data`). Offen ist, diese Logik für Itaba-Checkout-Orders automatisch bzw. zuverlässig aufzurufen oder eine klare manuelle Abnahmeaktion im Auftrag zu verwenden. Danach muss eine neue echte/markierte Testorder erzeugt und der Playwright-Test erneut ausgeführt werden.
+
 Kategorie-Test dokumentiert aktuell außerdem: Küche und Accessoires haben 0 aktive Produkte. Das ist kein technischer Fail, aber Launch-Hinweis.
 
 Hinweis: Der UI-Test für Abholung/Barzahlung redirectet im automatisierten Playwright-Lauf inzwischen korrekt auf `/bestellung/abholung?id=...`; die Testbestellung wird danach automatisch storniert.
