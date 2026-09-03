@@ -326,9 +326,10 @@ function MessageListItem({ message, active, onClick }: { message: InboxMessage; 
 
 function MessageDetail({ message, candidates, actionLoading, actionMessage, onAction }: { message: InboxMessage; candidates: EntityCandidate[]; actionLoading: boolean; actionMessage: string | null; onAction: (messageId: string, payload: Record<string, unknown>, method?: "PATCH" | "POST") => void }) {
   const [entityKey, setEntityKey] = useState("");
+  const [entitySearch, setEntitySearch] = useState("");
   const [createType, setCreateType] = useState<EntityType>("lead");
   const [companyName, setCompanyName] = useState("");
-  useEffect(() => { setEntityKey(""); setCreateType("lead"); setCompanyName(""); }, [message.id]);
+  useEffect(() => { setEntityKey(""); setEntitySearch(""); setCreateType("lead"); setCompanyName(""); }, [message.id]);
   const selectedCandidate = candidates.find((candidate) => `${candidate.type}:${candidate.id}` === entityKey);
   const colors = STATUS_STYLES[message.match_status] ?? STATUS_STYLES.unmatched;
   return (
@@ -350,6 +351,8 @@ function MessageDetail({ message, candidates, actionLoading, actionMessage, onAc
         selectedCandidate={selectedCandidate}
         entityKey={entityKey}
         setEntityKey={setEntityKey}
+        entitySearch={entitySearch}
+        setEntitySearch={setEntitySearch}
         createType={createType}
         setCreateType={setCreateType}
         companyName={companyName}
@@ -397,12 +400,14 @@ function MessageDetail({ message, candidates, actionLoading, actionMessage, onAc
   );
 }
 
-function ActionPanel({ message, candidates, selectedCandidate, entityKey, setEntityKey, createType, setCreateType, companyName, setCompanyName, actionLoading, actionMessage, onAction }: {
+function ActionPanel({ message, candidates, selectedCandidate, entityKey, setEntityKey, entitySearch, setEntitySearch, createType, setCreateType, companyName, setCompanyName, actionLoading, actionMessage, onAction }: {
   message: InboxMessage;
   candidates: EntityCandidate[];
   selectedCandidate?: EntityCandidate;
   entityKey: string;
   setEntityKey: (value: string) => void;
+  entitySearch: string;
+  setEntitySearch: (value: string) => void;
   createType: EntityType;
   setCreateType: (value: EntityType) => void;
   companyName: string;
@@ -411,12 +416,30 @@ function ActionPanel({ message, candidates, selectedCandidate, entityKey, setEnt
   actionMessage: string | null;
   onAction: (messageId: string, payload: Record<string, unknown>, method?: "PATCH" | "POST") => void;
 }) {
+  const filteredCandidates = useMemo(() => {
+    const term = entitySearch.trim().toLowerCase();
+    const list = term
+      ? candidates.filter((candidate) => candidateLabel(candidate).toLowerCase().includes(term))
+      : candidates;
+    const limited = list.slice(0, 50);
+    if (selectedCandidate && !limited.some((candidate) => candidate.id === selectedCandidate.id && candidate.type === selectedCandidate.type)) {
+      return [selectedCandidate, ...limited];
+    }
+    return limited;
+  }, [candidates, entitySearch, selectedCandidate]);
+
   return (
     <section style={{ padding: "16px 28px", background: "rgba(255,255,255,0.9)", borderBottom: "1px solid #E6E9F3", display: "grid", gap: "10px" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1fr) 140px 112px", gap: "10px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(180px, 0.85fr) minmax(220px, 1.15fr) 140px 112px", gap: "10px" }}>
+        <input
+          value={entitySearch}
+          onChange={(e) => setEntitySearch(e.target.value)}
+          placeholder="Kontakt suchen…"
+          style={compactInput}
+        />
         <select value={entityKey} onChange={(e) => setEntityKey(e.target.value)} style={compactInput}>
           <option value="">Mit Lead / Kunde / Partner verknüpfen…</option>
-          {candidates.map((candidate) => <option key={`${candidate.type}:${candidate.id}`} value={`${candidate.type}:${candidate.id}`}>{candidateLabel(candidate)}</option>)}
+          {filteredCandidates.map((candidate) => <option key={`${candidate.type}:${candidate.id}`} value={`${candidate.type}:${candidate.id}`}>{candidateLabel(candidate)}</option>)}
         </select>
         <button
           disabled={!selectedCandidate || actionLoading}
@@ -427,6 +450,9 @@ function ActionPanel({ message, candidates, selectedCandidate, entityKey, setEnt
         </button>
         <button disabled={actionLoading} onClick={() => onAction(message.id, { action: "ignore" })} style={ghostButton}>Ignorieren</button>
       </div>
+      <p style={{ margin: "-2px 0 0", color: "#8A91A5", fontSize: "11px" }}>
+        {entitySearch.trim() ? `${filteredCandidates.length} Treffer angezeigt` : `${Math.min(candidates.length, 50)} von ${candidates.length} Kontakten angezeigt`}
+      </p>
       {message.match_status === "unmatched" && (
         <div style={{ display: "grid", gridTemplateColumns: "160px minmax(160px, 1fr) 180px", gap: "10px" }}>
           <select value={createType} onChange={(e) => setCreateType(e.target.value as EntityType)} style={compactInput}>
