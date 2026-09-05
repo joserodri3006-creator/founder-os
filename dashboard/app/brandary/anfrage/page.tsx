@@ -126,7 +126,7 @@ export default function BrandaryAnfrageFormular() {
       style={{
         fontFamily: "Arial, sans-serif",
         background: "#FAFAFB",
-        padding: 12,
+        padding: 0,
         boxSizing: "border-box",
       }}
     >
@@ -135,19 +135,19 @@ export default function BrandaryAnfrageFormular() {
           background: "#FAFAFB",
           border: "1px solid #E3E6EF",
           borderRadius: 26,
-          padding: 16,
+          padding: 14,
           display: "grid",
-          gap: 8,
+          gap: 6,
           maxWidth: 640,
           margin: "0 auto",
         }}
       >
-        <h3 style={{ fontSize: 17, margin: 0, color: "#15172F" }}>Nachricht schreiben</h3>
+        <h3 style={{ fontSize: 16, margin: 0, color: "#15172F" }}>Nachricht schreiben</h3>
 
         {done ? (
           <p style={{ fontSize: 15, color: "#15172F", margin: 0 }}>{status}</p>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: "grid", gap: 8 }}>
+          <form onSubmit={handleSubmit} style={{ display: "grid", gap: 6 }}>
             <input
               type="text"
               name="website_url"
@@ -160,7 +160,7 @@ export default function BrandaryAnfrageFormular() {
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                gap: 8,
+                gap: 6,
               }}
             >
               <label style={labelStyle}>
@@ -184,7 +184,7 @@ export default function BrandaryAnfrageFormular() {
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                gap: 8,
+                gap: 6,
                 alignItems: "start",
               }}
             >
@@ -221,9 +221,9 @@ export default function BrandaryAnfrageFormular() {
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
-                    gap: "4px 10px",
-                    marginTop: 6,
-                    fontSize: 13,
+                    gap: "3px 8px",
+                    marginTop: 5,
+                    fontSize: 12,
                     fontWeight: 600,
                     color: "#5D6478",
                   }}
@@ -248,7 +248,7 @@ export default function BrandaryAnfrageFormular() {
                 rows={2}
                 required
                 placeholder="Menge, Produkt, gewünschte Veredelung"
-                style={{ ...fieldStyle, lineHeight: 1.4 }}
+                style={{ ...fieldStyle, lineHeight: 1.3, marginTop: 4 }}
               />
             </label>
             <button
@@ -259,8 +259,8 @@ export default function BrandaryAnfrageFormular() {
                 background: "#151B4A",
                 color: "white",
                 borderRadius: 999,
-                padding: "11px 20px",
-                fontSize: 15,
+                padding: "9px 20px",
+                fontSize: 14,
                 fontWeight: 800,
                 cursor: pending ? "default" : "pointer",
                 opacity: pending ? 0.7 : 1,
