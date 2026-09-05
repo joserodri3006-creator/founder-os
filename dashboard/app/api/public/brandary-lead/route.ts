@@ -5,6 +5,7 @@ import { cleanText, enforcePublicRateLimit } from "@/lib/public-sales";
 const ALLOWED_ORIGINS = new Set([
   "https://bybrandary.de",
   "https://www.bybrandary.de",
+  "https://founder-os-theta.vercel.app",
 ]);
 
 function corsHeaders(req: NextRequest) {
