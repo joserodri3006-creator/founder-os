@@ -3,20 +3,20 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 const fieldStyle: React.CSSProperties = {
-  marginTop: 6,
+  marginTop: 5,
   width: "100%",
   boxSizing: "border-box",
   border: "1px solid #D8DCEC",
-  borderRadius: 14,
-  padding: 13,
-  fontSize: 16,
+  borderRadius: 12,
+  padding: 10,
+  fontSize: 15,
   background: "white",
   color: "#15172F",
   fontFamily: "Arial, sans-serif",
 };
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 14,
+  fontSize: 13,
   fontWeight: 800,
   color: "#15172F",
   display: "block",
@@ -135,23 +135,22 @@ export default function BrandaryAnfrageFormular() {
           background: "#FAFAFB",
           border: "1px solid #E3E6EF",
           borderRadius: 26,
-          padding: 24,
+          padding: 18,
           display: "grid",
-          gap: 14,
+          gap: 10,
           maxWidth: 640,
           margin: "0 auto",
         }}
       >
-        <h3 style={{ fontSize: 20, margin: 0, color: "#15172F" }}>Nachricht schreiben</h3>
-        <p style={{ fontSize: 16, color: "#5D6478", margin: 0 }}>
-          Ideal sind kurze Angaben zu Menge, Termin, Produkt oder Produktidee, gewünschter
-          Veredelung und ein Logo oder Datei Link.
+        <h3 style={{ fontSize: 18, margin: 0, color: "#15172F" }}>Nachricht schreiben</h3>
+        <p style={{ fontSize: 14, color: "#5D6478", margin: 0 }}>
+          Ideal sind kurze Angaben zu Menge, Termin, Produkt und Veredelung.
         </p>
 
         {done ? (
           <p style={{ fontSize: 15, color: "#15172F", margin: 0 }}>{status}</p>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: "grid", gap: 14 }}>
+          <form onSubmit={handleSubmit} style={{ display: "grid", gap: 10 }}>
             <input
               type="text"
               name="website_url"
@@ -163,8 +162,8 @@ export default function BrandaryAnfrageFormular() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: 14,
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: 10,
               }}
             >
               <label style={labelStyle}>
@@ -184,15 +183,15 @@ export default function BrandaryAnfrageFormular() {
                 <input name="phone" style={fieldStyle} />
               </label>
             </div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: "#15172F" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#15172F" }}>
               Was benötigen Sie?
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-                  gap: 8,
-                  marginTop: 8,
-                  fontSize: 15,
+                  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                  gap: 6,
+                  marginTop: 6,
+                  fontSize: 14,
                   fontWeight: 600,
                   color: "#5D6478",
                 }}
@@ -212,8 +211,8 @@ export default function BrandaryAnfrageFormular() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: 14,
+                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                gap: 10,
               }}
             >
               <label style={labelStyle}>
@@ -228,29 +227,29 @@ export default function BrandaryAnfrageFormular() {
                 </select>
               </label>
               <label style={labelStyle}>
-                Gewünschter Termin
+                Termin
                 <input
                   name="desired_date"
-                  placeholder="Zum Beispiel Eventdatum oder Wunschmonat"
+                  placeholder="Eventdatum / Monat"
+                  style={fieldStyle}
+                />
+              </label>
+              <label style={labelStyle}>
+                Logo Link
+                <input
+                  name="logo_url"
+                  placeholder="Drive / Dropbox Link"
                   style={fieldStyle}
                 />
               </label>
             </div>
             <label style={labelStyle}>
-              Logo oder Datei Link
-              <input
-                name="logo_url"
-                placeholder="Drive, Dropbox oder WeTransfer Link"
-                style={fieldStyle}
-              />
-            </label>
-            <label style={labelStyle}>
               Nachricht
               <textarea
                 name="message"
-                rows={5}
+                rows={3}
                 required
-                style={{ ...fieldStyle, lineHeight: 1.5 }}
+                style={{ ...fieldStyle, lineHeight: 1.4 }}
               />
             </label>
             <button
@@ -261,7 +260,7 @@ export default function BrandaryAnfrageFormular() {
                 background: "#151B4A",
                 color: "white",
                 borderRadius: 999,
-                padding: "14px 20px",
+                padding: "12px 20px",
                 fontSize: 15,
                 fontWeight: 800,
                 cursor: pending ? "default" : "pointer",
@@ -270,7 +269,7 @@ export default function BrandaryAnfrageFormular() {
             >
               {pending ? "Wird gesendet..." : "Projekt anfragen"}
             </button>
-            <p style={{ fontSize: 13, color: "#5D6478", margin: 0 }}>{status}</p>
+            <p style={{ fontSize: 12, color: "#5D6478", margin: 0 }}>{status}</p>
           </form>
         )}
       </div>
