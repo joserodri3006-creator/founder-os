@@ -22,6 +22,13 @@ const labelStyle: React.CSSProperties = {
   display: "block",
 };
 
+const twoColStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 8,
+  alignItems: "start",
+};
+
 const NEED_OPTIONS = ["Textilien", "Gravur", "Merch", "Werbemittel"];
 const QUANTITY_OPTIONS = ["10 bis 25", "25 bis 50", "50 bis 100", "100 plus"];
 
@@ -156,13 +163,7 @@ export default function BrandaryAnfrageFormular() {
               style={{ position: "absolute", left: -9999, opacity: 0 }}
               aria-hidden="true"
             />
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                gap: 6,
-              }}
-            >
+            <div style={twoColStyle}>
               <label style={labelStyle}>
                 Name
                 <input name="name" required style={fieldStyle} />
@@ -171,6 +172,8 @@ export default function BrandaryAnfrageFormular() {
                 Unternehmen
                 <input name="company_name" style={fieldStyle} />
               </label>
+            </div>
+            <div style={twoColStyle}>
               <label style={labelStyle}>
                 E Mail
                 <input type="email" name="email" required style={fieldStyle} />
@@ -180,14 +183,7 @@ export default function BrandaryAnfrageFormular() {
                 <input name="phone" style={fieldStyle} />
               </label>
             </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-                gap: 6,
-                alignItems: "start",
-              }}
-            >
+            <div style={twoColStyle}>
               <label style={labelStyle}>
                 Stückzahl
                 <select name="quantity" required style={fieldStyle}>
@@ -207,6 +203,8 @@ export default function BrandaryAnfrageFormular() {
                   style={fieldStyle}
                 />
               </label>
+            </div>
+            <div style={twoColStyle}>
               <label style={labelStyle}>
                 Logo Link
                 <input
@@ -219,11 +217,11 @@ export default function BrandaryAnfrageFormular() {
                 Bedarf
                 <div
                   style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "3px 8px",
-                    marginTop: 5,
-                    fontSize: 12,
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "4px 8px",
+                    marginTop: 8,
+                    fontSize: 13,
                     fontWeight: 600,
                     color: "#5D6478",
                   }}
