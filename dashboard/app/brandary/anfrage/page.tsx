@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 const fieldStyle: React.CSSProperties = {
   marginTop: 6,
@@ -32,6 +32,8 @@ export default function BrandaryAnfrageFormular() {
     "Die Anfrage wird in Brandary Leads gespeichert und per E Mail bestätigt."
   );
   const [done, setDone] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lastHeightRef = useRef(0);
 
   function toggleNeed(value: string) {
     setNeed((current) =>
@@ -40,11 +42,19 @@ export default function BrandaryAnfrageFormular() {
   }
 
   function postHeight() {
-    // Inform the embedding page (Brandary website) of the current height,
-    // so the iframe can size itself instead of showing scrollbars or a
-    // large empty gap.
-    const height = document.documentElement.scrollHeight;
-    window.parent?.postMessage({ type: "brandary-form-height", height }, "*");
+    // Measure only the actual content box, never document.documentElement.
+    // document.documentElement.scrollHeight inside an iframe is circular with
+    // the iframe's own assigned height (parent grows iframe -> viewport grows
+    // -> scrollHeight grows -> parent grows iframe again), which causes an
+    // unbounded runaway feedback loop. Measuring the fixed content wrapper's
+    // own bounding height breaks that cycle. A hard cap is kept as a second
+    // safety net in case any future change reintroduces circularity.
+    const height = containerRef.current?.getBoundingClientRect().height;
+    if (!height) return;
+    const rounded = Math.min(Math.ceil(height), 2000);
+    if (Math.abs(rounded - lastHeightRef.current) < 2) return; // no real change, stop the loop
+    lastHeightRef.current = rounded;
+    window.parent?.postMessage({ type: "brandary-form-height", height: rounded }, "*");
   }
 
   useEffect(() => {
@@ -53,9 +63,9 @@ export default function BrandaryAnfrageFormular() {
     window.addEventListener("resize", postHeight);
 
     let observer: ResizeObserver | undefined;
-    if (typeof ResizeObserver !== "undefined") {
+    if (typeof ResizeObserver !== "undefined" && containerRef.current) {
       observer = new ResizeObserver(() => postHeight());
-      observer.observe(document.documentElement);
+      observer.observe(containerRef.current);
     }
 
     return () => {
@@ -112,6 +122,7 @@ export default function BrandaryAnfrageFormular() {
 
   return (
     <div
+      ref={containerRef}
       style={{
         fontFamily: "Arial, sans-serif",
         background: "#FAFAFB",
