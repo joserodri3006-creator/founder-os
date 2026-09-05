@@ -12,10 +12,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const isAuthPage = SHELL_FREE_PATHS.some((p) => pathname?.startsWith(p));
 
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Backdrop for mobile sidebar */}
-      {mobileOpen && !isAuthPage && (
+      {mobileOpen && (
         <div
           className="fixed inset-0 z-30 md:hidden"
           style={{ background: "rgba(0,0,0,0.55)" }}
