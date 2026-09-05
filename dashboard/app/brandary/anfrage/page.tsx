@@ -126,7 +126,7 @@ export default function BrandaryAnfrageFormular() {
       style={{
         fontFamily: "Arial, sans-serif",
         background: "#FAFAFB",
-        padding: 24,
+        padding: 12,
         boxSizing: "border-box",
       }}
     >
@@ -135,22 +135,19 @@ export default function BrandaryAnfrageFormular() {
           background: "#FAFAFB",
           border: "1px solid #E3E6EF",
           borderRadius: 26,
-          padding: 18,
+          padding: 16,
           display: "grid",
-          gap: 10,
+          gap: 8,
           maxWidth: 640,
           margin: "0 auto",
         }}
       >
-        <h3 style={{ fontSize: 18, margin: 0, color: "#15172F" }}>Nachricht schreiben</h3>
-        <p style={{ fontSize: 14, color: "#5D6478", margin: 0 }}>
-          Ideal sind kurze Angaben zu Menge, Termin, Produkt und Veredelung.
-        </p>
+        <h3 style={{ fontSize: 17, margin: 0, color: "#15172F" }}>Nachricht schreiben</h3>
 
         {done ? (
           <p style={{ fontSize: 15, color: "#15172F", margin: 0 }}>{status}</p>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: "grid", gap: 10 }}>
+          <form onSubmit={handleSubmit} style={{ display: "grid", gap: 8 }}>
             <input
               type="text"
               name="website_url"
@@ -162,8 +159,8 @@ export default function BrandaryAnfrageFormular() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: 10,
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: 8,
               }}
             >
               <label style={labelStyle}>
@@ -183,36 +180,12 @@ export default function BrandaryAnfrageFormular() {
                 <input name="phone" style={fieldStyle} />
               </label>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#15172F" }}>
-              Was benötigen Sie?
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-                  gap: 6,
-                  marginTop: 6,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: "#5D6478",
-                }}
-              >
-                {NEED_OPTIONS.map((option) => (
-                  <label key={option}>
-                    <input
-                      type="checkbox"
-                      checked={need.includes(option)}
-                      onChange={() => toggleNeed(option)}
-                    />{" "}
-                    {option}
-                  </label>
-                ))}
-              </div>
-            </div>
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-                gap: 10,
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: 8,
+                alignItems: "start",
               }}
             >
               <label style={labelStyle}>
@@ -242,13 +215,39 @@ export default function BrandaryAnfrageFormular() {
                   style={fieldStyle}
                 />
               </label>
+              <div style={labelStyle}>
+                Bedarf
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "4px 10px",
+                    marginTop: 6,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#5D6478",
+                  }}
+                >
+                  {NEED_OPTIONS.map((option) => (
+                    <label key={option} style={{ whiteSpace: "nowrap" }}>
+                      <input
+                        type="checkbox"
+                        checked={need.includes(option)}
+                        onChange={() => toggleNeed(option)}
+                      />{" "}
+                      {option}
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
             <label style={labelStyle}>
               Nachricht
               <textarea
                 name="message"
-                rows={3}
+                rows={2}
                 required
+                placeholder="Menge, Produkt, gewünschte Veredelung"
                 style={{ ...fieldStyle, lineHeight: 1.4 }}
               />
             </label>
@@ -260,7 +259,7 @@ export default function BrandaryAnfrageFormular() {
                 background: "#151B4A",
                 color: "white",
                 borderRadius: 999,
-                padding: "12px 20px",
+                padding: "11px 20px",
                 fontSize: 15,
                 fontWeight: 800,
                 cursor: pending ? "default" : "pointer",
@@ -269,7 +268,7 @@ export default function BrandaryAnfrageFormular() {
             >
               {pending ? "Wird gesendet..." : "Projekt anfragen"}
             </button>
-            <p style={{ fontSize: 12, color: "#5D6478", margin: 0 }}>{status}</p>
+            <p style={{ fontSize: 11, color: "#5D6478", margin: 0 }}>{status}</p>
           </form>
         )}
       </div>
