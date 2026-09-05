@@ -41,18 +41,27 @@ export default function BrandaryAnfrageFormular() {
 
   function postHeight() {
     // Inform the embedding page (Brandary website) of the current height,
-    // so the iframe can size itself instead of showing scrollbars.
+    // so the iframe can size itself instead of showing scrollbars or a
+    // large empty gap.
     const height = document.documentElement.scrollHeight;
     window.parent?.postMessage({ type: "brandary-form-height", height }, "*");
   }
 
   useEffect(() => {
     postHeight();
-    const timer = setTimeout(postHeight, 200);
+    const timers = [50, 200, 500, 1000].map((delay) => setTimeout(postHeight, delay));
     window.addEventListener("resize", postHeight);
+
+    let observer: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(() => postHeight());
+      observer.observe(document.documentElement);
+    }
+
     return () => {
-      clearTimeout(timer);
+      timers.forEach(clearTimeout);
       window.removeEventListener("resize", postHeight);
+      observer?.disconnect();
     };
   }, [need, done, pending]);
 
@@ -140,22 +149,30 @@ export default function BrandaryAnfrageFormular() {
               style={{ position: "absolute", left: -9999, opacity: 0 }}
               aria-hidden="true"
             />
-            <label style={labelStyle}>
-              Name
-              <input name="name" required style={fieldStyle} />
-            </label>
-            <label style={labelStyle}>
-              Unternehmen
-              <input name="company_name" style={fieldStyle} />
-            </label>
-            <label style={labelStyle}>
-              E Mail
-              <input type="email" name="email" required style={fieldStyle} />
-            </label>
-            <label style={labelStyle}>
-              Telefon
-              <input name="phone" style={fieldStyle} />
-            </label>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 14,
+              }}
+            >
+              <label style={labelStyle}>
+                Name
+                <input name="name" required style={fieldStyle} />
+              </label>
+              <label style={labelStyle}>
+                Unternehmen
+                <input name="company_name" style={fieldStyle} />
+              </label>
+              <label style={labelStyle}>
+                E Mail
+                <input type="email" name="email" required style={fieldStyle} />
+              </label>
+              <label style={labelStyle}>
+                Telefon
+                <input name="phone" style={fieldStyle} />
+              </label>
+            </div>
             <div style={{ fontSize: 14, fontWeight: 800, color: "#15172F" }}>
               Was benötigen Sie?
               <div
@@ -181,25 +198,33 @@ export default function BrandaryAnfrageFormular() {
                 ))}
               </div>
             </div>
-            <label style={labelStyle}>
-              Stückzahl
-              <select name="quantity" required style={fieldStyle}>
-                <option value="">Bitte auswählen</option>
-                {QUANTITY_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label style={labelStyle}>
-              Gewünschter Termin
-              <input
-                name="desired_date"
-                placeholder="Zum Beispiel Eventdatum oder Wunschmonat"
-                style={fieldStyle}
-              />
-            </label>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 14,
+              }}
+            >
+              <label style={labelStyle}>
+                Stückzahl
+                <select name="quantity" required style={fieldStyle}>
+                  <option value="">Bitte auswählen</option>
+                  {QUANTITY_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={labelStyle}>
+                Gewünschter Termin
+                <input
+                  name="desired_date"
+                  placeholder="Zum Beispiel Eventdatum oder Wunschmonat"
+                  style={fieldStyle}
+                />
+              </label>
+            </div>
             <label style={labelStyle}>
               Logo oder Datei Link
               <input
