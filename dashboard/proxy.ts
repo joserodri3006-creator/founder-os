@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PAGE_PREFIXES = ["/login", "/auth", "/invite", "/online-first"];
+const PUBLIC_PAGE_PREFIXES = ["/login", "/auth", "/invite", "/online-first", "/brandary"];
 const PUBLIC_API_PREFIXES = ["/api/invite", "/api/public"];
 
 type PermissionLevel = "edit" | "view" | "none";
