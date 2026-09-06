@@ -29,6 +29,25 @@ type Message = {
   remote_deleted_at: string | null;
 };
 
+type WhatsAppStatus = {
+  configured: boolean;
+  bridge_status: "stopped" | "queued" | "running" | "not_migrated" | string;
+  queued_or_running?: number;
+  latest_run?: {
+    id: string;
+    action: string;
+    status: string;
+    params: Record<string, unknown>;
+    result: Record<string, unknown>;
+    error: string | null;
+    queued_at: string;
+    started_at: string | null;
+    finished_at: string | null;
+  } | null;
+  read_receipts?: boolean;
+  note?: string;
+};
+
 function fmt(ts: string | null) {
   if (!ts) return "—";
   const d = new Date(ts);
@@ -51,6 +70,8 @@ export default function PrivateMessagesPage() {
   const [replyText, setReplyText] = useState("");
   const [loading, setLoading] = useState(true);
   const [threadLoading, setThreadLoading] = useState(false);
+  const [waStatus, setWaStatus] = useState<WhatsAppStatus | null>(null);
+  const [waBusy, setWaBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,7 +111,59 @@ export default function PrivateMessagesPage() {
     }
   }
 
+  async function loadWhatsAppStatus() {
+    try {
+      const res = await fetch("/api/private-os/whatsapp/status");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "WhatsApp-Status konnte nicht geladen werden.");
+      setWaStatus(data);
+    } catch (err) {
+      setWaStatus({ configured: false, bridge_status: "error", note: err instanceof Error ? err.message : "WhatsApp-Status nicht verfügbar" });
+    }
+  }
+
+  async function queueWhatsAppRun(mode: "sync" | "history_sync") {
+    setWaBusy(true);
+    setStatus(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/private-os/whatsapp/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mode === "history_sync"
+          ? { mode, history_days: 2, duration_seconds: 90 }
+          : { mode, duration_seconds: 45 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "WhatsApp-Sync konnte nicht gestartet werden.");
+      setStatus(mode === "history_sync" ? "Experimenteller WhatsApp-History-Sync wurde eingereiht." : "WhatsApp-Abruf wurde eingereiht.");
+      await loadWhatsAppStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "WhatsApp-Sync konnte nicht gestartet werden.");
+    } finally {
+      setWaBusy(false);
+    }
+  }
+
+  async function queueWhatsAppStop() {
+    setWaBusy(true);
+    setStatus(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/private-os/whatsapp/stop", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "WhatsApp-Bridge konnte nicht gestoppt werden.");
+      setStatus("Bridge-Stopp wurde eingereiht.");
+      await loadWhatsAppStatus();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "WhatsApp-Bridge konnte nicht gestoppt werden.");
+    } finally {
+      setWaBusy(false);
+    }
+  }
+
   useEffect(() => { if (!authLoading && user?.role === "founder") void loadThreads(); }, [provider, trackedOnly, authLoading, user?.role]);
+  useEffect(() => { if (!authLoading && user?.role === "founder") void loadWhatsAppStatus(); }, [authLoading, user?.role]);
   useEffect(() => { if (selectedId && user?.role === "founder") void loadMessages(selectedId); else setMessages([]); }, [selectedId, user?.role]);
 
   const selected = useMemo(() => threads.find((t) => t.id === selectedId) ?? null, [threads, selectedId]);
@@ -147,6 +220,31 @@ export default function PrivateMessagesPage() {
           <p className="text-sm mt-1" style={{ color: "#6B7280" }}>Instagram-first Thread-Ansicht für gespeicherte Kontakte. Antworten und Löschungen werden nur als Aktionen vorgemerkt.</p>
         </div>
         <button onClick={() => void loadThreads()} style={ghostButton}>Aktualisieren</button>
+      </div>
+
+      <div className="rounded-2xl p-4 mb-5" style={{ background: "#FFFFFF", border: "1px solid #D1D5E8", boxShadow: "0 2px 12px rgba(27,42,94,0.06)" }}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <p className="uppercase tracking-[0.18em] text-[11px] font-semibold" style={{ color: "#25D366" }}>WhatsApp On-Demand</p>
+            <h2 className="mt-1 text-lg font-semibold" style={{ color: "#14193A" }}>Bridge nur zeitweise aktivieren</h2>
+            <p className="text-sm mt-1 max-w-3xl" style={{ color: "#6B7280" }}>
+              Status: <strong>{waStatus?.bridge_status ?? "lädt…"}</strong> · Read Receipts bleiben aus. Der Button legt einen lokalen Worker-Run an; danach wird die Bridge wieder gestoppt.
+            </p>
+            {waStatus?.latest_run && (
+              <p className="text-xs mt-2" style={{ color: "#6B7280" }}>
+                Letzter Run: {waStatus.latest_run.action} · {waStatus.latest_run.status} · {fmt(waStatus.latest_run.finished_at ?? waStatus.latest_run.started_at ?? waStatus.latest_run.queued_at)}
+                {typeof waStatus.latest_run.result?.stored === "number" ? ` · ${waStatus.latest_run.result.stored} gespeichert` : ""}
+                {waStatus.latest_run.error ? ` · Fehler: ${waStatus.latest_run.error}` : ""}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-2 flex-wrap justify-end">
+            <button disabled={waBusy} onClick={() => void loadWhatsAppStatus()} style={ghostButton}>Status prüfen</button>
+            <button disabled={waBusy} onClick={() => void queueWhatsAppRun("sync")} style={primaryButton}>Jetzt WhatsApp abrufen</button>
+            <button disabled={waBusy} onClick={() => void queueWhatsAppRun("history_sync")} style={ghostButton}>letzte 2 Tage versuchen</button>
+            <button disabled={waBusy} onClick={() => void queueWhatsAppStop()} style={ghostButton}>Bridge stoppen</button>
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-2.5 mb-5 items-center flex-wrap p-3 rounded-xl" style={{ background: "#FFFFFF", border: "1px solid #D1D5E8" }}>
