@@ -314,7 +314,7 @@ def handle_run(sb: Supabase, run: dict[str, Any], port: int) -> dict[str, Any]:
         return result
 
     duration = int(params.get('duration_seconds') or DEFAULT_DURATION)
-    duration = max(10, min(duration, 180))
+    duration = max(10, min(duration, 300))
     store_untracked = bool(params.get('store_untracked'))
     include_groups = bool(params.get('include_groups'))
     history_days = int(params.get('history_days') or (2 if action == 'history_sync' else 0))
