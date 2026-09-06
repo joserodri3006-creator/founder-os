@@ -98,18 +98,34 @@ Worker:
 
 - `scripts/private_os_whatsapp_worker.py`
 
+Bei jedem Run:
+
+1. holt den nächsten `queued` Eintrag aus `private_os_whatsapp_sync_runs`
+2. startet die Baileys-Bridge nur temporär
+3. liest den **aktuellen** Online-Sichtbarkeits-Wert (`fetchPrivacySettings`) — rät ihn nie
+4. setzt die Sichtbarkeit für das Sync-Fenster auf `match_last_seen` (kein Live-"online"-Badge)
+5. sammelt Events für das gewählte Zeitfenster, speichert nur freigegebene Kontakte
+6. verarbeitet offene `reply`/`delete_local`-Aktionen
+7. **stellt die ursprüngliche Online-Sichtbarkeit garantiert wieder her** (auch im Fehlerfall, im `finally`-Block)
+8. stoppt die Bridge
+
+Neue Bridge-Endpunkte (lokal in `/opt/data/scripts/whatsapp-bridge/bridge.js`, nicht Teil dieses Repos):
+
+- `GET /privacy` — aktuelle Privacy-Settings inkl. `online`
+- `POST /privacy/online` — setzt `all` oder `match_last_seen`
+
 Dashboard-Buttons:
 
 - **Status prüfen** — liest den letzten Run aus `private_os_whatsapp_sync_runs`
-- **Jetzt WhatsApp abrufen** — queued einen kurzen Live-Sync; Worker startet Bridge, sammelt Events, stoppt Bridge
-- **letzte 2 Tage versuchen** — queued einen experimentellen History-Sync; aktuell nutzt er dasselbe sichere Sync-Fenster und dokumentiert im Run-Ergebnis, ob echte Retro-History verfügbar war
+- **Jetzt WhatsApp abrufen** — queued einen kurzen Sync; holt zugestellte, aber noch nicht an diese Bridge-Session ausgelieferte Nachrichten für freigegebene Kontakte (siehe Hinweis unten)
+- **letzte 2 Tage versuchen** — queued einen Sync mit längerem Zeitfenster; markiert im Ergebnis, ob ein nennenswerter Rückstand einging
 - **Bridge stoppen** — queued einen Stop-Run für lokale Bridge-Prozesse
 
-Wichtige Grenze:
+Wichtiger Hinweis zu "welche Nachrichten kommen zurück":
 
-- Die vorhandene Hermes/Baileys Bridge hat einen Live-Queue-Endpunkt `/messages`, aber keinen stabilen `/history?since=...` Endpunkt.
-- Deshalb ist „letzte 2 Tage“ als **Experiment** umgesetzt, nicht als Garantie.
-- Wenn Baileys später einen stabilen History-Zugriff liefert, wird dieser Modus im Worker erweitert, ohne UI/Datenmodell zu ändern.
+- Beim (Re-)Verbinden liefert WhatsApp der Bridge-Session einen **Zustellungs-Rückstand**: Nachrichten, die bereits verschickt, aber noch nicht an dieses verknüpfte Gerät ausgeliefert wurden — nicht nur Nachrichten, die exakt während des offenen Sync-Fensters neu eintreffen. Bestätigt durch echten Test: Ältere Reaktionen/Sticker eines Kontakts kamen beim Reconnect zurück, obwohl der Kontakt währenddessen nicht neu geschrieben hat.
+- Die Größe/der Zeitraum dieses Rückstands wird von WhatsApp serverseitig bestimmt und ist nicht dokumentiert oder garantiert — es ist kein Datums-Filter, den wir setzen können.
+- Die Bridge hat **keinen stabilen `/history?since=...`-Endpunkt**. „Letzte 2 Tage“ ist deshalb weiterhin als **Experiment** markiert, nicht als Garantie — der Run dokumentiert im Ergebnis, was tatsächlich einging.
 
 Empfohlene lokale Automatisierung:
 

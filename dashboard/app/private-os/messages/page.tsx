@@ -228,7 +228,7 @@ export default function PrivateMessagesPage() {
             <p className="uppercase tracking-[0.18em] text-[11px] font-semibold" style={{ color: "#25D366" }}>WhatsApp On-Demand</p>
             <h2 className="mt-1 text-lg font-semibold" style={{ color: "#14193A" }}>Bridge nur zeitweise aktivieren</h2>
             <p className="text-sm mt-1 max-w-3xl" style={{ color: "#6B7280" }}>
-              Status: <strong>{waStatus?.bridge_status ?? "lädt…"}</strong> · Read Receipts bleiben aus. Der Button legt einen lokalen Worker-Run an; danach wird die Bridge wieder gestoppt.
+              Status: <strong>{waStatus?.bridge_status ?? "lädt…"}</strong> · Online-Status wird während des Sync-Fensters automatisch versteckt und danach zurückgesetzt. Bridge läuft nur temporär.
             </p>
             {waStatus?.latest_run && (
               <p className="text-xs mt-2" style={{ color: "#6B7280" }}>

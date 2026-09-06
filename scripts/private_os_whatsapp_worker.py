@@ -160,6 +160,28 @@ def wait_connected(port: int, timeout_s: int = 25) -> dict[str, Any]:
     return last
 
 
+def get_online_privacy(port: int) -> str | None:
+    """Read the current 'online' visibility setting, if the bridge exposes it.
+
+    Returns None (rather than guessing) when the setting can't be read, so the
+    caller never restores a made-up default.
+    """
+    try:
+        data = http_json('GET', f'http://127.0.0.1:{port}/privacy', timeout=8)
+        settings = (data or {}).get('settings') or {}
+        return settings.get('online')
+    except Exception:
+        return None
+
+
+def set_online_privacy(port: int, value: str) -> bool:
+    try:
+        http_json('POST', f'http://127.0.0.1:{port}/privacy/online', {'value': value}, timeout=8)
+        return True
+    except Exception:
+        return False
+
+
 def event_time(event: dict[str, Any]) -> str:
     ts: Any = event.get('timestamp')
     try:
@@ -300,11 +322,26 @@ def handle_run(sb: Supabase, run: dict[str, Any], port: int) -> dict[str, Any]:
     sb.patch('private_os_whatsapp_sync_runs', f'id=eq.{rid}', {'status': 'running', 'started_at': utc_now(), 'result': {'bridge': 'starting'}})
     proc = start_bridge(port)
     result: dict[str, Any] = {'mode': action, 'duration_seconds': duration, 'history_days_requested': history_days, 'bridge_health': None, 'events': 0, 'stored': 0, 'skipped': {}, 'actions': {}}
+    original_online_privacy: str | None = None
+    privacy_hidden = False
     try:
         health = wait_connected(port)
         result['bridge_health'] = health
         if health.get('status') != 'connected':
             raise RuntimeError(f'WhatsApp bridge connected nicht: {health}')
+
+        # Hide online-status for the duration of this sync window only.
+        # Read the real current value first — never assume a default — so we
+        # restore exactly what the user had configured, not a guess.
+        original_online_privacy = get_online_privacy(port)
+        result['online_privacy_before'] = original_online_privacy
+        if original_online_privacy is not None:
+            privacy_hidden = set_online_privacy(port, 'match_last_seen')
+            result['online_privacy_hidden'] = privacy_hidden
+        else:
+            result['online_privacy_hidden'] = False
+            result['online_privacy_note'] = 'Privacy-Setting konnte nicht gelesen werden; Online-Status wurde nicht verändert (safe default: nichts raten).'
+
         if action == 'history_sync':
             # Baileys/Hermes bridge exposes live queue endpoints only. This run keeps
             # the naming explicit and records that true retro-history is experimental.
@@ -342,6 +379,15 @@ def handle_run(sb: Supabase, run: dict[str, Any], port: int) -> dict[str, Any]:
         sb.patch('private_os_whatsapp_sync_runs', f'id=eq.{rid}', {'status': 'error', 'finished_at': utc_now(), 'result': result, 'error': str(exc)[:500]})
         raise
     finally:
+        # Restore the user's original online-visibility before the bridge
+        # goes away — this must run even if the sync itself failed above.
+        if privacy_hidden and original_online_privacy is not None:
+            try:
+                restored = set_online_privacy(port, original_online_privacy)
+                result['online_privacy_restored'] = restored
+                result['online_privacy_restored_to'] = original_online_privacy
+            except Exception as restore_exc:
+                result['online_privacy_restore_error'] = str(restore_exc)[:300]
         try:
             proc.terminate()
             proc.wait(timeout=5)
@@ -351,6 +397,12 @@ def handle_run(sb: Supabase, run: dict[str, Any], port: int) -> dict[str, Any]:
             except Exception:
                 pass
         stop_bridge()
+        # Persist the final privacy-restore outcome even on the error path,
+        # where the earlier except-block already wrote result without it.
+        try:
+            sb.patch('private_os_whatsapp_sync_runs', f'id=eq.{rid}', {'result': result})
+        except Exception:
+            pass
 
 
 def main() -> int:
