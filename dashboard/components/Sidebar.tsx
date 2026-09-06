@@ -34,6 +34,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
   const navSections = [
     {
       items: [
+        { href: "/private-os/messages", label: "Private OS", show: user?.role === "founder" },
         { href: "/dashboard", label: "Dashboard", show: true },
         { href: "/jarvis", label: "Jarvis", show: user?.role === "founder" },
         { href: "/jarvis/memory", label: "Jarvis-Gedächtnis", show: user?.role === "founder" },
