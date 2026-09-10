@@ -127,35 +127,50 @@ export default function AufgabenPage() {
     }
   }
 
-  // Reihenfolge per Drag & Drop (Liste und Pipeline): kompletten Task-Array vor dem
-  // Drag snapshotten, betroffene Aufgabe neben ihre neuen Nachbarn einsortieren und
-  // den ganzen (im Client ohnehin geladenen) Array komplett neu durchnummerieren.
-  // Nur die tatsächlich geänderten Zeilen gehen an den Server; bei Fehlschlag wird
-  // der Snapshot zurückgesetzt (gleiches Prinzip wie bei updateTaskStatus, nur für
-  // den ganzen Array statt ein Feld).
+  function taskGroupRank(task: Task) {
+    return task.status === "done" ? 1 : 0;
+  }
+
+  function compareManualOrder(a: Task, b: Task) {
+    return taskGroupRank(a) - taskGroupRank(b) || a.sort_order - b.sort_order;
+  }
+
+  // Reihenfolge per Drag & Drop: komplette Aufgabenliste nach der manuellen
+  // sort_order aufbauen, die betroffene Aufgabe innerhalb ihrer Gruppe
+  // einsortieren und danach alles neu durchnummerieren. Erledigte Aufgaben
+  // bleiben visuell und persistiert immer unten in ihrer eigenen Gruppe.
   function handleReorder(taskId: string, afterId: string | null, beforeId: string | null, newStatus?: Task["status"]) {
     const previousTasks = tasks;
     const moved = tasks.find(t => t.id === taskId);
     if (!moved) return;
-    const rest = tasks.filter(t => t.id !== taskId);
+
+    const updatedMoved = newStatus ? { ...moved, status: newStatus } : moved;
+    const orderedRest = tasks
+      .filter(t => t.id !== taskId)
+      .sort(compareManualOrder);
+    const targetIsDone = updatedMoved.status === "done";
+    const otherGroup = orderedRest.filter(t => (t.status === "done") !== targetIsDone);
+    const targetGroup = orderedRest.filter(t => (t.status === "done") === targetIsDone);
 
     let insertAt: number;
     if (afterId) {
-      const idx = rest.findIndex(t => t.id === afterId);
-      insertAt = idx >= 0 ? idx + 1 : rest.length;
+      const idx = targetGroup.findIndex(t => t.id === afterId);
+      insertAt = idx >= 0 ? idx + 1 : targetGroup.length;
     } else if (beforeId) {
-      const idx = rest.findIndex(t => t.id === beforeId);
-      insertAt = idx >= 0 ? idx : rest.length;
+      const idx = targetGroup.findIndex(t => t.id === beforeId);
+      insertAt = idx >= 0 ? idx : targetGroup.length;
     } else {
       insertAt = 0;
     }
 
-    const updatedMoved = newStatus ? { ...moved, status: newStatus } : moved;
-    const next = [...rest.slice(0, insertAt), updatedMoved, ...rest.slice(insertAt)]
-      .map((t, i) => ({ ...t, sort_order: i }));
+    const nextTargetGroup = [...targetGroup.slice(0, insertAt), updatedMoved, ...targetGroup.slice(insertAt)];
+    const next = targetIsDone
+      ? [...otherGroup, ...nextTargetGroup]
+      : [...nextTargetGroup, ...otherGroup];
+    const renumbered = next.map((t, i) => ({ ...t, sort_order: i }));
 
-    setTasks(next);
-    persistReorder(previousTasks, next);
+    setTasks(renumbered);
+    persistReorder(previousTasks, renumbered);
   }
 
   async function persistReorder(previousTasks: Task[], updatedTasks: Task[]) {
@@ -193,7 +208,7 @@ export default function AufgabenPage() {
 
   const listFiltered = baseFiltered
     .filter(t => status === "alle" || t.status === status)
-    .sort((a, b) => a.sort_order - b.sort_order);
+    .sort(compareManualOrder);
 
   return (
     <div className="px-4 py-5 sm:p-8 max-w-4xl mx-auto">

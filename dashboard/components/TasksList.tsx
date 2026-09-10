@@ -66,14 +66,17 @@ export default function TasksList({ tasks, members, editingId, onStatusChange, o
   );
 
   const memberName = (id: string | null) => members.find(m => m.user_id === id)?.name ?? null;
+  const activeTasks = tasks.filter(t => t.status !== "done");
+  const doneTasks = tasks.filter(t => t.status === "done");
+  const showDoneGroup = activeTasks.length > 0 && doneTasks.length > 0;
 
-  function handleDragEnd(event: DragEndEvent) {
+  function handleDragEnd(groupTasks: ListTask[], event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const oldIndex = tasks.findIndex(t => t.id === active.id);
-    const newIndex = tasks.findIndex(t => t.id === over.id);
+    const oldIndex = groupTasks.findIndex(t => t.id === active.id);
+    const newIndex = groupTasks.findIndex(t => t.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
-    const reordered = arrayMove(tasks, oldIndex, newIndex);
+    const reordered = arrayMove(groupTasks, oldIndex, newIndex);
     const idx = reordered.findIndex(t => t.id === active.id);
     onReorder(
       String(active.id),
@@ -82,30 +85,49 @@ export default function TasksList({ tasks, members, editingId, onStatusChange, o
     );
   }
 
+  function renderSortableGroup(groupTasks: ListTask[], groupLabel?: string) {
+    if (groupTasks.length === 0) return null;
+    return (
+      <div className="space-y-2">
+        {groupLabel && (
+          <div className="pt-4 mt-3 border-t border-gray-100">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+              {groupLabel} <span className="font-normal">({groupTasks.length})</span>
+            </p>
+          </div>
+        )}
+        <DndContext sensors={sensors} onDragEnd={(event) => handleDragEnd(groupTasks, event)}>
+          <SortableContext items={groupTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {groupTasks.map(task => (
+                editingId === task.id ? (
+                  <TaskEditForm key={task.id} task={task} members={members} onDone={onEditDone} onCancel={onEditCancel} />
+                ) : (
+                  <SortableTaskRow
+                    key={task.id}
+                    task={task}
+                    assigneeName={memberName(task.assigned_to)}
+                    onStatusChange={(s) => onStatusChange(task, s)}
+                    onEdit={() => onEdit(task.id)}
+                    onCopy={() => onCopy(task.id)}
+                    onDelete={() => onDelete(task.id)}
+                    canMoveBetweenVentures={canMoveBetweenVentures}
+                    onMoveToVenture={(targetVenture) => onMoveToVenture?.(task, targetVenture)}
+                  />
+                )
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      </div>
+    );
+  }
+
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-        <div className="space-y-2">
-          {tasks.map(task => (
-            editingId === task.id ? (
-              <TaskEditForm key={task.id} task={task} members={members} onDone={onEditDone} onCancel={onEditCancel} />
-            ) : (
-              <SortableTaskRow
-                key={task.id}
-                task={task}
-                assigneeName={memberName(task.assigned_to)}
-                onStatusChange={(s) => onStatusChange(task, s)}
-                onEdit={() => onEdit(task.id)}
-                onCopy={() => onCopy(task.id)}
-                onDelete={() => onDelete(task.id)}
-                canMoveBetweenVentures={canMoveBetweenVentures}
-                onMoveToVenture={(targetVenture) => onMoveToVenture?.(task, targetVenture)}
-              />
-            )
-          ))}
-        </div>
-      </SortableContext>
-    </DndContext>
+    <div className="space-y-2">
+      {renderSortableGroup(activeTasks)}
+      {renderSortableGroup(doneTasks, showDoneGroup ? "Erledigte Aufgaben" : undefined)}
+    </div>
   );
 }
 
