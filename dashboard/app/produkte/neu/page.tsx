@@ -35,6 +35,15 @@ export default function NeuesProduktPage() {
     compare_at_price: "",
     cost_price: "",
     status: "draft",
+    source_type: "own",
+    affiliate_network: "",
+    affiliate_merchant: "",
+    affiliate_url: "",
+    affiliate_commission_rate: "",
+    affiliate_commission_type: "percent",
+    affiliate_cookie_days: "",
+    affiliate_status: "pending",
+    affiliate_notes: "",
     is_featured: false,
     track_inventory: false,
     weight: "",
@@ -97,8 +106,17 @@ export default function NeuesProduktPage() {
       compare_at_price: form.compare_at_price ? parseFloat(form.compare_at_price) : null,
       cost_price: form.cost_price ? parseFloat(form.cost_price) : null,
       status,
+      source_type: form.source_type,
+      affiliate_network: form.source_type === "affiliate" ? form.affiliate_network.trim() || null : null,
+      affiliate_merchant: form.source_type === "affiliate" ? form.affiliate_merchant.trim() || null : null,
+      affiliate_url: form.source_type === "affiliate" ? form.affiliate_url.trim() || null : null,
+      affiliate_commission_rate: form.source_type === "affiliate" && form.affiliate_commission_rate ? parseFloat(form.affiliate_commission_rate) : null,
+      affiliate_commission_type: form.source_type === "affiliate" ? form.affiliate_commission_type : "percent",
+      affiliate_cookie_days: form.source_type === "affiliate" && form.affiliate_cookie_days ? parseInt(form.affiliate_cookie_days) : null,
+      affiliate_status: form.source_type === "affiliate" ? form.affiliate_status : "pending",
+      affiliate_notes: form.source_type === "affiliate" ? form.affiliate_notes.trim() || null : null,
       is_featured: form.is_featured,
-      track_inventory: form.track_inventory,
+      track_inventory: form.source_type === "affiliate" ? false : form.track_inventory,
       weight: form.weight ? parseFloat(form.weight) : null,
       product_type_id: form.product_type_id || null,
       brand_id: form.brand_id || null,
@@ -128,6 +146,28 @@ export default function NeuesProduktPage() {
         {/* Basis */}
         <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Produktinfo</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Produktart</label>
+              <select value={form.source_type} onChange={e => upd({ source_type: e.target.value })}
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white focus:outline-none">
+                <option value="own">Eigenes Produkt</option>
+                <option value="affiliate">Affiliate Produkt</option>
+              </select>
+            </div>
+            {form.source_type === "affiliate" && (
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Affiliate-Status</label>
+                <select value={form.affiliate_status} onChange={e => upd({ affiliate_status: e.target.value })}
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white focus:outline-none">
+                  <option value="pending">Prüfen</option>
+                  <option value="active">Aktiv</option>
+                  <option value="paused">Pausiert</option>
+                  <option value="rejected">Abgelehnt</option>
+                </select>
+              </div>
+            )}
+          </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Name *</label>
             <input type="text" value={form.name} onChange={e => upd({ name: e.target.value })}
@@ -177,6 +217,59 @@ export default function NeuesProduktPage() {
             </div>
           </div>
         </div>
+
+        {form.source_type === "affiliate" && (
+          <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Affiliate</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Netzwerk / Plattform</label>
+                <input type="text" value={form.affiliate_network} onChange={e => upd({ affiliate_network: e.target.value })}
+                  placeholder="z.B. Awin, Shopify Collabs, Amazon"
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Merchant / Shop</label>
+                <input type="text" value={form.affiliate_merchant} onChange={e => upd({ affiliate_merchant: e.target.value })}
+                  placeholder="z.B. Partner-Shop"
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Affiliate-Link</label>
+              <input type="url" value={form.affiliate_url} onChange={e => upd({ affiliate_url: e.target.value })}
+                placeholder="https://…"
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Provision</label>
+                <input type="number" step="0.01" min="0" value={form.affiliate_commission_rate} onChange={e => upd({ affiliate_commission_rate: e.target.value })}
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Provisionstyp</label>
+                <select value={form.affiliate_commission_type} onChange={e => upd({ affiliate_commission_type: e.target.value })}
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white focus:outline-none">
+                  <option value="percent">%</option>
+                  <option value="fixed">Fixbetrag</option>
+                  <option value="unknown">Unbekannt</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Cookie-Tage</label>
+                <input type="number" min="0" value={form.affiliate_cookie_days} onChange={e => upd({ affiliate_cookie_days: e.target.value })}
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Affiliate-Notizen</label>
+              <textarea rows={3} value={form.affiliate_notes} onChange={e => upd({ affiliate_notes: e.target.value })}
+                placeholder="Bedingungen, Zielgruppe, Content-Ideen, Einschränkungen…"
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none" />
+            </div>
+          </div>
+        )}
 
         {/* Preise */}
         <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-4">

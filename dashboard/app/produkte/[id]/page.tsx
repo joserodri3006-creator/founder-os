@@ -61,6 +61,15 @@ export default function ProduktDetailPage() {
   const [editWeight, setEditWeight] = useState("");
   const [editFeatured, setEditFeatured] = useState(false);
   const [editTrackInventory, setEditTrackInventory] = useState(false);
+  const [editSourceType, setEditSourceType] = useState("own");
+  const [editAffiliateNetwork, setEditAffiliateNetwork] = useState("");
+  const [editAffiliateMerchant, setEditAffiliateMerchant] = useState("");
+  const [editAffiliateUrl, setEditAffiliateUrl] = useState("");
+  const [editAffiliateCommissionRate, setEditAffiliateCommissionRate] = useState("");
+  const [editAffiliateCommissionType, setEditAffiliateCommissionType] = useState("percent");
+  const [editAffiliateCookieDays, setEditAffiliateCookieDays] = useState("");
+  const [editAffiliateStatus, setEditAffiliateStatus] = useState("pending");
+  const [editAffiliateNotes, setEditAffiliateNotes] = useState("");
 
   // Variants
   const [variantOptions, setVariantOptions] = useState<VariantOption[]>([]);
@@ -163,6 +172,15 @@ export default function ProduktDetailPage() {
     setEditWeight(p.weight != null ? String(p.weight) : "");
     setEditFeatured(p.is_featured ?? false);
     setEditTrackInventory(p.track_inventory ?? false);
+    setEditSourceType(p.source_type ?? "own");
+    setEditAffiliateNetwork(p.affiliate_network ?? "");
+    setEditAffiliateMerchant(p.affiliate_merchant ?? "");
+    setEditAffiliateUrl(p.affiliate_url ?? "");
+    setEditAffiliateCommissionRate(p.affiliate_commission_rate != null ? String(p.affiliate_commission_rate) : "");
+    setEditAffiliateCommissionType(p.affiliate_commission_type ?? "percent");
+    setEditAffiliateCookieDays(p.affiliate_cookie_days != null ? String(p.affiliate_cookie_days) : "");
+    setEditAffiliateStatus(p.affiliate_status ?? "pending");
+    setEditAffiliateNotes(p.affiliate_notes ?? "");
     setEditSalePrice(p.sale_price != null ? String(p.sale_price) : "");
     setEditSaleFrom(p.sale_from ? p.sale_from.slice(0, 16) : "");
     setEditSaleUntil(p.sale_until ? p.sale_until.slice(0, 16) : "");
@@ -204,7 +222,16 @@ export default function ProduktDetailPage() {
       name: editName, sku: editSku || null, internal_number: editInternalNumber || null,
       short_description: editShortDesc || null, description: editDescription || null,
       weight: editWeight ? parseFloat(editWeight) : null,
-      is_featured: editFeatured, track_inventory: editTrackInventory,
+      is_featured: editFeatured, track_inventory: isAffiliate ? false : editTrackInventory,
+      source_type: editSourceType,
+      affiliate_network: editSourceType === "affiliate" ? editAffiliateNetwork || null : null,
+      affiliate_merchant: editSourceType === "affiliate" ? editAffiliateMerchant || null : null,
+      affiliate_url: editSourceType === "affiliate" ? editAffiliateUrl || null : null,
+      affiliate_commission_rate: editSourceType === "affiliate" && editAffiliateCommissionRate ? parseFloat(editAffiliateCommissionRate) : null,
+      affiliate_commission_type: editSourceType === "affiliate" ? editAffiliateCommissionType : "percent",
+      affiliate_cookie_days: editSourceType === "affiliate" && editAffiliateCookieDays ? parseInt(editAffiliateCookieDays) : null,
+      affiliate_status: editSourceType === "affiliate" ? editAffiliateStatus : "pending",
+      affiliate_notes: editSourceType === "affiliate" ? editAffiliateNotes || null : null,
       price: editPrice ? parseFloat(editPrice) : null,
       compare_at_price: editComparePrice ? parseFloat(editComparePrice) : null,
       cost_price: editCostPrice ? parseFloat(editCostPrice) : null,
@@ -370,8 +397,9 @@ export default function ProduktDetailPage() {
   if (!product) return <div className="p-8 text-sm text-red-500">Produkt nicht gefunden.</div>;
 
   const meta = getVenture(product.venture);
-  const hasInventory = product.product_type?.has_inventory;
-  const hasVariants = product.product_type?.has_variants;
+  const isAffiliate = editSourceType === "affiliate";
+  const hasInventory = !isAffiliate && product.product_type?.has_inventory;
+  const hasVariants = !isAffiliate && product.product_type?.has_variants;
   const hasWeight = product.product_type?.has_weight;
 
   return (
@@ -398,6 +426,28 @@ export default function ProduktDetailPage() {
             <div className="flex items-center justify-between">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Produktinfo</p>
               {meta && <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${meta.color}`}>{meta.label}</span>}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Produktart</label>
+                <select value={editSourceType} onChange={e => setEditSourceType(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white focus:outline-none">
+                  <option value="own">Eigenes Produkt</option>
+                  <option value="affiliate">Affiliate Produkt</option>
+                </select>
+              </div>
+              {isAffiliate && (
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Affiliate-Status</label>
+                  <select value={editAffiliateStatus} onChange={e => setEditAffiliateStatus(e.target.value)}
+                    className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white focus:outline-none">
+                    <option value="pending">Prüfen</option>
+                    <option value="active">Aktiv</option>
+                    <option value="paused">Pausiert</option>
+                    <option value="rejected">Abgelehnt</option>
+                  </select>
+                </div>
+              )}
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Name</label>
@@ -445,6 +495,67 @@ export default function ProduktDetailPage() {
               </label>
             </div>
           </div>
+
+          {isAffiliate && (
+            <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Affiliate</p>
+                {editAffiliateUrl && (
+                  <a href={editAffiliateUrl} target="_blank" rel="noreferrer"
+                    className="text-xs px-3 py-1 rounded-full font-semibold"
+                    style={{ background: "rgba(27,42,94,0.08)", color: "#1B2A5E" }}>
+                    Link öffnen ↗
+                  </a>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Netzwerk / Plattform</label>
+                  <input type="text" value={editAffiliateNetwork} onChange={e => setEditAffiliateNetwork(e.target.value)}
+                    placeholder="z.B. Awin, Shopify Collabs, Amazon"
+                    className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Merchant / Shop</label>
+                  <input type="text" value={editAffiliateMerchant} onChange={e => setEditAffiliateMerchant(e.target.value)}
+                    className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Affiliate-Link</label>
+                <input type="url" value={editAffiliateUrl} onChange={e => setEditAffiliateUrl(e.target.value)}
+                  placeholder="https://…"
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Provision</label>
+                  <input type="number" step="0.01" min="0" value={editAffiliateCommissionRate} onChange={e => setEditAffiliateCommissionRate(e.target.value)}
+                    className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Provisionstyp</label>
+                  <select value={editAffiliateCommissionType} onChange={e => setEditAffiliateCommissionType(e.target.value)}
+                    className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white focus:outline-none">
+                    <option value="percent">%</option>
+                    <option value="fixed">Fixbetrag</option>
+                    <option value="unknown">Unbekannt</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Cookie-Tage</label>
+                  <input type="number" min="0" value={editAffiliateCookieDays} onChange={e => setEditAffiliateCookieDays(e.target.value)}
+                    className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Affiliate-Notizen</label>
+                <textarea rows={3} value={editAffiliateNotes} onChange={e => setEditAffiliateNotes(e.target.value)}
+                  placeholder="Bedingungen, Content-Ideen, Einschränkungen…"
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none" />
+              </div>
+            </div>
+          )}
 
           {/* Preise */}
           <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-4">

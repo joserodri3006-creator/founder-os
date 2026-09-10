@@ -13,6 +13,8 @@ export async function GET(req: NextRequest) {
     .from("products")
     .select(`
       id, name, slug, sku, price, compare_at_price, status, is_featured,
+      source_type, affiliate_network, affiliate_merchant, affiliate_url,
+      affiliate_commission_rate, affiliate_commission_type, affiliate_status,
       sync_status, last_synced_at, wc_product_id, channel,
       track_inventory, venture, created_at, updated_at, images,
       product_type:product_types(id, name, has_variants, has_inventory),
@@ -22,6 +24,7 @@ export async function GET(req: NextRequest) {
 
   if (venture) query = query.eq("venture", venture);
   if (status) query = query.eq("status", status);
+  if (searchParams.get("source_type")) query = query.eq("source_type", searchParams.get("source_type"));
   if (type_id) query = query.eq("product_type_id", type_id);
   if (search) query = query.ilike("name", `%${search}%`);
 

@@ -14,6 +14,13 @@ interface Product {
   price: number | null;
   compare_at_price: number | null;
   status: string;
+  source_type: "own" | "affiliate" | string;
+  affiliate_network: string | null;
+  affiliate_merchant: string | null;
+  affiliate_url: string | null;
+  affiliate_commission_rate: number | null;
+  affiliate_commission_type: string | null;
+  affiliate_status: string | null;
   sync_status: string | null;
   is_featured: boolean;
   channel: string | null;
@@ -46,6 +53,13 @@ const STATUS_TEXT: Record<string, string> = {
   archived: "#B91C1C",
 };
 
+const AFFILIATE_STATUS_LABELS: Record<string, string> = {
+  pending: "Prüfen",
+  active: "Aktiv",
+  paused: "Pausiert",
+  rejected: "Abgelehnt",
+};
+
 type Modal =
   | { type: "copy"; id: string; name: string }
   | { type: "archive"; id: string; name: string }
@@ -59,19 +73,21 @@ export default function ProdukteListPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
   const [modal, setModal] = useState<Modal>(null);
 
   async function load() {
     setLoading(true);
     const params = new URLSearchParams({ venture });
     if (statusFilter) params.set("status", statusFilter);
+    if (sourceFilter) params.set("source_type", sourceFilter);
     if (search) params.set("search", search);
     const data = await fetch(`/api/produkte?${params}`).then((r) => r.json());
     setProducts(Array.isArray(data) ? data : []);
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [venture, statusFilter]);
+  useEffect(() => { load(); }, [venture, statusFilter, sourceFilter]);
 
   async function handleArchive(id: string) {
     await fetch(`/api/produkte/${id}`, {
@@ -173,6 +189,24 @@ export default function ProdukteListPage() {
           <option value="draft">Entwurf</option>
           <option value="archived">Archiviert</option>
         </select>
+        <select
+          value={sourceFilter}
+          onChange={(e) => setSourceFilter(e.target.value)}
+          style={{
+            fontSize: "13px",
+            border: "1px solid #D1D5E8",
+            borderRadius: "8px",
+            padding: "7px 12px",
+            background: "#FFFFFF",
+            color: "#14193A",
+            outline: "none",
+            fontFamily: "var(--font-sans)",
+          }}
+        >
+          <option value="">Alle Produktarten</option>
+          <option value="own">Eigene Produkte</option>
+          <option value="affiliate">Affiliate</option>
+        </select>
         <div className="ml-auto flex items-center gap-3">
           <Link href="/produkte/sync-log" className="text-xs text-gray-500 hover:text-[#1B2A5E] flex items-center gap-1">
             🔄 Sync-Log
@@ -212,10 +246,10 @@ export default function ProdukteListPage() {
           <table className="w-full text-sm" style={{ minWidth: '580px' }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EEF0F7", background: "#F7F8FC" }}>
-                {["Produkt", "Typ", "SKU", "Preis", "Channel", "Status", "Aktionen"].map((h) => (
+                {["Produkt", "Art", "Typ", "SKU", "Preis", "Channel", "Status", "Aktionen"].map((h) => (
                   <th
                     key={h}
-                    className={`px-4 py-3 font-semibold uppercase ${h === "Preis" ? "text-right" : ["Status","Channel"].includes(h) ? "text-center" : "text-left"}`}
+                    className={`px-4 py-3 font-semibold uppercase ${h === "Preis" ? "text-right" : ["Status","Channel","Art"].includes(h) ? "text-center" : "text-left"}`}
                     style={{ fontSize: "11px", letterSpacing: "0.07em", color: "#6B7280" }}
                   >
                     {h}
@@ -266,11 +300,22 @@ export default function ProdukteListPage() {
                           )}
                         </div>
                         {p.brand && <p className="text-xs" style={{ color: "#6B7280" }}>{p.brand.name}</p>}
+                        {p.source_type === "affiliate" && p.affiliate_merchant && <p className="text-xs" style={{ color: "#92650A" }}>{p.affiliate_merchant}</p>}
                       </div>
                     </Link>
                   </td>
+                  <td className="px-4 py-3 text-center">
+                    {p.source_type === "affiliate" ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(200,169,110,0.15)", color: "#92650A" }}>Affiliate</span>
+                    ) : (
+                      <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: "#EEF0F7", color: "#4B5563" }}>Eigen</span>
+                    )}
+                    {p.source_type === "affiliate" && p.affiliate_status && (
+                      <p className="text-[11px] mt-1" style={{ color: "#6B7280" }}>{AFFILIATE_STATUS_LABELS[p.affiliate_status] ?? p.affiliate_status}</p>
+                    )}
+                  </td>
                   <td className="px-4 py-3" style={{ color: "#6B7280", fontSize: "13px" }}>
-                    {p.product_type?.name ?? "—"}
+                    {p.source_type === "affiliate" ? (p.affiliate_network || p.product_type?.name || "Affiliate") : (p.product_type?.name ?? "—")}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs" style={{ color: "#6B7280" }}>
                     {p.sku ?? "—"}
