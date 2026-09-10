@@ -15,6 +15,7 @@ interface InboxMessage {
   venture: string;
   account_email: string;
   folder: string;
+  provider: "imap" | "gmail" | "instagram" | string;
   from_email: string;
   from_name: string | null;
   subject: string | null;
@@ -50,6 +51,7 @@ interface EntityCandidate {
 const ENTITY_LABELS: Record<EntityType, string> = { lead: "Lead", customer: "Kunde", supplier: "Partner" };
 const FOLDER_LABELS: Record<FolderFilter, string> = { alle: "Alle", INBOX: "Eingang", sent: "Gesendet", drafts: "Entwürfe" };
 const STATUS_LABELS: Record<MatchStatus, string> = { alle: "Alle", matched_lead: "Lead", matched_customer: "Kunde", matched_supplier: "Lieferant", unmatched: "Unmatched" };
+const PROVIDER_LABELS: Record<string, string> = { imap: "E-Mail", gmail: "Gmail", instagram: "Instagram" };
 
 const FILTERS: { key: MatchStatus; label: string }[] = [
   { key: "unmatched", label: "Unmatched" },
@@ -119,6 +121,10 @@ function fmtFull(ts: string) {
 
 function senderName(message: InboxMessage) {
   return message.from_name || message.from_email.split("@")[0] || "Unbekannt";
+}
+
+function providerLabel(message: InboxMessage) {
+  return PROVIDER_LABELS[message.provider] ?? message.provider;
 }
 
 export default function InboxPage() {
@@ -256,11 +262,11 @@ export default function InboxPage() {
             const el = e.currentTarget;
             if (el.scrollHeight - el.scrollTop - el.clientHeight < 160) void loadMore();
           }} style={{ borderRight: "1px solid #D1D5E8", background: "#FFFFFF", minWidth: 0, minHeight: 0, overflowY: "auto" }}>
-            {loading ? <EmptyState text="Laden…" /> : error ? <EmptyState text={error} /> : filtered.length === 0 ? <EmptyState text="Keine E-Mails für diesen Filter." /> : filtered.map((message) => (
+            {loading ? <EmptyState text="Laden…" /> : error ? <EmptyState text={error} /> : filtered.length === 0 ? <EmptyState text="Keine Nachrichten für diesen Filter." /> : filtered.map((message) => (
               <MessageListItem key={message.id} message={message} active={selected?.id === message.id} onClick={() => setSelectedId(message.id)} />
             ))}
-            {loadingMore && <EmptyState text="Weitere Mails laden…" />}
-            {!loading && hasMore && !loadingMore && <button onClick={() => void loadMore()} style={{ ...ghostButton, width: "calc(100% - 24px)", margin: "12px" }}>Weitere Mails laden</button>}
+            {loadingMore && <EmptyState text="Weitere Nachrichten laden…" />}
+            {!loading && hasMore && !loadingMore && <button onClick={() => void loadMore()} style={{ ...ghostButton, width: "calc(100% - 24px)", margin: "12px" }}>Weitere Nachrichten laden</button>}
           </section>
 
           <main style={{ minWidth: 0, minHeight: 0, background: "#F7F8FC", overflowY: "auto" }}>
@@ -292,6 +298,7 @@ function MessageListItem({ message, active, onClick }: { message: InboxMessage; 
         {mailActionColors && mailActionLabel && mailActionStatus && (
           <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 7px", borderRadius: "999px", background: mailActionColors.bg, color: mailActionColors.color, border: `1px solid ${mailActionColors.border}` }}>{mailActionLabel}: {mailActionStatus}</span>
         )}
+        <span style={smallBadge}>{providerLabel(message)}</span>
         <span style={smallBadge}>{message.folder === "INBOX" ? "Eingang" : FOLDER_LABELS[message.folder as FolderFilter] ?? message.folder}</span>
         <span style={smallBadge}>{message.account_email}</span>
       </div>
@@ -324,6 +331,7 @@ function MessageDetail({ message, candidates, actionLoading, actionMessage, onAc
 
   const colors = STATUS_STYLES[message.match_status] ?? STATUS_STYLES.unmatched;
   const isDraft = message.folder === "drafts";
+  const isInstagram = message.provider === "instagram";
   const linkedLabel = message.entity_href && message.entity_name
     ? `${message.entity_name}${message.entity_company ? ` · ${message.entity_company}` : ""}`
     : null;
@@ -338,7 +346,7 @@ function MessageDetail({ message, candidates, actionLoading, actionMessage, onAc
           <div style={{ minWidth: 0 }}>
             <h2 style={{ margin: 0, fontFamily: "var(--font-sans)", fontSize: "16px", fontWeight: 700, color: "#14193A", lineHeight: 1.3 }}>{message.subject || "(ohne Betreff)"}</h2>
             <p style={{ margin: "4px 0 0", fontSize: "12px", color: "#6B7280" }}>
-              {senderName(message)} · {message.from_email} · {fmtFull(message.received_at)} · {message.account_email}
+              {senderName(message)} · {providerLabel(message)} · {message.from_email} · {fmtFull(message.received_at)} · {message.account_email}
             </p>
             <p style={{ margin: "4px 0 0", fontSize: "12px", color: linkedLabel ? "#3A5BA0" : "#6B7280", fontWeight: linkedLabel ? 700 : 500 }}>
               {linkedLabel && message.entity_href ? <Link href={message.entity_href} style={{ color: "#3A5BA0", textDecoration: "none" }}>Verknüpft: {linkedLabel}</Link> : "Noch nicht verknüpft"}
@@ -381,10 +389,10 @@ function MessageDetail({ message, candidates, actionLoading, actionMessage, onAc
         )}
 
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {message.folder === "INBOX" && <button disabled={actionLoading} onClick={() => window.confirm("Diese Mail wirklich im Postfach archivieren?") && onAction(message.id, { action: "mail_archive" })} style={ghostButton}>Archivieren</button>}
-          {isDraft && <button disabled={actionLoading} onClick={() => setEditingDraft((v) => !v)} style={ghostButton}>{editingDraft ? "Bearbeiten schließen" : "Entwurf bearbeiten"}</button>}
-          {isDraft && <button disabled={actionLoading} onClick={() => window.confirm("Diesen Entwurf wirklich senden?") && onAction(message.id, { action: "mail_send" })} style={primaryButton}>Senden</button>}
-          <button disabled={actionLoading} onClick={() => window.confirm("Diese Mail wirklich im Postfach löschen? Das ist nicht nur Ausblenden.") && onAction(message.id, { action: "mail_delete" })} style={dangerButton}>Löschen</button>
+          {!isInstagram && message.folder === "INBOX" && <button disabled={actionLoading} onClick={() => window.confirm("Diese Mail wirklich im Postfach archivieren?") && onAction(message.id, { action: "mail_archive" })} style={ghostButton}>Archivieren</button>}
+          {!isInstagram && isDraft && <button disabled={actionLoading} onClick={() => setEditingDraft((v) => !v)} style={ghostButton}>{editingDraft ? "Bearbeiten schließen" : "Entwurf bearbeiten"}</button>}
+          {!isInstagram && isDraft && <button disabled={actionLoading} onClick={() => window.confirm("Diesen Entwurf wirklich senden?") && onAction(message.id, { action: "mail_send" })} style={primaryButton}>Senden</button>}
+          {!isInstagram && <button disabled={actionLoading} onClick={() => window.confirm("Diese Mail wirklich im Postfach löschen? Das ist nicht nur Ausblenden.") && onAction(message.id, { action: "mail_delete" })} style={dangerButton}>Löschen</button>}
         </div>
       </section>
 

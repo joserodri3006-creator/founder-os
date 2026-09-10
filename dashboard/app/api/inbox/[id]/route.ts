@@ -41,6 +41,10 @@ async function queueMailAction(messageId: string, action: "mail_archive" | "mail
   if (messageError) return NextResponse.json({ error: messageError.message }, { status: 500 });
   if (!message) return missingMessage();
 
+  if (!["imap", "gmail"].includes(String(message.provider))) {
+    return NextResponse.json({ error: "Mailbox-Aktionen sind nur für E-Mail-Nachrichten verfügbar." }, { status: 400 });
+  }
+
   if (action === "mail_send" && message.folder !== "drafts") {
     return NextResponse.json({ error: "Senden ist nur für Entwürfe möglich." }, { status: 400 });
   }

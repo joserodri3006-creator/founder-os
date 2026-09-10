@@ -16,6 +16,7 @@ Optional:
   PRIVATE_OS_INSTAGRAM_API_VERSION=v21.0
   PRIVATE_OS_INSTAGRAM_SYNC_LIMIT=25
   PRIVATE_OS_STORE_UNTRACKED=false  # true stores messages before contact approval
+  PRIVATE_OS_INSTAGRAM_MIRROR_INBOX=true  # mirror Blazed DMs into /inbox
 """
 from __future__ import annotations
 
@@ -118,6 +119,40 @@ def participant_id(participant: dict[str, Any], own_id: str) -> str:
     return str(participant.get('id') or participant.get('username') or own_id)
 
 
+def instagram_contact_address(contact_provider_id: str, username: str | None) -> str:
+    handle = (username or contact_provider_id or 'unknown').strip().lower().lstrip('@')
+    safe = ''.join(ch if ch.isalnum() or ch in {'_', '.', '-'} else '_' for ch in handle) or 'unknown'
+    return f'{safe}@instagram.local'
+
+
+def mirror_to_operational_inbox(sb: Supabase, *, account_id: str | None, ig_user_id: str, contact_provider_id: str, display_name: str, username: str | None, conv: dict[str, Any], msg: dict[str, Any], direction: str) -> None:
+    attachments = msg.get('attachments', {}).get('data', []) if isinstance(msg.get('attachments'), dict) else []
+    body_text = msg.get('message') or ('[Instagram-Medium]' if attachments else '')
+    from_address = 'blazed@instagram.local' if direction == 'outbound' else instagram_contact_address(contact_provider_id, username)
+    from_name = 'Blazed Outfitters Instagram' if direction == 'outbound' else display_name
+    sb.upsert('inbox_messages', {
+        'venture': 'blazed_outfitters',
+        'account_id': account_id or 'blazed_instagram',
+        'account_email': 'Blazed Instagram',
+        'folder': 'sent' if direction == 'outbound' else 'INBOX',
+        'provider': 'instagram',
+        'message_uid': str(msg['id']),
+        'message_id': str(msg['id']),
+        'thread_key': str(conv['id']),
+        'from_email': from_address,
+        'from_name': from_name,
+        'to_emails': ['Blazed Instagram'] if direction == 'inbound' else [instagram_contact_address(contact_provider_id, username)],
+        'cc_emails': [],
+        'subject': f'Instagram DM · {display_name}',
+        'body_preview': body_text.replace('\n', ' ').strip()[:500] if body_text else '[Instagram-Medium]',
+        'body_text': body_text or None,
+        'has_attachments': bool(attachments),
+        'attachment_names': ['Instagram-Medium'] if attachments else [],
+        'received_at': msg.get('created_time') or now_iso(),
+        'match_status': 'unmatched',
+    }, 'account_email,folder,message_uid')
+
+
 def sync_instagram(sb: Supabase, *, dry_run: bool = False) -> dict[str, int]:
     ig_user_id = os.environ.get('PRIVATE_OS_INSTAGRAM_IG_USER_ID')
     if not ig_user_id or not os.environ.get('PRIVATE_OS_INSTAGRAM_PAGE_ACCESS_TOKEN'):
@@ -125,6 +160,7 @@ def sync_instagram(sb: Supabase, *, dry_run: bool = False) -> dict[str, int]:
 
     limit = os.environ.get('PRIVATE_OS_INSTAGRAM_SYNC_LIMIT', '25')
     store_untracked = os.environ.get('PRIVATE_OS_STORE_UNTRACKED', 'false').lower() in {'1', 'true', 'yes', 'on'}
+    mirror_inbox = os.environ.get('PRIVATE_OS_INSTAGRAM_MIRROR_INBOX', 'true').lower() in {'1', 'true', 'yes', 'on'}
     fields = 'id,updated_time,participants{id,username,name},messages.limit(25){id,message,created_time,from,to,attachments}'
     payload = graph_get(f'{ig_user_id}/conversations', {'platform': 'instagram', 'fields': fields, 'limit': limit})
     stats = {'conversations': 0, 'messages': 0, 'skipped': 0, 'error_missing_instagram_env': 0}
@@ -180,15 +216,16 @@ def sync_instagram(sb: Supabase, *, dry_run: bool = False) -> dict[str, int]:
             thread_id = None
         stats['conversations'] += 1
 
-        if not is_tracked and not store_untracked:
-            stats['skipped'] += len(msgs)
-            continue
-
         for msg in msgs:
             sender = msg.get('from') or {}
             direction = 'outbound' if str(sender.get('id')) == str(ig_user_id) else 'inbound'
             if dry_run:
                 stats['messages'] += 1
+                continue
+            if mirror_inbox:
+                mirror_to_operational_inbox(sb, account_id=account_id, ig_user_id=ig_user_id, contact_provider_id=contact_provider_id, display_name=display_name, username=username, conv=conv, msg=msg, direction=direction)
+            if not is_tracked and not store_untracked:
+                stats['skipped'] += 1
                 continue
             sb.upsert('private_os_messages', {
                 'provider': PROVIDER,
