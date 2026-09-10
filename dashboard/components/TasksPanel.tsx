@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState, type CSSProperties } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { VENTURES } from "@/lib/ventures";
 
 interface Task {
   id: string;
@@ -9,6 +11,7 @@ interface Task {
   priority: "low" | "medium" | "high";
   due_date: string | null;
   assigned_to: string | null;
+  venture: string;
   created_at: string;
 }
 
@@ -39,6 +42,8 @@ function isOverdue(task: Task) {
 const fieldStyle: CSSProperties = { padding: "7px 8px", border: "1px solid #D1D5E8", borderRadius: "6px", fontSize: "13px", background: "#fff" };
 
 export default function TasksPanel({ entityType, entityId, venture }: Props) {
+  const { user } = useAuth();
+  const isFounder = user?.role === "founder";
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +100,23 @@ export default function TasksPanel({ entityType, entityId, venture }: Props) {
     }
   }
 
+  async function moveToVenture(task: Task, targetVenture: string) {
+    if (task.venture === targetVenture) return;
+    const previousTasks = tasks;
+    setTasks(prev => prev.filter(t => t.id !== task.id));
+    const res = await fetch(`/api/tasks/${task.id}/venture`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ venture: targetVenture }),
+    });
+    if (!res.ok) {
+      setTasks(previousTasks);
+      alert("Venture konnte nicht geändert werden.");
+      return;
+    }
+    await load();
+  }
+
   const openTasks = tasks.filter(t => t.status !== "done").sort((a, b) => {
     if (!a.due_date) return 1;
     if (!b.due_date) return -1;
@@ -147,7 +169,9 @@ export default function TasksPanel({ entityType, entityId, venture }: Props) {
                 onStatusChange={(s) => updateStatus(task, s)}
                 onEdit={() => { setEditingId(task.id); setShowForm(false); }}
                 onCopy={() => copy(task.id)}
-                onDelete={() => remove(task.id)} />
+                onDelete={() => remove(task.id)}
+                canMoveBetweenVentures={isFounder}
+                onMoveToVenture={(targetVenture) => moveToVenture(task, targetVenture)} />
             )
           ))}
 
@@ -173,7 +197,9 @@ export default function TasksPanel({ entityType, entityId, venture }: Props) {
                     onStatusChange={(s) => updateStatus(task, s)}
                     onEdit={() => { setEditingId(task.id); setShowForm(false); }}
                     onCopy={() => copy(task.id)}
-                    onDelete={() => remove(task.id)} />
+                    onDelete={() => remove(task.id)}
+                    canMoveBetweenVentures={isFounder}
+                    onMoveToVenture={(targetVenture) => moveToVenture(task, targetVenture)} />
                 )
               ))}
             </>
@@ -259,10 +285,12 @@ function TaskForm({ mode, initial, venture, entityType, entityId, members, onDon
   );
 }
 
-function TaskRow({ task, assigneeName, onStatusChange, onEdit, onCopy, onDelete }: {
+function TaskRow({ task, assigneeName, onStatusChange, onEdit, onCopy, onDelete, canMoveBetweenVentures, onMoveToVenture }: {
   task: Task; assigneeName: string | null;
   onStatusChange: (status: Task["status"]) => void;
   onEdit: () => void; onCopy: () => void; onDelete: () => void;
+  canMoveBetweenVentures: boolean;
+  onMoveToVenture: (targetVenture: string) => void;
 }) {
   const overdue = isOverdue(task);
   const pc = PRIORITY_COLORS[task.priority];
@@ -295,6 +323,16 @@ function TaskRow({ task, assigneeName, onStatusChange, onEdit, onCopy, onDelete 
         </div>
       </div>
       <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+        {canMoveBetweenVentures && (
+          <select
+            value={task.venture}
+            onChange={(e) => onMoveToVenture(e.target.value)}
+            title="Aufgabe in anderes Venture verschieben"
+            style={{ ...fieldStyle, padding: "3px 6px", fontSize: "11px", color: "#6B7280", maxWidth: "140px" }}
+          >
+            {VENTURES.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+          </select>
+        )}
         <button onClick={onEdit} title="Bearbeiten"
           style={{ background: "transparent", border: "none", cursor: "pointer", color: "#9CA3AF", fontSize: "12px", padding: "0 2px" }}>
           ✎

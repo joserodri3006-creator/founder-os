@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { useVenture } from "@/context/VentureContext";
 import TasksPipeline, { type PipelineTask } from "@/components/TasksPipeline";
 import TasksList, { type ListTask, STATUS_LABELS } from "@/components/TasksList";
@@ -14,6 +15,7 @@ interface Task {
   due_date: string | null;
   assigned_to: string | null;
   sort_order: number;
+  venture: string;
   entity_type: "lead" | "customer";
   entity_id: string;
   entity_name: string | null;
@@ -37,6 +39,8 @@ function isOverdue(task: Task) {
 
 export default function AufgabenPage() {
   const { venture } = useVenture();
+  const { user } = useAuth();
+  const isFounder = user?.role === "founder";
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,6 +106,24 @@ export default function AufgabenPage() {
     if (!res.ok) {
       alert("Löschen fehlgeschlagen.");
       await load();
+    }
+  }
+
+  async function moveTaskToVenture(task: Task, targetVenture: string) {
+    if (task.venture === targetVenture) return;
+    const previousTasks = tasks;
+    setTasks(prev => prev.filter(t => t.id !== task.id));
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/venture`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ venture: targetVenture }),
+      });
+      if (!res.ok) throw new Error();
+      await load();
+    } catch {
+      setTasks(previousTasks);
+      alert("Venture konnte nicht geändert werden.");
     }
   }
 
@@ -273,6 +295,8 @@ export default function AufgabenPage() {
           onEditCancel={() => setEditingId(null)}
           onCopy={copyTask}
           onDelete={removeTask}
+          canMoveBetweenVentures={isFounder}
+          onMoveToVenture={(task, targetVenture) => moveTaskToVenture(task as Task, targetVenture)}
         />
       )}
     </div>

@@ -2,6 +2,7 @@
 
 import { useState, type ComponentProps } from "react";
 import Link from "next/link";
+import { VENTURES } from "@/lib/ventures";
 import {
   DndContext, PointerSensor, TouchSensor, KeyboardSensor,
   useSensor, useSensors, type DragEndEvent,
@@ -18,6 +19,7 @@ export interface ListTask {
   due_date: string | null;
   assigned_to: string | null;
   sort_order: number;
+  venture: string;
   entity_type: "lead" | "customer";
   entity_id: string;
   entity_name: string | null;
@@ -52,9 +54,11 @@ interface Props {
   onEditCancel: () => void;
   onCopy: (id: string) => void;
   onDelete: (id: string) => void;
+  canMoveBetweenVentures?: boolean;
+  onMoveToVenture?: (task: ListTask, targetVenture: string) => void;
 }
 
-export default function TasksList({ tasks, members, editingId, onStatusChange, onReorder, onEdit, onEditDone, onEditCancel, onCopy, onDelete }: Props) {
+export default function TasksList({ tasks, members, editingId, onStatusChange, onReorder, onEdit, onEditDone, onEditCancel, onCopy, onDelete, canMoveBetweenVentures = false, onMoveToVenture }: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
@@ -94,6 +98,8 @@ export default function TasksList({ tasks, members, editingId, onStatusChange, o
                 onEdit={() => onEdit(task.id)}
                 onCopy={() => onCopy(task.id)}
                 onDelete={() => onDelete(task.id)}
+                canMoveBetweenVentures={canMoveBetweenVentures}
+                onMoveToVenture={(targetVenture) => onMoveToVenture?.(task, targetVenture)}
               />
             )
           ))}
@@ -116,10 +122,12 @@ function DragHandle(props: ComponentProps<"button">) {
   );
 }
 
-function SortableTaskRow({ task, assigneeName, onStatusChange, onEdit, onCopy, onDelete }: {
+function SortableTaskRow({ task, assigneeName, onStatusChange, onEdit, onCopy, onDelete, canMoveBetweenVentures, onMoveToVenture }: {
   task: ListTask; assigneeName: string | null;
   onStatusChange: (status: ListTask["status"]) => void;
   onEdit: () => void; onCopy: () => void; onDelete: () => void;
+  canMoveBetweenVentures: boolean;
+  onMoveToVenture: (targetVenture: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
@@ -165,6 +173,16 @@ function SortableTaskRow({ task, assigneeName, onStatusChange, onEdit, onCopy, o
       </div>
 
       <div className="flex items-center gap-1 -mx-1 pt-1 md:pt-0 border-t md:border-t-0 border-gray-100 md:contents">
+        {canMoveBetweenVentures && (
+          <select
+            value={task.venture}
+            onChange={(e) => onMoveToVenture(e.target.value)}
+            title="Aufgabe in anderes Venture verschieben"
+            className="text-xs text-gray-500 border border-gray-200 rounded px-1.5 py-1 bg-white min-h-[44px] md:min-h-0 md:ml-auto"
+          >
+            {VENTURES.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
+          </select>
+        )}
         <button onClick={onEdit} className="text-xs text-gray-400 hover:text-gray-700 min-h-[44px] md:min-h-0 px-2 md:px-0 md:ml-auto md:pl-2">Bearbeiten</button>
         <button onClick={onCopy} className="text-xs text-gray-400 hover:text-gray-700 min-h-[44px] md:min-h-0 px-2 md:px-0">Kopieren</button>
         <button onClick={onDelete} className="text-xs text-gray-400 hover:text-red-600 min-h-[44px] md:min-h-0 px-2 md:px-0">Löschen</button>
