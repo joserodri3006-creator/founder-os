@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import MessageBody from "@/components/MessageBody";
 
 interface InboxMessage {
   id: string;
@@ -95,9 +96,7 @@ export default function InboxTimeline({ entityType, entityId, venture }: Props) 
                         Anhang: {(message.attachment_names ?? []).join(", ") || "vorhanden"}
                       </p>
                     )}
-                    <pre style={{ whiteSpace: "pre-wrap", margin: 0, fontFamily: "var(--font-sans)", fontSize: "12px", lineHeight: 1.55, color: "#374151" }}>
-                      {message.body_text || message.body_preview || "Kein Textinhalt erkannt."}
-                    </pre>
+                    <MessageBody text={message.body_text} fallback={message.body_preview} style={{ fontFamily: "var(--font-sans)", fontSize: "12px", lineHeight: 1.55, color: "#374151" }} />
                   </div>
                 )}
               </div>

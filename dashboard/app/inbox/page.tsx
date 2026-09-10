@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import MessageBody from "@/components/MessageBody";
 import { useVenture } from "@/context/VentureContext";
 import { VENTURES } from "@/lib/ventures";
 
@@ -401,7 +402,7 @@ function MessageDetail({ message, candidates, actionLoading, actionMessage, onAc
 
       <section style={detailCard}>
         {message.has_attachments && <p style={{ margin: "0 0 10px", fontSize: "12px", color: "#A07840", fontWeight: 700 }}>Anhang: {(message.attachment_names ?? []).join(", ") || "vorhanden"}</p>}
-        <pre style={{ whiteSpace: "pre-wrap", margin: 0, fontFamily: "var(--font-sans)", fontSize: "14px", lineHeight: 1.65, color: "#374151" }}>{message.body_text || message.body_preview || "Kein Textinhalt erkannt."}</pre>
+        <MessageBody text={message.body_text} fallback={message.body_preview} style={{ fontFamily: "var(--font-sans)", fontSize: "14px", lineHeight: 1.65, color: "#374151" }} />
       </section>
     </div>
   );
