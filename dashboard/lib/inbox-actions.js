@@ -33,6 +33,14 @@ function bulkCandidateCount(messages, selectedMessage) {
   return messages.filter((message) => normalizeEmail(message?.from_email) === sender && message?.venture === selectedMessage?.venture).length;
 }
 
+function hasPendingMailSend(actions, messageId) {
+  return actions.some((action) =>
+    action?.status === "queued" &&
+    ["mail_send", "mail_update_and_send"].includes(action?.action) &&
+    action?.message?.id === messageId
+  );
+}
+
 function linkUpdateForEntity(entityType, entityId) {
   if (!VALID_LINK_TYPES.has(entityType)) throw new Error("entity_type muss lead, customer oder supplier sein");
   if (!entityId) throw new Error("entity_id ist erforderlich");
@@ -118,6 +126,7 @@ module.exports = {
   linkUpdateForEntity,
   normalizeFolder,
   bulkCandidateCount,
+  hasPendingMailSend,
   parseIgnoredIds,
   addIgnoredId,
   payloadFromInboxMessage,

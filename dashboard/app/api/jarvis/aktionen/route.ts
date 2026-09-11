@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getSender, sendMail } from "@/lib/mail-helpers";
+import { statusAfterSuccessfulEmailSend } from "@/lib/lead-mail-state";
 
 async function requireFounder() {
   const supabase = await createClient();
@@ -57,7 +58,7 @@ async function executeAction(action: {
 
   const { data: lead, error: leadError } = await supabaseAdmin
     .from("leads")
-    .select("first_name, last_name, email")
+    .select("first_name, last_name, email, status")
     .eq("id", action.entity_id)
     .single();
   if (leadError || !lead) throw new Error("Lead nicht gefunden");
@@ -78,6 +79,17 @@ async function executeAction(action: {
     text: body,
   });
   if (!resendRes.ok) throw new Error(`E-Mail-Versand fehlgeschlagen: ${await resendRes.text()}`);
+
+  const sentAt = new Date().toISOString();
+  const nextStatus = statusAfterSuccessfulEmailSend(lead.status);
+  const nextFollowUpDate = new Date();
+  nextFollowUpDate.setDate(nextFollowUpDate.getDate() + 5);
+  const { error: updateError } = await supabaseAdmin.from("leads").update({
+    status: nextStatus,
+    last_contacted_at: sentAt,
+    follow_up_date: nextStatus === "follow_up" ? nextFollowUpDate.toISOString().split("T")[0] : null,
+  }).eq("id", action.entity_id);
+  if (updateError) throw new Error(`Versand erfolgt, Lead-Status konnte nicht aktualisiert werden: ${updateError.message}`);
 
   await supabaseAdmin.from("lead_activities").insert({
     lead_id: action.entity_id,
@@ -104,6 +116,21 @@ export async function PATCH(req: NextRequest) {
   if (fetchError || !action) return NextResponse.json({ error: "Aktion nicht gefunden" }, { status: 404 });
   if (action.status !== "pending") {
     return NextResponse.json({ error: "Aktion ist bereits bearbeitet" }, { status: 409 });
+  }
+
+  // Atomarer Claim: nur wenn status noch "pending" ist, auf "processing" wechseln.
+  // Verhindert, dass zwei gleichzeitige Freigabe-Klicks (z.B. Doppelklick, zwei Tabs)
+  // beide die Prüfung oben bestehen und die Mail doppelt versenden.
+  const { data: claimed, error: claimError } = await supabaseAdmin
+    .from("jarvis_autonomous_actions")
+    .update({ status: "processing" })
+    .eq("id", id)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+  if (claimError) return NextResponse.json({ error: claimError.message }, { status: 500 });
+  if (!claimed) {
+    return NextResponse.json({ error: "Aktion wurde bereits von einer anderen Anfrage übernommen" }, { status: 409 });
   }
 
   if (!body.approved) {

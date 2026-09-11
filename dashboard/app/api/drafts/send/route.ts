@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { statusAfterSuccessfulEmailSend } from "@/lib/lead-mail-state";
 
 async function getSenderForVenture(venture: string | null): Promise<{ name: string; email: string }> {
   const fallback = { name: "Jose | Online First", email: "info@onlinefirst.eu" };
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
 
   const { data: lead, error } = await supabaseAdmin
     .from("leads")
-    .select("first_name, last_name, email, venture")
+    .select("first_name, last_name, email, venture, status")
     .eq("id", lead_id)
     .single();
 
@@ -69,15 +70,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "E-Mail-Versand fehlgeschlagen", detail: err }, { status: 500 });
   }
 
-  await supabaseAdmin
+  const sentAt = new Date().toISOString();
+  const nextStatus = statusAfterSuccessfulEmailSend(lead.status);
+  const nextFollowUpDate = new Date();
+  nextFollowUpDate.setDate(nextFollowUpDate.getDate() + 5);
+  const followUpDateUpdate = nextStatus === "follow_up"
+    ? nextFollowUpDate.toISOString().split("T")[0]
+    : nextStatus === "nachgefasst" ? null : undefined;
+  const { error: updateError } = await supabaseAdmin
     .from("leads")
     .update({
       ai_draft_subject: subject,
       ai_draft_body: body,
       ai_draft_approved: true,
-      status: "kontaktiert",
+      status: nextStatus,
+      last_contacted_at: sentAt,
+      ...(followUpDateUpdate !== undefined ? { follow_up_date: followUpDateUpdate } : {}),
     })
     .eq("id", lead_id);
 
-  return NextResponse.json({ success: true });
+  if (updateError) {
+    return NextResponse.json(
+      { error: `E-Mail wurde versendet, aber der Lead-Status konnte nicht aktualisiert werden: ${updateError.message}` },
+      { status: 500 }
+    );
+  }
+
+  await supabaseAdmin.from("lead_activities").insert({
+    lead_id,
+    activity_type: "email_sent",
+    description: `Betreff: ${subject}`,
+  });
+
+  return NextResponse.json({ success: true, status: nextStatus, sent_at: sentAt });
 }

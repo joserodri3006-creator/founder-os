@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import MessageBody from "@/components/MessageBody";
+import { mailKind, type LeadMailKind } from "@/lib/lead-mail-state";
 
 interface InboxMessage {
   id: string;
@@ -15,7 +16,15 @@ interface InboxMessage {
   match_status: string;
   has_attachments: boolean;
   attachment_names: string[] | null;
+  folder: string;
+  to_emails: string[] | null;
 }
+
+const MAIL_KIND_META: Record<LeadMailKind, { label: string; color: string; background: string }> = {
+  received: { label: "Eingegangen", color: "#1D4ED8", background: "#DBEAFE" },
+  sent: { label: "Gesendet", color: "#15803D", background: "#DCFCE7" },
+  draft: { label: "Entwurf", color: "#A16207", background: "#FEF3C7" },
+};
 
 interface Props {
   entityType: "lead" | "customer" | "supplier";
@@ -33,6 +42,30 @@ export default function InboxTimeline({ entityType, entityId, venture }: Props) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [draftEdits, setDraftEdits] = useState<Record<string, { subject: string; body: string }>>({});
+  const [actionState, setActionState] = useState<Record<string, string>>({});
+
+  async function sendEditedDraft(message: InboxMessage) {
+    const edit = draftEdits[message.id] ?? { subject: message.subject ?? "", body: message.body_text ?? "" };
+    if (!edit.subject.trim() || !edit.body.trim()) {
+      setActionState((current) => ({ ...current, [message.id]: "Betreff und Text sind erforderlich." }));
+      return;
+    }
+    if (!window.confirm("Diesen bearbeiteten Entwurf wirklich senden?")) return;
+    setActionState((current) => ({ ...current, [message.id]: "Wird zum Versand vorbereitet…" }));
+    const res = await fetch(`/api/inbox/${message.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "mail_update_and_send", subject: edit.subject, body_text: edit.body }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setActionState((current) => ({
+      ...current,
+      [message.id]: res.ok
+        ? "Zum Versand freigegeben. Der Status ändert sich erst nach erfolgreichem Versand."
+        : data.error ?? "Versand konnte nicht vorbereitet werden.",
+    }));
+  }
 
   useEffect(() => {
     if (!entityId) return;
@@ -61,11 +94,13 @@ export default function InboxTimeline({ entityType, entityId, venture }: Props) 
       ) : error ? (
         <p style={{ fontSize: "13px", color: "#9CA3AF", textAlign: "center", padding: "12px 0", margin: 0 }}>{error}</p>
       ) : messages.length === 0 ? (
-        <p style={{ fontSize: "13px", color: "#6B7280", textAlign: "center", padding: "8px 0", margin: 0 }}>Noch keine eingehenden E-Mails verknüpft</p>
+        <p style={{ fontSize: "13px", color: "#6B7280", textAlign: "center", padding: "8px 0", margin: 0 }}>Noch keine verknüpften E-Mails</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {messages.map((message) => {
             const open = openId === message.id;
+            const kind = mailKind(message.folder);
+            const meta = MAIL_KIND_META[kind];
             return (
               <div key={message.id} style={{ background: "#F7F8FC", border: "1px solid #EEF0F7", borderRadius: "10px", padding: "12px 14px" }}>
                 <button
@@ -77,9 +112,14 @@ export default function InboxTimeline({ entityType, entityId, venture }: Props) 
                       <p style={{ margin: 0, fontSize: "13px", color: "#14193A", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {message.subject || "(ohne Betreff)"}
                       </p>
-                      <p style={{ margin: "3px 0 0", fontSize: "11px", color: "#6B7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        Von {message.from_name ? `${message.from_name} <${message.from_email}>` : message.from_email} · an {message.account_email}
-                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px" }}>
+                        <span style={{ fontSize: "10px", fontWeight: 600, color: meta.color, background: meta.background, borderRadius: "999px", padding: "2px 7px" }}>{meta.label}</span>
+                        <p style={{ margin: 0, fontSize: "11px", color: "#6B7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {kind === "received"
+                            ? `Von ${message.from_name ? `${message.from_name} <${message.from_email}>` : message.from_email}`
+                            : `Über ${message.account_email}`}
+                        </p>
+                      </div>
                     </div>
                     <span style={{ fontSize: "11px", color: "#9CA3AF", whiteSpace: "nowrap" }}>{fmt(message.received_at)}</span>
                   </div>
@@ -96,7 +136,36 @@ export default function InboxTimeline({ entityType, entityId, venture }: Props) 
                         Anhang: {(message.attachment_names ?? []).join(", ") || "vorhanden"}
                       </p>
                     )}
-                    <MessageBody text={message.body_text} fallback={message.body_preview} style={{ fontFamily: "var(--font-sans)", fontSize: "12px", lineHeight: 1.55, color: "#374151" }} />
+                    {kind === "draft" ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <p style={{ margin: 0, fontSize: "11px", color: "#6B7280" }}>
+                          An {(message.to_emails ?? []).join(", ") || "Empfänger aus dem Postfach-Entwurf"}
+                        </p>
+                        <input
+                          value={draftEdits[message.id]?.subject ?? message.subject ?? ""}
+                          onChange={(event) => setDraftEdits((current) => ({ ...current, [message.id]: { subject: event.target.value, body: current[message.id]?.body ?? message.body_text ?? "" } }))}
+                          aria-label="Betreff des Entwurfs"
+                          style={{ width: "100%", border: "1px solid #D1D5E8", borderRadius: "8px", padding: "8px 10px", fontSize: "12px", color: "#14193A" }}
+                        />
+                        <textarea
+                          rows={8}
+                          value={draftEdits[message.id]?.body ?? message.body_text ?? ""}
+                          onChange={(event) => setDraftEdits((current) => ({ ...current, [message.id]: { subject: current[message.id]?.subject ?? message.subject ?? "", body: event.target.value } }))}
+                          aria-label="Text des Entwurfs"
+                          style={{ width: "100%", border: "1px solid #D1D5E8", borderRadius: "8px", padding: "8px 10px", fontSize: "12px", lineHeight: 1.55, color: "#374151", resize: "vertical" }}
+                        />
+                        <button
+                          onClick={() => void sendEditedDraft(message)}
+                          disabled={actionState[message.id]?.startsWith("Wird") || actionState[message.id]?.includes("freigegeben")}
+                          style={{ alignSelf: "flex-start", background: "#1B2A5E", color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "8px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                        >
+                          Bearbeitet senden
+                        </button>
+                        {actionState[message.id] && <p style={{ margin: 0, fontSize: "11px", color: actionState[message.id].includes("freigegeben") ? "#15803D" : "#B91C1C" }}>{actionState[message.id]}</p>}
+                      </div>
+                    ) : (
+                      <MessageBody text={message.body_text} fallback={message.body_preview} style={{ fontFamily: "var(--font-sans)", fontSize: "12px", lineHeight: 1.55, color: "#374151" }} />
+                    )}
                   </div>
                 )}
               </div>

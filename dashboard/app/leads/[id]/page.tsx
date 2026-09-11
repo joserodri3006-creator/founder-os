@@ -42,6 +42,16 @@ const ACTIVITY_COLORS: Record<string, string> = {
   created: "bg-teal-100 text-teal-700",
 };
 
+const ACTIVITY_LABELS: Record<string, string> = {
+  status_change: "Status geändert",
+  email_sent: "Gesendet",
+  email_draft: "Entwurf",
+  email_received: "Eingegangen",
+  note: "Notiz",
+  call: "Anruf",
+  created: "Erstellt",
+};
+
 const SOURCES: LeadSource[] = ["website", "linkedin", "empfehlung", "kaltakquise", "csv_import", "ki_suche"];
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as LeadStatus[];
 const REVIEW_STATUSES = Object.keys(REVIEW_STATUS_LABELS) as LeadReviewStatus[];
@@ -73,6 +83,7 @@ export default function LeadDetailPage() {
   const [selectedTags, setSelectedTags] = useState<{ id: string; name: string }[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [showMailModal, setShowMailModal] = useState(false);
+  const [editExistingDraft, setEditExistingDraft] = useState(false);
 
   // Kontaktdaten
   const [editFirst, setEditFirst] = useState("");
@@ -200,8 +211,11 @@ export default function LeadDetailPage() {
             firma: lead.company_name ?? "",
             email: lead.email ?? "",
           }}
-          onClose={() => setShowMailModal(false)}
+          onClose={() => { setShowMailModal(false); setEditExistingDraft(false); }}
           onSent={load}
+          initialSubject={editExistingDraft ? lead.ai_draft_subject ?? "" : ""}
+          initialBody={editExistingDraft ? lead.ai_draft_body ?? "" : ""}
+          isDraft={editExistingDraft}
         />
       )}
 
@@ -317,6 +331,23 @@ export default function LeadDetailPage() {
               }} />
           </Card>
 
+          {lead.ai_draft_approved === false && lead.ai_draft_subject && lead.ai_draft_body && (
+            <Card title="Offener E-Mail-Entwurf" badge="Entwurf">
+              <p style={{ margin: "0 0 6px", fontSize: "13px", fontWeight: 600, color: "#14193A" }}>
+                {lead.ai_draft_subject}
+              </p>
+              <p style={{ margin: "0 0 14px", fontSize: "12px", lineHeight: 1.55, color: "#6B7280", whiteSpace: "pre-wrap" }}>
+                {lead.ai_draft_body}
+              </p>
+              <button
+                onClick={() => { setEditExistingDraft(true); setShowMailModal(true); }}
+                style={{ background: "#1B2A5E", color: "#FFFFFF", border: "none", borderRadius: "8px", padding: "9px 14px", fontSize: "13px", cursor: "pointer", fontWeight: 500 }}
+              >
+                Bearbeiten und senden
+              </button>
+            </Card>
+          )}
+
           {/* Activity Feed */}
           <Card title="Aktivitäten">
             {activities.length === 0 ? (
@@ -328,7 +359,7 @@ export default function LeadDetailPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${ACTIVITY_COLORS[a.activity_type] ?? "bg-gray-100 text-gray-600"}`}>
-                          {a.activity_type}
+                          {ACTIVITY_LABELS[a.activity_type] ?? a.activity_type}
                         </span>
                         <div>
                           {a.from_status && a.to_status && (
@@ -359,7 +390,11 @@ export default function LeadDetailPage() {
               <label style={labelStyle}>Status</label>
               <select value={lead.status} onChange={e => saveField("status", e.target.value)}
                 style={{ ...inputStyle, background: '#fff', cursor: 'pointer' }}>
-                {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+                {ALL_STATUSES.map(s => (
+                  <option key={s} value={s} disabled={s === "follow_up" || s === "nachgefasst"}>
+                    {STATUS_LABELS[s]}{s === "follow_up" || s === "nachgefasst" ? " (nur nach Mailversand)" : ""}
+                  </option>
+                ))}
               </select>
             </div>
             <div style={{ marginBottom: '14px' }}>

@@ -18,6 +18,9 @@ interface Props {
   vars: Record<string, string>;
   onClose: () => void;
   onSent?: () => void;
+  initialSubject?: string;
+  initialBody?: string;
+  isDraft?: boolean;
 }
 
 function resolvePlaceholders(text: string, vars: Record<string, string>) {
@@ -26,11 +29,12 @@ function resolvePlaceholders(text: string, vars: Record<string, string>) {
 
 export default function SendMailModal({
   entityType, entityId, venture, recipientEmail, recipientName, vars, onClose, onSent,
+  initialSubject = "", initialBody = "", isDraft = false,
 }: Props) {
   const [templates, setTemplates] = useState<OutreachTemplate[]>([]);
   const [templateId, setTemplateId] = useState("");
-  const [subject, setSubject] = useState("");
-  const [body, setBody] = useState("");
+  const [subject, setSubject] = useState(initialSubject);
+  const [body, setBody] = useState(initialBody);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -58,7 +62,7 @@ export default function SendMailModal({
     const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subject, body }),
+      body: JSON.stringify({ subject, body, is_ai_draft_send: isDraft }),
     });
     setSending(false);
     if (res.ok) {
@@ -88,7 +92,7 @@ export default function SendMailModal({
 
         <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid #EEF0F7" }}>
           <h2 style={{ fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: "20px", color: "#14193A" }}>
-            E-Mail schreiben
+            {isDraft ? "E-Mail-Entwurf bearbeiten" : "E-Mail schreiben"}
           </h2>
           <button onClick={onClose} style={{ color: "#6B7280", fontSize: "22px", lineHeight: 1, background: "none", border: "none", cursor: "pointer" }}>×</button>
         </div>
@@ -144,7 +148,7 @@ export default function SendMailModal({
                 disabled={sending || !recipientEmail || !subject.trim() || !body.trim()}
                 className="flex-1 py-2.5 text-sm font-semibold rounded-lg"
                 style={{ background: "#1B2A5E", color: "#FFFFFF", border: "none", cursor: sending ? "not-allowed" : "pointer", opacity: (sending || !recipientEmail) ? 0.6 : 1 }}>
-                {sending ? "Wird gesendet…" : "Senden"}
+                {sending ? "Wird gesendet…" : isDraft ? "Entwurf senden" : "Senden"}
               </button>
               <button onClick={onClose} type="button"
                 className="flex-1 py-2.5 text-sm font-medium rounded-lg"

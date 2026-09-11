@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { canSetStatusWithoutEmailSend } from "@/lib/lead-mail-state";
 import { searchGoogleLeads } from "@/lib/google-lead-search";
 import { upsertMemory, MemoryType } from "@/lib/jarvis-memory";
 
@@ -334,6 +335,9 @@ export async function executeJarvisTool(
       const leadId = input.lead_id as string;
       const status = input.status as string;
       if (!leadId || !status) return JSON.stringify({ error: "lead_id und status erforderlich" });
+      if (!canSetStatusWithoutEmailSend(status)) {
+        return JSON.stringify({ error: "Follow-up und Nachgefasst dürfen nur durch einen erfolgreich versendeten E-Mail-Schritt gesetzt werden." });
+      }
 
       const { data: existing, error: fetchError } = await supabaseAdmin
         .from("leads")

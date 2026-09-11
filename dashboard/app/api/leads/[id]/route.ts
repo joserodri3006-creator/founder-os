@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { canSetStatusWithoutEmailSend } from "@/lib/lead-mail-state";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -33,6 +34,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const rawBody = await req.json();
   const { tag_ids, ...body } = rawBody;
+
+  if (body.status && !canSetStatusWithoutEmailSend(body.status)) {
+    return NextResponse.json(
+      { error: "Follow-up und Nachgefasst werden nur nach einem erfolgreich versendeten E-Mail-Schritt gesetzt." },
+      { status: 409 }
+    );
+  }
 
   if (tag_ids !== undefined) {
     await supabaseAdmin.from("lead_tag_map").delete().eq("lead_id", id);

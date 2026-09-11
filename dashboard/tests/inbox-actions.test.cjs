@@ -8,6 +8,7 @@ const {
   parseIgnoredIds,
   addIgnoredId,
   payloadFromInboxMessage,
+  hasPendingMailSend,
 } = require("../lib/inbox-actions.js");
 
 const message = {
@@ -88,4 +89,14 @@ test("counts bulk candidates by same sender and venture", () => {
     { from_email: "a@example.com", venture: "online_first" },
     { from_email: "b@example.com", venture: "brandary" },
   ], selected), 2);
+});
+
+test("detects an already queued send for the same mailbox draft", () => {
+  const actions = [
+    { status: "queued", action: "mail_update_and_send", message: { id: "draft-1" } },
+    { status: "done", action: "mail_send", message: { id: "draft-2" } },
+  ];
+  assert.equal(hasPendingMailSend(actions, "draft-1"), true);
+  assert.equal(hasPendingMailSend(actions, "draft-2"), false);
+  assert.equal(hasPendingMailSend(actions, "draft-3"), false);
 });

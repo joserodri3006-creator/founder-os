@@ -73,6 +73,7 @@ const ACTION_LABELS: Record<string, string> = {
   mail_delete: "Löschen",
   mail_send: "Senden",
   mail_update_draft: "Entwurf speichern",
+  mail_update_and_send: "Bearbeiten & senden",
 };
 
 const ACTION_STATUS_LABELS: Record<string, string> = {

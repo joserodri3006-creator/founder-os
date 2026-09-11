@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { canSetStatusWithoutEmailSend } from "@/lib/lead-mail-state";
 
 const REVIEW_COLUMNS = [
   "review_status",
@@ -83,6 +84,9 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const { id, status } = await req.json();
   if (!id || !status) return NextResponse.json({ error: "id und status erforderlich" }, { status: 400 });
+  if (!canSetStatusWithoutEmailSend(status)) {
+    return NextResponse.json({ error: "Follow-up und Nachgefasst werden nur nach erfolgreichem E-Mail-Versand gesetzt." }, { status: 409 });
+  }
 
   const { error } = await supabaseAdmin.from("leads").update({ status }).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

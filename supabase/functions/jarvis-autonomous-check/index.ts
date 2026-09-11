@@ -117,6 +117,21 @@ async function sendFollowUpEmail(venture: string, lead: LeadCandidate, proposal:
   });
   if (!res.ok) throw new Error(`Resend Fehler (${res.status}): ${await res.text()}`);
 
+  const sentAt = new Date().toISOString();
+  const nextStatus = lead.status === "neu" || lead.status === "in_bearbeitung"
+    ? "kontaktiert"
+    : lead.status === "kontaktiert"
+      ? "follow_up"
+      : lead.status === "follow_up" ? "nachgefasst" : lead.status;
+  const nextFollowUpDate = new Date();
+  nextFollowUpDate.setDate(nextFollowUpDate.getDate() + 5);
+  const { error: updateError } = await supabase.from("leads").update({
+    status: nextStatus,
+    last_contacted_at: sentAt,
+    follow_up_date: nextStatus === "follow_up" ? nextFollowUpDate.toISOString().split("T")[0] : null,
+  }).eq("id", lead.id);
+  if (updateError) throw new Error(`Versand erfolgt, Lead-Status konnte nicht aktualisiert werden: ${updateError.message}`);
+
   await supabase.from("lead_activities").insert({
     lead_id: lead.id,
     activity_type: "email_sent",

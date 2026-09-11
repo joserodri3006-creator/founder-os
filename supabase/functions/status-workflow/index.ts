@@ -237,15 +237,9 @@ Deno.serve(async (req) => {
       }
 
       case "follow_up": {
-        if (!lead.automation_enabled) break;
-        const today = new Date().toISOString().split("T")[0];
-        if (lead.follow_up_date && lead.follow_up_date > today) break; // Noch nicht fällig
-
-        const draft = await generateDraft(lead, "follow_up");
-        update.ai_draft_subject = draft.subject;
-        update.ai_draft_body = draft.body;
-        update.ai_draft_created_at = new Date().toISOString();
-        update.ai_draft_approved = false;
+        // Der Status ist ein Versandnachweis und darf nicht selbst den Entwurf erzeugen.
+        // Fällige Follow-up-Entwürfe kommen aus dem Jarvis-Autonomie-Check, während
+        // der Lead bis zum erfolgreichen Versand auf "kontaktiert" bleibt.
         break;
       }
 
