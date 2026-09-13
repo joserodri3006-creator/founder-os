@@ -6,8 +6,7 @@ export async function GET(req: NextRequest) {
   let query = supabaseAdmin
     .from("return_classes")
     .select("*")
-    .order("is_default", { ascending: false })
-    .order("created_at");
+    .order("max_weight", { ascending: true, nullsFirst: false });
 
   if (venture) query = query.eq("venture", venture);
 

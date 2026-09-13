@@ -8,9 +8,17 @@ interface ReturnClass {
   name: string;
   description?: string;
   cost: number;
-  is_default: boolean;
+  max_weight: number | null; // Gramm; null = oberste/unbegrenzte Stufe
   venture: string;
   created_at: string;
+}
+
+function sortByWeight(classes: ReturnClass[]) {
+  return [...classes].sort((a, b) => {
+    const aw = a.max_weight ?? Infinity;
+    const bw = b.max_weight ?? Infinity;
+    return aw - bw;
+  });
 }
 
 export default function RetoureklassenPage() {
@@ -21,21 +29,29 @@ export default function RetoureklassenPage() {
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [newCost, setNewCost] = useState("0");
+  const [newMaxWeight, setNewMaxWeight] = useState(""); // kg, leer = unbegrenzt
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editCost, setEditCost] = useState("0");
+  const [editMaxWeight, setEditMaxWeight] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
     fetch(`/api/retoureklassen?venture=${venture}`)
       .then(r => r.json())
-      .then(data => setClasses(Array.isArray(data) ? data : []))
+      .then(data => setClasses(sortByWeight(Array.isArray(data) ? data : [])))
       .finally(() => setLoading(false));
   }, [venture]);
 
   useEffect(() => { load(); }, [load]);
+
+  function parseMaxWeightKg(value: string): number | null {
+    if (!value.trim()) return null; // unbegrenzt
+    const kg = parseFloat(value.replace(",", "."));
+    return Number.isFinite(kg) ? Math.round(kg * 1000) : null;
+  }
 
   async function create() {
     if (!newName.trim()) return;
@@ -47,11 +63,11 @@ export default function RetoureklassenPage() {
         name: newName.trim(),
         description: newDesc.trim() || null,
         cost: parseFloat(newCost) || 0,
+        max_weight: parseMaxWeightKg(newMaxWeight),
         venture,
-        is_default: classes.length === 0,
       }),
     });
-    setNewName(""); setNewDesc(""); setNewCost("0");
+    setNewName(""); setNewDesc(""); setNewCost("0"); setNewMaxWeight("");
     setShowNew(false);
     setSaving(false);
     load();
@@ -66,6 +82,7 @@ export default function RetoureklassenPage() {
         name: editName.trim(),
         description: editDesc.trim() || null,
         cost: parseFloat(editCost) || 0,
+        max_weight: parseMaxWeightKg(editMaxWeight),
       }),
     });
     setEditId(null);
@@ -74,21 +91,8 @@ export default function RetoureklassenPage() {
   }
 
   async function remove(id: string, name: string) {
-    if (!confirm(`Retoureklasse "${name}" wirklich löschen? Produkte verlieren die Zuordnung.`)) return;
+    if (!confirm(`Gewichtsstufe "${name}" wirklich löschen?`)) return;
     await fetch(`/api/retoureklassen/${id}`, { method: "DELETE" });
-    load();
-  }
-
-  async function setDefault(id: string) {
-    await Promise.all(
-      classes.map(c =>
-        fetch(`/api/retoureklassen/${c.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ is_default: c.id === id }),
-        })
-      )
-    );
     load();
   }
 
@@ -97,6 +101,7 @@ export default function RetoureklassenPage() {
     setEditName(c.name);
     setEditDesc(c.description ?? "");
     setEditCost(String(c.cost));
+    setEditMaxWeight(c.max_weight != null ? String(c.max_weight / 1000) : "");
   }
 
   return (
@@ -105,14 +110,14 @@ export default function RetoureklassenPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-900">Retoureklassen</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Retourekosten pro Klasse · {venture.replace(/_/g, " ")}
+            Gewichtsbasierte Rücksendekosten · {venture.replace(/_/g, " ")}
           </p>
         </div>
         <button
           onClick={() => setShowNew(true)}
           className="text-sm px-4 py-2 bg-[#1B2A5E] text-white rounded-lg hover:bg-[#14224D] transition-colors"
         >
-          + Neue Klasse
+          + Neue Gewichtsstufe
         </button>
       </div>
 
@@ -120,24 +125,35 @@ export default function RetoureklassenPage() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
         <p className="font-semibold mb-1">Wie funktionieren Retoureklassen?</p>
         <ul className="list-disc list-inside space-y-0.5 text-blue-700">
-          <li>Jedes Produkt kann einer Retoureklasse zugewiesen werden</li>
-          <li>Bei Retouren werden die Kosten automatisch angezeigt</li>
-          <li>Kunden sehen die Retourekosten vor der Beantragung</li>
-          <li>Beispiele: „Kostenlos", „Käufer trägt Porto (4,99 €)", „Sperrgut (19,90 €)"</li>
+          <li>Analog zu den Versandklassen — nach Gesamtgewicht der Rücksendung gestaffelt</li>
+          <li>Jede Stufe hat ein Maximalgewicht (in kg) und einen Pauschalpreis</li>
+          <li>Bei einer Retoure wird automatisch die passende Stufe anhand des Gesamtgewichts gewählt</li>
+          <li>Die letzte Stufe (ohne Maximalgewicht) fängt alles oberhalb der anderen Stufen auf</li>
         </ul>
       </div>
 
       {/* Neue Klasse */}
       {showNew && (
         <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-3">
-          <p className="text-sm font-semibold text-gray-700">Neue Retoureklasse</p>
+          <p className="text-sm font-semibold text-gray-700">Neue Gewichtsstufe</p>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="text-xs text-gray-500 block mb-1">Name *</label>
               <input
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
-                placeholder="z.B. Kostenlose Retoure"
+                placeholder="z.B. Standard, Schwer, Sperrig"
+                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Bis Gewicht (kg)</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={newMaxWeight}
+                onChange={e => setNewMaxWeight(e.target.value)}
+                placeholder="leer = unbegrenzt"
                 className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
@@ -152,7 +168,7 @@ export default function RetoureklassenPage() {
                 className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
-            <div>
+            <div className="col-span-2">
               <label className="text-xs text-gray-500 block mb-1">Beschreibung (optional)</label>
               <input
                 value={newDesc}
@@ -180,13 +196,13 @@ export default function RetoureklassenPage() {
         </div>
       )}
 
-      {/* Klassenlist */}
+      {/* Klassenliste */}
       {loading ? (
         <p className="text-sm text-gray-400">Laden…</p>
       ) : classes.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 px-5 py-8 text-center">
-          <p className="text-sm text-gray-500">Noch keine Retoureklassen</p>
-          <p className="text-xs text-gray-400 mt-1">Klasse anlegen um Retourekosten zu definieren</p>
+          <p className="text-sm text-gray-500">Noch keine Gewichtsstufen</p>
+          <p className="text-xs text-gray-400 mt-1">Stufe anlegen um Retourekosten zu definieren</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -204,6 +220,17 @@ export default function RetoureklassenPage() {
                       />
                     </div>
                     <div>
+                      <label className="text-xs text-gray-500 block mb-1">Bis Gewicht (kg)</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={editMaxWeight}
+                        onChange={e => setEditMaxWeight(e.target.value)}
+                        placeholder="leer = unbegrenzt"
+                        className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
                       <label className="text-xs text-gray-500 block mb-1">Retourekosten (€)</label>
                       <input
                         type="number"
@@ -214,7 +241,7 @@ export default function RetoureklassenPage() {
                         className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <label className="text-xs text-gray-500 block mb-1">Beschreibung</label>
                       <input
                         value={editDesc}
@@ -239,11 +266,9 @@ export default function RetoureklassenPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                      {c.is_default && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1B2A5E] text-white font-bold uppercase">
-                          Standard
-                        </span>
-                      )}
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">
+                        {c.max_weight != null ? `bis ${(c.max_weight / 1000).toLocaleString("de-DE")} kg` : "unbegrenzt"}
+                      </span>
                     </div>
                     {c.description && <p className="text-xs text-gray-400 mt-0.5">{c.description}</p>}
                     <p className="text-sm font-semibold mt-1" style={{ color: c.cost === 0 ? "#16A34A" : "#D97706" }}>
@@ -251,14 +276,6 @@ export default function RetoureklassenPage() {
                     </p>
                   </div>
                   <div className="flex gap-2 shrink-0">
-                    {!c.is_default && (
-                      <button
-                        onClick={() => setDefault(c.id)}
-                        className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
-                      >
-                        Als Standard
-                      </button>
-                    )}
                     <button
                       onClick={() => startEdit(c)}
                       className="text-xs text-blue-600 hover:text-blue-700"
