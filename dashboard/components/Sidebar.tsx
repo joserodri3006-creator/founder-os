@@ -58,6 +58,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       label: "Website",
       items: [
         { href: "/website/startseite", label: "Startseite", show: venture === "itaba" && canView("settings") },
+        { href: "/website/banner", label: "Ankündigungsbanner", show: venture === "itaba" && canView("settings") },
       ],
     },
     {

@@ -51,6 +51,7 @@ interface Customer {
   customer_type: "b2c" | "b2b" | null;
   status: "active" | "pending" | "inactive" | null;
   discount_rate: number | null;
+  payment_terms_days: number | null;
   created_at: string;
   orders: Order[];
   tags?: Tag[];
@@ -104,6 +105,7 @@ export default function KundeDetailPage() {
   const [editType, setEditType]         = useState<"b2c" | "b2b">("b2c");
   const [editStatus, setEditStatus]     = useState<"active" | "pending" | "inactive">("active");
   const [editDiscount, setEditDiscount] = useState<string>("0");
+  const [editPaymentTerms, setEditPaymentTerms] = useState<string>("");
 
   // B2B-Rabatte
   const [catDiscounts, setCatDiscounts]   = useState<CategoryDiscount[]>([]);
@@ -140,6 +142,7 @@ export default function KundeDetailPage() {
     setEditType((data.customer_type as "b2c" | "b2b") ?? "b2c");
     setEditStatus((data.status as "active" | "pending" | "inactive") ?? "active");
     setEditDiscount(String(data.discount_rate ?? 0));
+    setEditPaymentTerms(data.payment_terms_days != null ? String(data.payment_terms_days) : "");
     setLoading(false);
   }
 
@@ -497,7 +500,7 @@ export default function KundeDetailPage() {
             </div>
 
             {/* Globaler Rabatt */}
-            <div>
+            <div style={{ marginBottom: '14px' }}>
               <label style={labelStyle}>Globaler Rabatt (%)</label>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
@@ -515,6 +518,29 @@ export default function KundeDetailPage() {
                   ✓ {editDiscount}% Rabatt aktiv
                 </p>
               )}
+            </div>
+
+            {/* Zahlungsziel */}
+            <div>
+              <label style={labelStyle}>Zahlungsziel (Tage)</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="number" min="0" max="365" step="1"
+                  value={editPaymentTerms}
+                  onChange={e => setEditPaymentTerms(e.target.value)}
+                  style={{ ...inputStyle, width: '100px' }}
+                  onFocus={e => e.target.style.borderColor = '#1B2A5E'}
+                  onBlur={e => {
+                    e.target.style.borderColor = '#D1D5E8';
+                    const parsed = parseInt(editPaymentTerms, 10);
+                    saveB2BField("payment_terms_days", Number.isFinite(parsed) ? parsed : null);
+                  }}
+                />
+                <span style={{ fontSize: '13px', color: '#6B7280', alignSelf: 'center' }}>Tage nach Rechnung</span>
+              </div>
+              <p style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+                Leer = Standard-Zahlungsziel 30 Tage.
+              </p>
             </div>
           </Card>
 

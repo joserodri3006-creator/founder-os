@@ -33,6 +33,7 @@ interface Order {
   status: string;
   deadline: string | null;
   venture: string;
+  channel: string | null;
   created_at: string;
   notes: string | null;
   description: string | null;
@@ -46,8 +47,11 @@ interface Order {
   invoice_number: string | null;
   invoice_generated_at: string | null;
   invoice_html: string | null;
+  invoice_data: { delivery_method?: string } | null;
   payment_model_id: string | null;
   payment_steps: PaymentStep[];
+  pickup_ready: boolean;
+  pickup_ready_at: string | null;
   customer: {
     id: string;
     first_name: string;
@@ -147,6 +151,14 @@ export default function AuftragDetailPage() {
 
   // Storno
   const [stornoSaving, setStornoSaving] = useState(false);
+
+  // Itaba: Abholbereit markieren (B2C Abholung)
+  const [pickupReadySaving, setPickupReadySaving] = useState(false);
+  const [pickupReadyMsg, setPickupReadyMsg] = useState<string | null>(null);
+
+  // Itaba: B2B-Bestellung bestätigen (Rechnung erst bei Bestätigung)
+  const [b2bConfirmSaving, setB2bConfirmSaving] = useState(false);
+  const [b2bConfirmMsg, setB2bConfirmMsg] = useState<string | null>(null);
 
   // Rechnungsvorschau
   const [showInvoicePreview, setShowInvoicePreview] = useState(false);
@@ -389,6 +401,80 @@ export default function AuftragDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Itaba: B2B-Bestellung bestätigen (erst hier wird die Rechnung generiert) */}
+          {order.venture === "itaba" && order.channel === "b2b" && order.status === "neu" && (
+            <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-2">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">B2B-Bestellung</p>
+              <p className="text-sm text-gray-600">
+                Diese Bestellung wurde vom Kunden vorgemerkt. Erst nach Bestätigung wird die Rechnung generiert und dem Kunden per E-Mail zugestellt.
+              </p>
+              {b2bConfirmMsg && (
+                <div className="text-xs px-3 py-2 rounded-md bg-blue-50 text-blue-700">{b2bConfirmMsg}</div>
+              )}
+              <button
+                onClick={async () => {
+                  setB2bConfirmSaving(true);
+                  setB2bConfirmMsg(null);
+                  const res = await fetch(`/api/auftraege/${id}/b2b-bestaetigen`, { method: "POST" });
+                  const data = await res.json();
+                  if (res.ok) {
+                    setB2bConfirmMsg(
+                      data.already_confirmed
+                        ? "Bereits bestätigt."
+                        : `Bestätigt — Rechnung ${data.invoice_number ?? ""} ${data.invoice_sent ? "versendet" : "erstellt"}.`
+                    );
+                    await reload();
+                  } else {
+                    setB2bConfirmMsg(data.error ?? "Fehler bei der Bestätigung");
+                  }
+                  setB2bConfirmSaving(false);
+                }}
+                disabled={b2bConfirmSaving}
+                className="text-sm px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              >
+                {b2bConfirmSaving ? "…" : "Bestellung bestätigen"}
+              </button>
+            </div>
+          )}
+
+          {/* Itaba: Abholbereit markieren (B2C Abholung) */}
+          {order.venture === "itaba" && order.channel === "b2c" && order.invoice_data?.delivery_method === "abholung" && (
+            <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Abholung</p>
+                {order.pickup_ready && (
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">
+                    ✓ Abholbereit{order.pickup_ready_at ? ` seit ${new Date(order.pickup_ready_at).toLocaleDateString("de-DE")}` : ""}
+                  </span>
+                )}
+              </div>
+              {pickupReadyMsg && (
+                <div className="text-xs px-3 py-2 rounded-md bg-blue-50 text-blue-700">{pickupReadyMsg}</div>
+              )}
+              {!order.pickup_ready && (
+                <button
+                  onClick={async () => {
+                    setPickupReadySaving(true);
+                    setPickupReadyMsg(null);
+                    const res = await fetch(`/api/auftraege/${id}/pickup-ready`, { method: "POST" });
+                    const data = await res.json();
+                    if (res.ok) {
+                      setPickupReadyMsg(data.already_ready ? "War bereits abholbereit." : "Kunde wurde per E-Mail benachrichtigt.");
+                      await reload();
+                    } else {
+                      setPickupReadyMsg(data.error ?? "Fehler beim Markieren");
+                    }
+                    setPickupReadySaving(false);
+                  }}
+                  disabled={pickupReadySaving}
+                  className="text-sm px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                >
+                  {pickupReadySaving ? "…" : "Als abholbereit markieren + Kunde benachrichtigen"}
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Auftragsdetails */}
           <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 grid grid-cols-2 gap-4 text-sm">

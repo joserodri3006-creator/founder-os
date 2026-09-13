@@ -21,6 +21,7 @@ const API_SECTIONS: Array<{ prefix: string; section: Section }> = [
   { prefix: "/api/team", section: "settings" },
   { prefix: "/api/outreach-templates", section: "settings" },
   { prefix: "/api/config", section: "settings" },
+  { prefix: "/api/itaba-banner", section: "settings" },
   { prefix: "/api/attachments", section: "orders" },
 ];
 // /api/tasks bedient sowohl Leads als auch Kunden (polymorph) — bewusst nicht auf

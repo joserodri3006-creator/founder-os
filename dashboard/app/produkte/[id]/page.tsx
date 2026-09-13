@@ -59,6 +59,7 @@ export default function ProduktDetailPage() {
   const [editShortDesc, setEditShortDesc] = useState("");
   const [editSku, setEditSku] = useState("");
   const [editWeight, setEditWeight] = useState("");
+  const [editPackagingUnit, setEditPackagingUnit] = useState("");
   const [editFeatured, setEditFeatured] = useState(false);
   const [editTrackInventory, setEditTrackInventory] = useState(false);
   const [editSourceType, setEditSourceType] = useState("own");
@@ -170,6 +171,7 @@ export default function ProduktDetailPage() {
     setEditSku(p.sku ?? "");
     setEditInternalNumber(p.internal_number ?? "");
     setEditWeight(p.weight != null ? String(p.weight) : "");
+    setEditPackagingUnit(p.packaging_unit ?? "");
     setEditFeatured(p.is_featured ?? false);
     setEditTrackInventory(p.track_inventory ?? false);
     setEditSourceType(p.source_type ?? "own");
@@ -222,6 +224,7 @@ export default function ProduktDetailPage() {
       name: editName, sku: editSku || null, internal_number: editInternalNumber || null,
       short_description: editShortDesc || null, description: editDescription || null,
       weight: editWeight ? parseFloat(editWeight) : null,
+      packaging_unit: editPackagingUnit.trim() || null,
       is_featured: editFeatured, track_inventory: isAffiliate ? false : editTrackInventory,
       source_type: editSourceType,
       affiliate_network: editSourceType === "affiliate" ? editAffiliateNetwork || null : null,
@@ -473,6 +476,12 @@ export default function ProduktDetailPage() {
                     className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
                 </div>
               )}
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Verpackungseinheit</label>
+                <input type="text" value={editPackagingUnit} onChange={e => setEditPackagingUnit(e.target.value)}
+                  placeholder="z.B. 1 Stück, 6er-Karton, Set à 4"
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
             </div>
             <div>
               <label className="text-xs text-gray-500 block mb-1">Kurzbeschreibung</label>
