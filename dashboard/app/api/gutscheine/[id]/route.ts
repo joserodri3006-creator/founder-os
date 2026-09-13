@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+type Params = { params: Promise<{ id: string }> };
+
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: Params
 ) {
-  const { id } = params;
+  const { id } = await params;
 
   const [voucherRes, redemptionsRes] = await Promise.all([
     supabaseAdmin.from("vouchers").select("*").eq("id", id).single(),
@@ -27,9 +29,9 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: Params
 ) {
-  const { id } = params;
+  const { id } = await params;
   const body = await req.json();
 
   const allowed = ["status", "notes", "valid_until", "max_uses"];

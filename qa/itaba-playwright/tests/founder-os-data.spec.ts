@@ -39,7 +39,7 @@ test.describe('Founder OS / Supabase data for Itaba', () => {
     const orders = await supabaseGet<Order>('orders?select=id,invoice_number,title,status,value,channel,invoice_generated_at,invoice_html,invoice_sent,invoice_data,notes,created_at&venture=eq.itaba&order=created_at.desc&limit=10');
     expect(orders.length).toBeGreaterThan(0);
     for (const order of orders.slice(0, 3)) {
-      expect(order.invoice_number).toMatch(/^IT-/);
+      expect(order.invoice_number).toMatch(/^IT(?:\d{6}|-[A-Z0-9]{4,8})$/);
       expect(order.value).toBeGreaterThan(0);
     }
 

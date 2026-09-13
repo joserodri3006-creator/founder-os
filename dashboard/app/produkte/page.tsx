@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useVenture } from "@/context/VentureContext";
 import { getVenture } from "@/lib/ventures";
 import CopyEntityModal from "@/components/CopyEntityModal";
+import { stockPresentation } from "@/lib/product-stock";
 
 interface Product {
   id: string;
@@ -25,6 +26,8 @@ interface Product {
   is_featured: boolean;
   channel: string | null;
   images: { url: string; alt: string }[];
+  track_inventory: boolean;
+  product_variants: { stock_quantity: number }[];
   product_type: { id: string; name: string; has_variants: boolean; has_inventory: boolean } | null;
   brand: { id: string; name: string } | null;
 }
@@ -243,13 +246,13 @@ export default function ProdukteListPage() {
           }}
         >
           <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ minWidth: '580px' }}>
+          <table className="w-full text-sm" style={{ minWidth: '680px' }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EEF0F7", background: "#F7F8FC" }}>
-                {["Produkt", "Art", "Typ", "SKU", "Preis", "Channel", "Status", "Aktionen"].map((h) => (
+                {["Produkt", "Art", "Typ", "SKU", "Preis", "Bestand", "Channel", "Status", "Aktionen"].map((h) => (
                   <th
                     key={h}
-                    className={`px-4 py-3 font-semibold uppercase ${h === "Preis" ? "text-right" : ["Status","Channel","Art"].includes(h) ? "text-center" : "text-left"}`}
+                    className={`px-4 py-3 font-semibold uppercase ${h === "Preis" ? "text-right" : ["Status","Channel","Art","Bestand"].includes(h) ? "text-center" : "text-left"}`}
                     style={{ fontSize: "11px", letterSpacing: "0.07em", color: "#6B7280" }}
                   >
                     {h}
@@ -333,6 +336,27 @@ export default function ProdukteListPage() {
                         )}
                       </div>
                     ) : <span style={{ color: "#6B7280" }}>—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {(() => {
+                      const stock = stockPresentation(p.track_inventory, p.product_variants);
+                      const tones: Record<string, { background: string; color: string; title: string }> = {
+                        untracked: { background: "transparent", color: "#9CA3AF", title: "Bestand wird nicht geführt" },
+                        out: { background: "rgba(220,38,38,0.1)", color: "#B91C1C", title: "Nicht auf Lager" },
+                        low: { background: "rgba(217,119,6,0.12)", color: "#B45309", title: "Niedriger Bestand" },
+                        ok: { background: "rgba(22,163,74,0.08)", color: "#15803D", title: "Auf Lager" },
+                      };
+                      const tone = tones[stock.tone];
+                      return (
+                        <span
+                          className="inline-flex min-w-7 justify-center rounded-full px-2 py-0.5 text-xs font-semibold"
+                          style={{ background: tone.background, color: tone.color }}
+                          title={tone.title}
+                        >
+                          {stock.label}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {(() => {

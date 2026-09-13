@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { activeVariantStocks } from "@/lib/product-stock";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -17,6 +18,7 @@ export async function GET(req: NextRequest) {
       affiliate_commission_rate, affiliate_commission_type, affiliate_status,
       sync_status, last_synced_at, wc_product_id, channel,
       track_inventory, venture, created_at, updated_at, images,
+      product_variants(stock_quantity, is_active),
       product_type:product_types(id, name, has_variants, has_inventory),
       brand:product_brands(id, name)
     `)
@@ -31,17 +33,22 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const products = (data ?? []).map((product: any) => ({
+    ...product,
+    product_variants: activeVariantStocks(product.product_variants),
+  }));
+
   // Filter by category via junction table
-  if (category_id && data) {
+  if (category_id) {
     const { data: map } = await supabaseAdmin
       .from("product_category_map")
       .select("product_id")
       .eq("category_id", category_id);
     const ids = new Set((map ?? []).map((r: any) => r.product_id));
-    return NextResponse.json(data.filter((p: any) => ids.has(p.id)));
+    return NextResponse.json(products.filter((p: any) => ids.has(p.id)));
   }
 
-  return NextResponse.json(data ?? []);
+  return NextResponse.json(products);
 }
 
 export async function POST(req: NextRequest) {

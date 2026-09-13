@@ -55,6 +55,12 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       ],
     },
     {
+      label: "Website",
+      items: [
+        { href: "/website/startseite", label: "Startseite", show: venture === "itaba" && canView("settings") },
+      ],
+    },
+    {
       label: "Produkte",
       items: [
         { href: "/produkte", label: "Produkte", show: canView("products") },

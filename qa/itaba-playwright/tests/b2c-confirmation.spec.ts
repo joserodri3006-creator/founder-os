@@ -59,7 +59,7 @@ test.describe('Itaba B2C Bestellbestätigung', () => {
 
       // Kerninhalte der Bestätigungsseite
       await expect(page.locator('h1')).toContainText(/Bestellung vorgemerkt/i);
-      await expect(page.locator('body')).toContainText(/IT-/); // Rechnungsnummer
+      await expect(page.locator('body')).toContainText(/IT\d{6}/); // Rechnungsnummer
       await expect(page.locator('body')).toContainText(/29,90\s*€/i); // Gesamtbetrag
       await expect(page.locator('body')).toContainText(/HERMES PLAYWRIGHT TEST/i); // Kundenname
       await expect(page.locator('body')).toContainText(/Teller rund/i); // Produkt
@@ -105,9 +105,9 @@ test.describe('Itaba B2C Bestellbestätigung', () => {
       await openPreviewShop(page);
       await page.goto(`${confirmPath}&preview=${PREVIEW_TOKEN}`, { waitUntil: 'networkidle', timeout: 20_000 });
       const bodyText = await page.locator('body').innerText();
-      const match = bodyText.match(/\bIT-[A-Z0-9]{4,8}\b/);
+      const match = bodyText.match(/\bIT\d{6}\b/);
       expect(match, 'Rechnungsnummer im Format IT-XXXXX nicht gefunden').toBeTruthy();
-      expect(match![0]).toMatch(/^IT-[A-Z0-9]{4,8}$/);
+      expect(match![0]).toMatch(/^IT\d{6}$/);
     } finally {
       await cancelTestOrder(order.order_id);
     }

@@ -16,8 +16,8 @@ test.describe('Itaba B2C cart and checkout', () => {
 
     await expect(page).toHaveURL(/\/kasse/);
     await expect(page.locator('body')).toContainText(/Kasse/i);
-    await expect(page.locator('body')).toContainText(/Gesamt\s*34,80\s*€/i);
-    await expect(page.locator('body')).toContainText(/Zahlung & Adresse|PayPal/i);
+    await expect(page.locator('body')).toContainText(/Gesamt\s*36,39\s*€/i);
+    await expect(page.locator('body')).toContainText(/Zahlung & Lieferadresse|PayPal/i);
   });
 
   test('pickup/bar checkout form is fillable and shows free pickup total before submit', async ({ page }) => {

@@ -19,7 +19,7 @@ test.describe('Itaba service flows', () => {
     const order = await createBarPickupOrderViaApi(request);
     try {
       const byId = await (await request.get(`/api/sendungsverfolgung?order_id=${order.order_id}&email=${encodeURIComponent(order.customer.email)}`, { headers: previewCookie })).json();
-      expect(byId.order_number).toMatch(/^IT-/);
+      expect(byId.order_number).toMatch(/^IT\d{6}$/);
       expect(byId.delivery_method).toBe('abholung');
       expect(byId.total).toBe(29.9);
 
