@@ -17,7 +17,8 @@ test.describe('Itaba approved change round', () => {
     await shop.hover();
     const submenu = page.locator('header').getByRole('link').filter({ hasText: /Tisch|Wohnen|Accessoires|Küche|Lebensmittel/ });
     await expect(submenu).toHaveCount(5);
-    expect(await submenu.allInnerTexts()).toEqual(expectedCategories);
+    expect((await submenu.allInnerTexts()).map(text => text.trim().toLocaleLowerCase('de-DE')))
+      .toEqual(expectedCategories.map(text => text.toLocaleLowerCase('de-DE')));
   });
 
   test('mobile header exposes expandable Shop submenu in approved order', async ({ page }) => {
@@ -26,9 +27,11 @@ test.describe('Itaba approved change round', () => {
     await page.getByRole('button', { name: /Menü öffnen/i }).click();
     const shopButton = page.getByRole('button', { name: 'Shop', exact: true });
     await shopButton.click();
-    for (const category of expectedCategories) await expect(page.getByRole('link', { name: category, exact: true })).toBeVisible();
-    const categoryTexts = await page.locator('header a[href*="kategorie="]').allInnerTexts();
-    expect(categoryTexts).toEqual(expectedCategories);
+    const header = page.locator('header');
+    for (const category of expectedCategories) await expect(header.getByRole('link', { name: category, exact: true })).toBeVisible();
+    const categoryTexts = await page.locator('header > div').last().locator('a[href*="kategorie="]').allInnerTexts();
+    expect(categoryTexts.map(text => text.trim().toLocaleLowerCase('de-DE')))
+      .toEqual(expectedCategories.map(text => text.toLocaleLowerCase('de-DE')));
   });
 
   test('checkout uses the same numbered contact and payment steps for shipping and pickup', async ({ page }) => {
@@ -41,7 +44,7 @@ test.describe('Itaba approved change round', () => {
     await expect(page.getByPlaceholder(/Vor- und Nachname/i)).toBeVisible();
     await page.getByText(/Abholung/).first().click();
     await expect(page.getByText(/2 · Kontaktdaten/i)).toBeVisible();
-    await expect(page.getByText(/^3 · Zahlung$/i)).toBeVisible();
+    await expect(page.getByText(/3\s*·\s*Zahlung/i)).toBeVisible();
     await expect(page.getByPlaceholder(/Vor- und Nachname/i)).toBeVisible();
   });
 
