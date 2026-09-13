@@ -43,7 +43,7 @@ export async function acceptOnlyRequiredCookies(page: Page) {
 }
 
 export function uniqueTestStamp() {
-  return new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+  return `${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 17)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
 export function readSupabaseServiceKey(): string {
