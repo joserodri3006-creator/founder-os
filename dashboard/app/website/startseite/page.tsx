@@ -15,11 +15,13 @@ type HomepageSlot = {
 };
 
 type PendingImage = { file: File; previewUrl: string };
+type LibraryImage = { id: string; name: string; url: string; storage_path?: string | null; source?: string };
 
 export default function StartseitePage() {
   const { venture } = useVenture();
   const { canEdit } = useAuth();
   const [slots, setSlots] = useState<HomepageSlot[]>([]);
+  const [library, setLibrary] = useState<LibraryImage[]>([]);
   const [pending, setPending] = useState<Record<string, PendingImage>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,6 +35,7 @@ export default function StartseitePage() {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "Bilder konnten nicht geladen werden.");
         setSlots(body.slots ?? []);
+        setLibrary(body.library ?? []);
       })
       .catch((error) => setMessage({ kind: "error", text: error.message }))
       .finally(() => setLoading(false));
@@ -70,6 +73,26 @@ export default function StartseitePage() {
       setSlots(latestSlots);
       setPending({});
       setMessage({ kind: "success", text: "Die Startseitenbilder wurden gespeichert." });
+    } catch (error) {
+      setMessage({ kind: "error", text: error instanceof Error ? error.message : "Speichern fehlgeschlagen." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function useLibraryImage(slotId: string, image: LibraryImage) {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/public/itaba-homepage-images", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slot: slotId, url: image.url, storage_path: image.storage_path, source: "library" }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Bild konnte nicht übernommen werden.");
+      setSlots(body.slots ?? []);
+      setMessage({ kind: "success", text: `${image.name} wurde übernommen.` });
     } catch (error) {
       setMessage({ kind: "error", text: error instanceof Error ? error.message : "Speichern fehlgeschlagen." });
     } finally {
@@ -147,7 +170,7 @@ export default function StartseitePage() {
                   </div>
                   {editable && (
                     <label className="mt-4 inline-flex cursor-pointer items-center rounded-lg border border-[#D1D5E8] px-3 py-2 text-sm font-semibold text-[#1B2A5E] hover:bg-[#F7F8FC]">
-                      Bild ersetzen
+                      Bild hochladen
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
@@ -157,6 +180,26 @@ export default function StartseitePage() {
                     </label>
                   )}
                   <p className="mt-2 text-[11px] text-[#9CA3AF]">JPG, PNG oder WebP · maximal 10 MB</p>
+
+                  {editable && library.length > 0 && (
+                    <div className="mt-4 border-t border-[#EEF0F7] pt-4">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">Auswahlbilder</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {library.map((image) => (
+                          <button
+                            key={`${slot.id}-${image.id}`}
+                            type="button"
+                            onClick={() => useLibraryImage(slot.id, image)}
+                            disabled={saving}
+                            className="group overflow-hidden rounded-lg border border-[#D1D5E8] bg-[#F7F8FC] text-left disabled:opacity-50"
+                            title={`${image.name} für ${slot.label} verwenden`}
+                          >
+                            <img src={image.url} alt={image.name} className="aspect-square w-full object-cover transition-transform group-hover:scale-105" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </article>
             );

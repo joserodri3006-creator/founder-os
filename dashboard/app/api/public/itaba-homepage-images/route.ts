@@ -10,6 +10,7 @@ import {
 } from "@/lib/itaba-homepage-images";
 
 const CONFIG_KEY = "itaba_homepage_images";
+const LIBRARY_KEY = "itaba_homepage_image_library";
 const STORAGE_BUCKET = "product-images";
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -22,13 +23,68 @@ async function readConfigValue() {
 }
 
 export async function GET() {
-  const { data, error } = await readConfigValue();
+  const [{ data, error }, libraryRes] = await Promise.all([
+    readConfigValue(),
+    supabaseAdmin.from("system_config").select("value").eq("key", LIBRARY_KEY).maybeSingle(),
+  ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (libraryRes.error) return NextResponse.json({ error: libraryRes.error.message }, { status: 500 });
+
+  const libraryValue = typeof libraryRes.data?.value === "string"
+    ? JSON.parse(libraryRes.data.value || "{}")
+    : libraryRes.data?.value ?? {};
 
   return NextResponse.json({
     key: CONFIG_KEY,
     slots: mergeHomepageImages(data?.value),
+    library: Array.isArray(libraryValue.images) ? libraryValue.images : [],
   });
+}
+
+export async function PATCH(req: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { data: roleRow, error: roleError } = await supabaseAdmin
+    .from("user_venture_roles")
+    .select("role, venture, permissions")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (roleError) return NextResponse.json({ error: roleError.message }, { status: 500 });
+  if (!canManageHomepageImages(roleRow?.role, roleRow?.venture, roleRow?.permissions ?? {})) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const slotDefinition = HOMEPAGE_IMAGE_SLOTS.find((item) => item.id === body.slot);
+  if (!slotDefinition || typeof body.url !== "string" || !body.url.trim()) {
+    return NextResponse.json({ error: "Gültiger Bildbereich und Bild-URL sind erforderlich." }, { status: 400 });
+  }
+
+  const { data: currentConfig, error: readError } = await readConfigValue();
+  if (readError) return NextResponse.json({ error: readError.message }, { status: 500 });
+  const previousImages = parseImages(currentConfig?.value);
+  const images = {
+    ...previousImages,
+    [slotDefinition.id]: {
+      url: body.url.trim(),
+      storage_path: typeof body.storage_path === "string" ? body.storage_path : null,
+      updated_at: new Date().toISOString(),
+      source: body.source ?? "library",
+    },
+  };
+
+  const { error: updateError } = await supabaseAdmin.from("system_config").upsert({
+    key: CONFIG_KEY,
+    value: JSON.stringify(images),
+    description: "Itaba Startseitenbilder",
+  }, { onConflict: "key" });
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+  return NextResponse.json({ key: CONFIG_KEY, slots: mergeHomepageImages(images) });
 }
 
 export async function POST(req: NextRequest) {
