@@ -57,16 +57,24 @@ async function restoreReturnItemsToStock(ret: { id: string; order_id: string | n
     const orderItem = (orderItems ?? []).find((oi) => oi.product_name === name);
     if (!orderItem?.product_id) { skipped++; continue; }
 
+    const { data: product, error: productError } = await supabaseAdmin
+      .from("products")
+      .select("track_inventory")
+      .eq("id", orderItem.product_id)
+      .maybeSingle();
+    if (productError) throw new Error(productError.message);
+    if (product?.track_inventory === false) { skipped++; continue; }
+
     const { data: variant, error: variantError } = await supabaseAdmin
       .from("product_variants")
-      .select("id, track_inventory, is_active")
+      .select("id, is_active")
       .eq("product_id", orderItem.product_id)
       .eq("is_active", true)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
     if (variantError) throw new Error(variantError.message);
-    if (!variant?.id || variant.track_inventory === false) { skipped++; continue; }
+    if (!variant?.id) { skipped++; continue; }
 
     const { error: movementError } = await supabaseAdmin.from("inventory_movements").insert({
       venture: ret.venture,
