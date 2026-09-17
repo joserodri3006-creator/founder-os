@@ -84,7 +84,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
     {
       label: "Team & Konto",
       items: [
-        { href: "/einstellungen", label: "Einstellungen", show: canEdit("settings") },
+        { href: "/einstellungen", label: "Einstellungen", show: canEdit("settings") && venture !== "itaba" },
         { href: "/einstellungen/team", label: "Team", show: canEdit("settings") && venture !== "itaba" },
         { href: "/benachrichtigungen", label: "Benachrichtigungen", show: true },
         { href: "/einstellungen/benachrichtigungen", label: "Benachrichtigungs-Einstellungen", show: true },
@@ -94,18 +94,18 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       label: "Shop-Einstellungen",
       items: [
         { href: "/einstellungen/zahlungsmodelle", label: "Zahlungsmodelle", show: canEdit("settings") && venture !== "itaba" },
-        { href: "/einstellungen/produkttypen", label: "Produkttypen", show: canEdit("settings") },
-        { href: "/einstellungen/marken", label: "Marken", show: canEdit("settings") },
-        { href: "/einstellungen/steuern", label: "Steuern", show: canEdit("settings") },
+        { href: "/einstellungen/produkttypen", label: "Produkttypen", show: canEdit("settings") && venture !== "itaba" },
+        { href: "/einstellungen/marken", label: "Marken", show: canEdit("settings") && venture !== "itaba" },
+        { href: "/einstellungen/steuern", label: "Steuern", show: canEdit("settings") && venture !== "itaba" },
         { href: "/einstellungen/retoureklassen", label: "Retoureklassen", show: canEdit("settings") },
-        { href: "/einstellungen/lieferanten", label: "Lieferanten", show: canEdit("settings") },
+        { href: "/einstellungen/lieferanten", label: "Lieferanten", show: canEdit("settings") && venture !== "itaba" },
       ],
     },
     {
       label: "Vorlagen",
       items: [
-        { href: "/einstellungen/e-mail-vorlagen", label: "E-Mail-Vorlagen", show: canEdit("settings") },
-        { href: "/einstellungen/anschreiben-vorlagen", label: "Anschreiben-Vorlagen", show: canEdit("settings") },
+        { href: "/einstellungen/e-mail-vorlagen", label: "E-Mail-Vorlagen", show: canEdit("settings") && venture !== "itaba" },
+        { href: "/einstellungen/anschreiben-vorlagen", label: "Anschreiben-Vorlagen", show: canEdit("settings") && venture !== "itaba" },
       ],
     },
   ];
