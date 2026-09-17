@@ -34,24 +34,37 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
   const navSections = [
     {
       items: [
-        { href: "/private-os/messages", label: "Private OS", show: user?.role === "founder" },
         { href: "/dashboard", label: "Dashboard", show: true },
-        { href: "/jarvis", label: "Jarvis", show: user?.role === "founder" },
-        { href: "/jarvis/memory", label: "Jarvis-Gedächtnis", show: user?.role === "founder" },
-        { href: "/jarvis/aktionen", label: "Jarvis-Aktionen", show: user?.role === "founder" },
+        { href: "/private-os/messages", label: "Private OS", show: user?.role === "founder" },
       ],
     },
     {
-      label: "CRM",
+      label: "Jarvis",
+      items: [
+        { href: "/jarvis", label: "Chat", show: user?.role === "founder" },
+        { href: "/jarvis/memory", label: "Gedächtnis", show: user?.role === "founder" },
+        { href: "/jarvis/aktionen", label: "Aktionen", show: user?.role === "founder" },
+      ],
+    },
+    {
+      label: "CRM & Vertrieb",
       items: [
         { href: "/leads", label: "Leads", show: canView("leads") },
         { href: "/kunden", label: "Kunden", show: canView("customers") },
         { href: "/inbox", label: "Inbox", show: canView("leads") || canView("customers") },
-        { href: "/auftraege", label: "Aufträge", show: canView("orders") },
-        { href: '/retouren', label: 'Retouren', show: canView('orders') },
-        { href: '/gutscheine', label: 'Gutscheine', show: canView('orders') },
         { href: "/aufgaben", label: "Aufgaben", show: canView("leads") || canView("customers") },
         { href: "/drafts", label: "KI-Drafts", show: canView("drafts") && venture !== "itaba" },
+      ],
+    },
+    {
+      label: "Shop & Bestellungen",
+      items: [
+        { href: "/produkte", label: "Produkte", show: canView("products") },
+        { href: "/produkte/kategorien", label: "Kategorien", show: canView("products") },
+        { href: "/produkte/sync-log", label: "Sync-Log", show: canView("products") && venture !== "itaba" },
+        { href: "/auftraege", label: "Aufträge", show: canView("orders") },
+        { href: "/retouren", label: "Retouren", show: canView("orders") },
+        { href: "/gutscheine", label: "Gutscheine", show: canView("orders") },
       ],
     },
     {
@@ -62,14 +75,6 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       ],
     },
     {
-      label: "Produkte",
-      items: [
-        { href: "/produkte", label: "Produkte", show: canView("products") },
-        { href: "/produkte/kategorien", label: "Kategorien", show: canView("products") },
-        { href: "/produkte/sync-log", label: "Sync-Log", show: canView("products") && venture !== "itaba" },
-      ],
-    },
-    {
       label: "Reporting",
       items: [
         { href: "/reporting", label: "Selektion", show: user?.role === "founder" },
@@ -77,19 +82,30 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       ],
     },
     {
-      label: "Einstellungen",
+      label: "Team & Konto",
       items: [
         { href: "/einstellungen", label: "Einstellungen", show: canEdit("settings") },
         { href: "/einstellungen/team", label: "Team", show: canEdit("settings") && venture !== "itaba" },
+        { href: "/benachrichtigungen", label: "Benachrichtigungen", show: true },
+        { href: "/einstellungen/benachrichtigungen", label: "Benachrichtigungs-Einstellungen", show: true },
+      ],
+    },
+    {
+      label: "Shop-Einstellungen",
+      items: [
         { href: "/einstellungen/zahlungsmodelle", label: "Zahlungsmodelle", show: canEdit("settings") && venture !== "itaba" },
         { href: "/einstellungen/produkttypen", label: "Produkttypen", show: canEdit("settings") },
         { href: "/einstellungen/marken", label: "Marken", show: canEdit("settings") },
         { href: "/einstellungen/steuern", label: "Steuern", show: canEdit("settings") },
         { href: "/einstellungen/retoureklassen", label: "Retoureklassen", show: canEdit("settings") },
         { href: "/einstellungen/lieferanten", label: "Lieferanten", show: canEdit("settings") },
+      ],
+    },
+    {
+      label: "Vorlagen",
+      items: [
         { href: "/einstellungen/e-mail-vorlagen", label: "E-Mail-Vorlagen", show: canEdit("settings") },
         { href: "/einstellungen/anschreiben-vorlagen", label: "Anschreiben-Vorlagen", show: canEdit("settings") },
-        { href: "/einstellungen/benachrichtigungen", label: "Benachrichtigungen", show: true },
       ],
     },
   ];
