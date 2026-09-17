@@ -60,6 +60,9 @@ export default function ProduktDetailPage() {
   const [editSku, setEditSku] = useState("");
   const [editWeight, setEditWeight] = useState("");
   const [editPackagingUnit, setEditPackagingUnit] = useState("");
+  const [editWidthCm, setEditWidthCm] = useState("");
+  const [editHeightCm, setEditHeightCm] = useState("");
+  const [editDepthCm, setEditDepthCm] = useState("");
   const [editFeatured, setEditFeatured] = useState(false);
   const [editTrackInventory, setEditTrackInventory] = useState(false);
   const [editSourceType, setEditSourceType] = useState("own");
@@ -165,6 +168,9 @@ export default function ProduktDetailPage() {
     setEditInternalNumber(p.internal_number ?? "");
     setEditWeight(p.weight != null ? String(p.weight) : "");
     setEditPackagingUnit(p.packaging_unit ?? "");
+    setEditWidthCm(p.width_cm != null ? String(p.width_cm) : "");
+    setEditHeightCm(p.height_cm != null ? String(p.height_cm) : "");
+    setEditDepthCm(p.depth_cm != null ? String(p.depth_cm) : "");
     setEditFeatured(p.is_featured ?? false);
     setEditTrackInventory(p.track_inventory ?? false);
     setEditSourceType(p.source_type ?? "own");
@@ -217,6 +223,9 @@ export default function ProduktDetailPage() {
       short_description: editShortDesc || null, description: editDescription || null,
       weight: editWeight ? parseFloat(editWeight) : null,
       packaging_unit: editPackagingUnit.trim() || null,
+      width_cm: editWidthCm ? parseFloat(editWidthCm) : null,
+      height_cm: editHeightCm ? parseFloat(editHeightCm) : null,
+      depth_cm: editDepthCm ? parseFloat(editDepthCm) : null,
       is_featured: editFeatured, track_inventory: isAffiliate ? false : editTrackInventory,
       source_type: editSourceType,
       affiliate_network: editSourceType === "affiliate" ? editAffiliateNetwork || null : null,
@@ -473,6 +482,17 @@ export default function ProduktDetailPage() {
                 <input type="text" value={editPackagingUnit} onChange={e => setEditPackagingUnit(e.target.value)}
                   placeholder="z.B. 1 Stück, 6er-Karton, Set à 4"
                   className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Maße (cm)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <input type="number" step="0.1" min="0" value={editWidthCm} onChange={e => setEditWidthCm(e.target.value)}
+                    placeholder="Breite" className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  <input type="number" step="0.1" min="0" value={editHeightCm} onChange={e => setEditHeightCm(e.target.value)}
+                    placeholder="Höhe" className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                  <input type="number" step="0.1" min="0" value={editDepthCm} onChange={e => setEditDepthCm(e.target.value)}
+                    placeholder="Länge" className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
               </div>
             </div>
             <div>

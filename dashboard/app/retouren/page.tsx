@@ -17,6 +17,7 @@ interface Return {
   refund_gross_amount: number | null;
   return_shipping_cost: number | null;
   return_label_url: string | null;
+  credit_note_number: string | null;
   notes: string | null;
   requested_at: string;
   processed_at: string | null;
@@ -221,6 +222,9 @@ export default function RetourenPage() {
                         Rückerstattung: {Number(r.refund_amount).toFixed(2).replace(".", ",")} €
                         {r.refund_method && ` via ${r.refund_method}`}
                       </p>
+                    )}
+                    {r.credit_note_number && (
+                      <p className="text-xs text-gray-500 mt-1">Gutschrift (Buchhaltung): {r.credit_note_number}</p>
                     )}
                     {r.notes && <p className="text-xs text-gray-400 mt-1 italic">{r.notes}</p>}
                     {r.events && r.events.length > 0 && (

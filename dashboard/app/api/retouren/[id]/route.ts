@@ -25,6 +25,59 @@ function returnItemQty(item: ReturnItem) {
   return Number.isFinite(Number(qty)) ? Number(qty) : 0;
 }
 
+const VENTURE_BRAND: Record<string, { name: string; address: string; email: string; taxNote: string }> = {
+  itaba: { name: "iTABA", address: "Töngesgasse 42, 60311 Frankfurt am Main", email: "info@itaba.de", taxNote: "Amtsgericht Frankfurt am Main, HRB 134184" },
+};
+
+function generateCreditNoteNumber(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const rand = Math.floor(Math.random() * 9000) + 1000;
+  return `GS-${y}${m}-${rand}`;
+}
+
+function buildCreditNoteHtml(opts: {
+  venture: string;
+  creditNoteNumber: string;
+  orderRef: string;
+  customerName: string;
+  customerEmail: string;
+  items: ReturnItem[];
+  grossAmount: number;
+  returnShippingCost: number;
+  refundAmount: number;
+  refundMethod: string;
+}): string {
+  const brand = VENTURE_BRAND[opts.venture] ?? VENTURE_BRAND.itaba;
+  const today = new Date().toLocaleDateString("de-DE");
+  const fmt = (n: number) => n.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+  const itemRows = opts.items.map(i => `<tr><td style="padding:6px 0;border-bottom:1px solid #eee;">${returnItemName(i)}</td><td style="padding:6px 0;border-bottom:1px solid #eee;text-align:right;">${returnItemQty(i)}</td></tr>`).join("");
+  return `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"></head>
+<body style="font-family:Georgia,serif;color:#1a1a1a;max-width:640px;margin:40px auto;">
+  <p style="font-size:20px;letter-spacing:3px;margin:0 0 4px;">${brand.name}</p>
+  <p style="font-size:11px;color:#888;margin:0 0 28px;">${brand.address} · ${brand.email}</p>
+  <h1 style="font-size:20px;font-weight:normal;border-bottom:2px solid #1a1a1a;padding-bottom:10px;">Gutschrift / Einnahmeminderung</h1>
+  <table style="width:100%;font-size:13px;color:#555;margin:16px 0 24px;">
+    <tr><td style="padding:3px 0;">Gutschriftnummer</td><td style="text-align:right;font-family:monospace;">${opts.creditNoteNumber}</td></tr>
+    <tr><td style="padding:3px 0;">Datum</td><td style="text-align:right;">${today}</td></tr>
+    <tr><td style="padding:3px 0;">Bezug Bestellung</td><td style="text-align:right;font-family:monospace;">${opts.orderRef}</td></tr>
+    <tr><td style="padding:3px 0;">Kunde</td><td style="text-align:right;">${opts.customerName} (${opts.customerEmail})</td></tr>
+  </table>
+  <table style="width:100%;font-size:13px;border-collapse:collapse;">
+    <thead><tr><th style="text-align:left;padding:6px 0;border-bottom:2px solid #1a1a1a;font-size:11px;text-transform:uppercase;color:#888;">Zurückgesandter Artikel</th><th style="text-align:right;padding:6px 0;border-bottom:2px solid #1a1a1a;font-size:11px;text-transform:uppercase;color:#888;">Menge</th></tr></thead>
+    <tbody>${itemRows}</tbody>
+  </table>
+  <table style="width:100%;font-size:13px;margin-top:20px;">
+    <tr><td style="padding:4px 0;color:#555;">Warenwert (brutto)</td><td style="text-align:right;">${fmt(opts.grossAmount)}</td></tr>
+    <tr><td style="padding:4px 0;color:#555;">abzüglich Rücksendekosten</td><td style="text-align:right;">-${fmt(opts.returnShippingCost)}</td></tr>
+    <tr><td style="padding:8px 0;font-weight:bold;border-top:2px solid #1a1a1a;">Erstattungsbetrag (Einnahmeminderung)</td><td style="text-align:right;font-weight:bold;border-top:2px solid #1a1a1a;padding-top:8px;">${fmt(opts.refundAmount)}</td></tr>
+    <tr><td style="padding:4px 0;color:#555;">Erstattungsmethode</td><td style="text-align:right;">${opts.refundMethod || "—"}</td></tr>
+  </table>
+  <p style="margin-top:28px;font-size:11px;color:#aaa;">${brand.name} · ${brand.address} · ${brand.taxNote}</p>
+</body></html>`;
+}
+
 async function restoreReturnItemsToStock(ret: { id: string; order_id: string | null; venture: string; items: ReturnItem[] | null }) {
   if (!ret.order_id || !Array.isArray(ret.items) || ret.items.length === 0) {
     return { restored: 0, skipped: 0 };
@@ -139,6 +192,29 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
   }
 
+  // ── Gutschrift (Einnahmeminderung) für die Buchhaltung ─────────────
+  let creditNoteNumber: string | null = ret.credit_note_number ?? null;
+  let creditNoteHtml: string | null = ret.credit_note_html ?? null;
+  if (action === "complete" && ret.status !== "completed" && !creditNoteNumber) {
+    const finalGross = refund_gross_amount ?? ret.refund_gross_amount ?? refund_amount ?? ret.refund_amount ?? 0;
+    const finalReturnCost = return_shipping_cost ?? ret.return_shipping_cost ?? 0;
+    const finalRefund = refund_amount ?? ret.refund_amount ?? Math.max(0, finalGross - finalReturnCost);
+    creditNoteNumber = generateCreditNoteNumber();
+    creditNoteHtml = buildCreditNoteHtml({
+      venture: ret.venture,
+      creditNoteNumber,
+      orderRef: ret.order_id ? String(ret.order_id).slice(0, 8).toUpperCase() : "—",
+      customerName: ret.customer_name ?? "Kunde",
+      customerEmail: ret.customer_email ?? "",
+      items: Array.isArray(ret.items) ? ret.items : [],
+      grossAmount: Number(finalGross) || 0,
+      returnShippingCost: Number(finalReturnCost) || 0,
+      refundAmount: Number(finalRefund) || 0,
+      refundMethod: refund_method ?? ret.refund_method ?? "",
+    });
+    await logReturnEvent(ret.id, ret.venture, "credit_note_created", `Gutschrift ${creditNoteNumber} erstellt (Einnahmeminderung für die Buchhaltung).`, { creditNoteNumber });
+  }
+
   const finalNotes = [notes ?? ret.notes, stockNote].filter(Boolean).join("\n");
 
   const updatePayload: Record<string, unknown> = {
@@ -153,6 +229,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (return_label_attachment_id) updatePayload.return_label_attachment_id = return_label_attachment_id;
   if (return_label_url) updatePayload.return_label_url = return_label_url;
   if (stockNote) updatePayload.stock_restored_at = new Date().toISOString();
+  if (creditNoteNumber && !ret.credit_note_number) {
+    updatePayload.credit_note_number = creditNoteNumber;
+    updatePayload.credit_note_html = creditNoteHtml;
+    updatePayload.credit_note_generated_at = new Date().toISOString();
+  }
 
   const { error: updateError } = await supabaseAdmin.from("returns").update(updatePayload).eq("id", id);
   if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
@@ -260,7 +341,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         : `[Retoure ${newStatus.toUpperCase()}] ${customerName} — ${ret.venture}`,
       text: tplAdmin
         ? `${resolve(tplAdmin.intro_text, { ...vars, action: newStatus.toUpperCase() })}\n\n${resolve(tplAdmin.footer_text, { ...vars, action: newStatus.toUpperCase() })}`
-        : `Retoure bearbeitet:\n\nKunde: ${customerName} <${ret.customer_email}>\nAktion: ${action}\nGrund: ${ret.reason ?? "—"}\nRückerstattung: ${refund_amount ? `${Number(refund_amount).toFixed(2)} €` : "—"}`,
+        : `Retoure bearbeitet:\n\nKunde: ${customerName} <${ret.customer_email}>\nAktion: ${action}\nGrund: ${ret.reason ?? "—"}\nRückerstattung: ${refund_amount ? `${Number(refund_amount).toFixed(2)} €` : "—"}${creditNoteNumber ? `\nGutschrift (Buchhaltung): ${creditNoteNumber}` : ""}`,
+      attachments: creditNoteHtml
+        ? [{ filename: `Gutschrift-${creditNoteNumber}.html`, content: Buffer.from(creditNoteHtml).toString("base64"), content_type: "text/html" }]
+        : undefined,
     }),
   ]);
 
