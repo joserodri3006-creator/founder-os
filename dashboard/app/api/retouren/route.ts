@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from("returns")
-    .select(`*, order:orders(id, title, invoice_number, value)`)
+    .select(`*, order:orders(id, title, invoice_number, value), events:return_events(id, event_type, message, metadata, created_at)`)
     .order("requested_at", { ascending: false });
 
   if (venture && venture !== "alle") query = query.eq("venture", venture);

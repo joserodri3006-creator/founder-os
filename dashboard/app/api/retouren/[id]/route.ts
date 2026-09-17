@@ -6,6 +6,16 @@ type Params = { params: Promise<{ id: string }> };
 
 type ReturnItem = { name?: string; product_name?: string; qty?: number; quantity?: number };
 
+async function logReturnEvent(returnId: string, venture: string, eventType: string, message: string, metadata: Record<string, unknown> = {}) {
+  await supabaseAdmin.from("return_events").insert({
+    return_id: returnId,
+    venture,
+    event_type: eventType,
+    message,
+    metadata,
+  });
+}
+
 function returnItemName(item: ReturnItem) {
   return item.name ?? item.product_name ?? "";
 }
@@ -80,7 +90,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
   const FOUNDER_EMAIL = process.env.FOUNDER_EMAIL ?? "jose.rodri3006@gmail.com";
   const body = await req.json();
-  const { action, notes, refund_amount, refund_method, restore_stock } = body;
+  const {
+    action,
+    notes,
+    refund_amount,
+    refund_method,
+    restore_stock,
+    customer_subject,
+    customer_text,
+    return_shipping_cost,
+    refund_gross_amount,
+    return_label_attachment_id,
+    return_label_url,
+  } = body;
 
   const { data: ret, error } = await supabaseAdmin
     .from("returns")
@@ -100,6 +122,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     try {
       const result = await restoreReturnItemsToStock(ret);
       stockNote = `Lager zurückgebucht: ${result.restored} Position(en)${result.skipped ? `, ${result.skipped} übersprungen` : ""}.`;
+      await logReturnEvent(ret.id, ret.venture, "stock_restored", stockNote, result);
     } catch (stockError) {
       return NextResponse.json(
         { error: stockError instanceof Error ? stockError.message : "Lagerrückbuchung fehlgeschlagen" },
@@ -110,13 +133,30 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const finalNotes = [notes ?? ret.notes, stockNote].filter(Boolean).join("\n");
 
-  await supabaseAdmin.from("returns").update({
+  const updatePayload: Record<string, unknown> = {
     status: newStatus,
     notes: finalNotes || null,
     refund_amount: refund_amount ?? ret.refund_amount,
     refund_method: refund_method ?? ret.refund_method,
     processed_at: newStatus !== "requested" ? new Date().toISOString() : ret.processed_at,
-  }).eq("id", id);
+  };
+  if (return_shipping_cost !== undefined) updatePayload.return_shipping_cost = return_shipping_cost;
+  if (refund_gross_amount !== undefined) updatePayload.refund_gross_amount = refund_gross_amount;
+  if (return_label_attachment_id) updatePayload.return_label_attachment_id = return_label_attachment_id;
+  if (return_label_url) updatePayload.return_label_url = return_label_url;
+  if (stockNote) updatePayload.stock_restored_at = new Date().toISOString();
+
+  const { error: updateError } = await supabaseAdmin.from("returns").update(updatePayload).eq("id", id);
+  if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+
+  const eventType = action === "approve" ? "approved" : action === "reject" ? "rejected" : "completed";
+  await logReturnEvent(ret.id, ret.venture, eventType, finalNotes || `Retoure ${newStatus}`, {
+    refund_amount: refund_amount ?? ret.refund_amount ?? null,
+    refund_method: refund_method ?? ret.refund_method ?? null,
+    return_shipping_cost: return_shipping_cost ?? ret.return_shipping_cost ?? null,
+    return_label_attachment_id: return_label_attachment_id ?? null,
+    return_label_url: return_label_url ?? null,
+  });
 
   if (!RESEND_API_KEY || !ret.customer_email) return NextResponse.json({ success: true });
 
@@ -134,6 +174,27 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     reason:        notes ?? ret.reason ?? "—",
     orderRef:      ret.order_id ? ret.order_id.slice(0, 8).toUpperCase() : "—",
   };
+
+  let labelAttachment: { filename: string; content: string; content_type: string } | null = null;
+  let labelLinkText = "";
+  if (return_label_attachment_id) {
+    const { data: att } = await supabaseAdmin
+      .from("attachments")
+      .select("filename, storage_path, mime_type")
+      .eq("id", return_label_attachment_id)
+      .maybeSingle();
+    if (att?.storage_path) {
+      const { data: fileBlob } = await supabaseAdmin.storage.from("attachments").download(att.storage_path);
+      if (fileBlob) {
+        labelAttachment = {
+          filename: att.filename ?? "Retoureschein.pdf",
+          content: Buffer.from(await fileBlob.arrayBuffer()).toString("base64"),
+          content_type: att.mime_type ?? "application/pdf",
+        };
+      }
+    }
+  }
+  if (return_label_url) labelLinkText = `\n\nRetoureschein/Link: ${return_label_url}`;
 
   // Template key per action
   const tplKeyCustomer: Record<string, string> = {
@@ -164,15 +225,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const senderCustomer = tplCustomer ? { name: tplCustomer.from_name, email: tplCustomer.from_email } : defaultSender;
   const senderAdmin    = tplAdmin    ? { name: tplAdmin.from_name,    email: tplAdmin.from_email    } : defaultSender;
 
+  const subject = typeof customer_subject === "string" && customer_subject.trim()
+    ? customer_subject.trim()
+    : tplCustomer ? resolve(tplCustomer.subject, vars) : fallbackSubject[action];
+  const text = typeof customer_text === "string" && customer_text.trim()
+    ? customer_text.trim()
+    : tplCustomer
+      ? `${resolve(tplCustomer.intro_text, vars)}\n\n${resolve(tplCustomer.footer_text, vars)}`
+      : fallbackText[action];
+
   await Promise.allSettled([
     // Kundenmail
     sendMail(RESEND_API_KEY, {
       from:    `${senderCustomer.name} <${senderCustomer.email}>`,
       to:      [`${customerName} <${ret.customer_email}>`],
-      subject: tplCustomer ? resolve(tplCustomer.subject, vars) : fallbackSubject[action],
-      text:    tplCustomer
-        ? `${resolve(tplCustomer.intro_text, vars)}\n\n${resolve(tplCustomer.footer_text, vars)}`
-        : fallbackText[action],
+      subject,
+      text:    `${text}${labelLinkText}`,
+      attachments: labelAttachment ? [labelAttachment] : undefined,
     }),
     // Admin-Notification
     sendMail(RESEND_API_KEY, {
@@ -186,6 +255,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         : `Retoure bearbeitet:\n\nKunde: ${customerName} <${ret.customer_email}>\nAktion: ${action}\nGrund: ${ret.reason ?? "—"}\nRückerstattung: ${refund_amount ? `${Number(refund_amount).toFixed(2)} €` : "—"}`,
     }),
   ]);
+
+  await logReturnEvent(ret.id, ret.venture, "customer_email_sent", `Kundenmail gesendet: ${subject}`, { action, subject });
 
   return NextResponse.json({ success: true });
 }
