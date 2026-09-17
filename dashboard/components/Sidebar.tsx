@@ -31,10 +31,14 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
 
   const current = VENTURES.find((v) => v.id === venture) ?? VENTURES[0];
 
+  // Individuelle Anpassung nur für diesen einen Account (info@itaba.de):
+  // schlankere Navigation ohne Dashboard/Leads/Inbox, "Aufträge" heißt hier "Bestellungen".
+  const isItabaManagerAccount = user?.email === "info@itaba.de";
+
   const navSections = [
     {
       items: [
-        { href: "/dashboard", label: "Dashboard", show: true },
+        { href: "/dashboard", label: "Dashboard", show: !isItabaManagerAccount },
         { href: "/private-os/messages", label: "Private OS", show: user?.role === "founder" },
       ],
     },
@@ -49,9 +53,9 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
     {
       label: "CRM & Vertrieb",
       items: [
-        { href: "/leads", label: "Leads", show: canView("leads") },
+        { href: "/leads", label: "Leads", show: canView("leads") && !isItabaManagerAccount },
         { href: "/kunden", label: "Kunden", show: canView("customers") },
-        { href: "/inbox", label: "Inbox", show: canView("leads") || canView("customers") },
+        { href: "/inbox", label: "Inbox", show: (canView("leads") || canView("customers")) && !isItabaManagerAccount },
         { href: "/aufgaben", label: "Aufgaben", show: canView("leads") || canView("customers") },
         { href: "/drafts", label: "KI-Drafts", show: canView("drafts") && venture !== "itaba" },
       ],
@@ -62,7 +66,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
         { href: "/produkte", label: "Produkte", show: canView("products") },
         { href: "/produkte/kategorien", label: "Kategorien", show: canView("products") },
         { href: "/produkte/sync-log", label: "Sync-Log", show: canView("products") && venture !== "itaba" },
-        { href: "/auftraege", label: "Aufträge", show: canView("orders") },
+        { href: "/auftraege", label: isItabaManagerAccount ? "Bestellungen" : "Aufträge", show: canView("orders") },
         { href: "/retouren", label: "Retouren", show: canView("orders") },
         { href: "/gutscheine", label: "Gutscheine", show: canView("orders") },
       ],
