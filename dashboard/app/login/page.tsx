@@ -79,7 +79,7 @@ export default function LoginPage() {
       }
       return;
     }
-    router.push("/dashboard");
+    router.push(email.trim().toLowerCase() === "info@itaba.de" ? "/auftraege" : "/dashboard");
     router.refresh();
   }
 

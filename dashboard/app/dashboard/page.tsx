@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Lead, STATUS_LABELS, STATUS_COLORS } from "@/lib/types";
 import { getVenture } from "@/lib/ventures";
 import { useVenture } from "@/context/VentureContext";
+import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 
 interface Kpi {
@@ -42,8 +44,14 @@ function getDateString() {
 
 export default function DashboardPage() {
   const { venture } = useVenture();
+  const { user } = useAuth();
+  const router = useRouter();
   const [data, setData]     = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user?.email === "info@itaba.de") router.replace("/auftraege");
+  }, [user, router]);
 
   const [loadError, setLoadError] = useState<string | null>(null);
 
