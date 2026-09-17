@@ -45,6 +45,7 @@ export default function RetourenPage() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [refundForm, setRefundForm] = useState({ amount: "", method: "", notes: "" });
+  const [restoreStock, setRestoreStock] = useState(true);
 
   async function load() {
     setLoading(true);
@@ -59,13 +60,20 @@ export default function RetourenPage() {
 
   async function act(id: string, action: string, extra?: Record<string, unknown>) {
     setProcessing(id + action);
-    await fetch(`/api/retouren/${id}`, {
+    const response = await fetch(`/api/retouren/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, ...extra }),
     });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      alert(body.error ?? "Retoure konnte nicht aktualisiert werden.");
+      setProcessing(null);
+      return;
+    }
     setActiveId(null);
     setRefundForm({ amount: "", method: "", notes: "" });
+    setRestoreStock(true);
     await load();
     setProcessing(null);
   }
@@ -230,12 +238,29 @@ export default function RetourenPage() {
                         className="w-full text-sm border border-gray-200 rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
+                    {r.status === "approved" && (
+                      <label className="flex items-start gap-2 rounded-md bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-900">
+                        <input
+                          type="checkbox"
+                          checked={restoreStock}
+                          onChange={e => setRestoreStock(e.target.checked)}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="font-medium">Verkaufsfähige Artikel zurück ins Lager buchen</span>
+                          <span className="block text-blue-700 mt-0.5">
+                            Nur aktiv lassen, wenn die retournierte Ware geprüft und wieder verkaufsfähig ist.
+                          </span>
+                        </span>
+                      </label>
+                    )}
                     <div className="flex gap-2 pt-1">
                       <button
                         onClick={() => act(r.id, r.status === "requested" ? "approve" : "complete", {
                           refund_amount: refundForm.amount ? parseFloat(refundForm.amount) : null,
                           refund_method: refundForm.method || null,
                           notes: refundForm.notes || null,
+                          restore_stock: r.status === "approved" ? restoreStock : false,
                         })}
                         disabled={!!processing}
                         className="text-sm px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
