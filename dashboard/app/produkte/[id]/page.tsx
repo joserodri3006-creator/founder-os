@@ -29,6 +29,12 @@ interface InventoryMovement {
   created_at: string;
   variant: { option_values: Record<string, string>; sku: string | null } | null;
 }
+interface StockLocationRow {
+  variant_id: string;
+  location_id: string;
+  quantity: number;
+  location: { id: string; name: string; parent_id: string | null } | null;
+}
 
 const STATUS_LABELS: Record<string, string> = { draft: "Entwurf", active: "Aktiv", archived: "Archiviert" };
 const STATUS_COLORS: Record<string, string> = {
@@ -89,7 +95,12 @@ export default function ProduktDetailPage() {
   // Inventory
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [showAddMovement, setShowAddMovement] = useState(false);
-  const [movForm, setMovForm] = useState({ type: "in", quantity: "", variant_id: "", note: "" });
+  const [movForm, setMovForm] = useState({ type: "in", quantity: "", variant_id: "", location_id: "", note: "" });
+
+  // Bestand je Lagerort (variant_id -> Zeilen)
+  const [stockByLocation, setStockByLocation] = useState<Record<string, StockLocationRow[]>>({});
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [transferForm, setTransferForm] = useState({ variant_id: "", from_location_id: "", to_location_id: "", quantity: "", note: "" });
 
   // Sale price
   const [editSalePrice, setEditSalePrice] = useState("");
@@ -153,6 +164,14 @@ export default function ProduktDetailPage() {
         .then(r => r.json())
         .then(data => setAllSuppliers(Array.isArray(data) ? data : []));
     }
+    fetch(`/api/produkte/${id}/lagerbestand`)
+      .then(r => r.json())
+      .then(data => {
+        const map: Record<string, StockLocationRow[]> = {};
+        for (const v of data.variants ?? []) map[v.id] = v.locations ?? [];
+        setStockByLocation(map);
+      })
+      .catch(() => setStockByLocation({}));
     setProductSuppliers(Array.isArray(sup) ? sup : []);
     setProduct(p);
     setSelectedCategories((p.categories ?? []).map((c: any) => c.id));
@@ -322,21 +341,77 @@ export default function ProduktDetailPage() {
   async function addMovement() {
     if (!movForm.quantity) return;
     setSaving("movement");
-    await fetch(`/api/produkte/${id}/lager`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: movForm.type,
-        quantity: parseInt(movForm.quantity),
-        variant_id: movForm.variant_id || null,
-        note: movForm.note || null,
-        reference_type: "manual",
-      }),
-    });
-    setMovForm({ type: "in", quantity: "", variant_id: "", note: "" });
+    if (movForm.location_id && movForm.variant_id) {
+      // Lagerort-bewusste Buchung — hält variant_stock_locations UND die
+      // Gesamtsumme (stock_quantity) konsistent.
+      const qty = parseInt(movForm.quantity);
+      await fetch(`/api/produkte/${id}/lagerbestand`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          variant_id: movForm.variant_id,
+          location_id: movForm.location_id,
+          delta: movForm.type === "out" ? -qty : qty,
+          type: movForm.type === "in" ? "in" : movForm.type === "out" ? "out" : "correction",
+          note: movForm.note || null,
+        }),
+      });
+    } else {
+      // Kein Lagerort gewählt (oder keine Variante) — alte, ortlose Buchung
+      // für Rückwärtskompatibilität mit noch nicht migrierten Produkten.
+      await fetch(`/api/produkte/${id}/lager`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: movForm.type,
+          quantity: parseInt(movForm.quantity),
+          variant_id: movForm.variant_id || null,
+          note: movForm.note || null,
+          reference_type: "manual",
+        }),
+      });
+    }
+    setMovForm({ type: "in", quantity: "", variant_id: "", location_id: "", note: "" });
     setShowAddMovement(false);
     await load();
     setSaving(null);
+  }
+
+  async function addTransfer() {
+    const { variant_id, from_location_id, to_location_id, quantity, note } = transferForm;
+    if (!variant_id || !from_location_id || !to_location_id || !quantity) return;
+    if (from_location_id === to_location_id) return;
+    setSaving("transfer");
+    await fetch(`/api/produkte/${id}/lagerbestand`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "transfer",
+        variant_id,
+        from_location_id,
+        to_location_id,
+        quantity: parseInt(quantity),
+        note: note || null,
+      }),
+    });
+    setTransferForm({ variant_id: "", from_location_id: "", to_location_id: "", quantity: "", note: "" });
+    setShowTransfer(false);
+    await load();
+    setSaving(null);
+  }
+
+  function locationLabel(locId: string) {
+    const l = allLocations.find(x => x.id === locId);
+    if (!l) return "—";
+    let depth = 0;
+    let current = l;
+    while (current.parent_id) {
+      const parent = allLocations.find(p2 => p2.id === current.parent_id);
+      if (!parent) break;
+      depth += 1;
+      current = parent;
+    }
+    return `${"—".repeat(depth)}${depth > 0 ? " " : ""}${l.name}`;
   }
 
   async function addTag() {
@@ -1173,6 +1248,21 @@ export default function ProduktDetailPage() {
                       </div>
                     )}
                   </div>
+                  {allLocations.length > 0 && (
+                    <div>
+                      <label className="text-xs text-gray-500 block mb-1">
+                        Lagerort {movForm.variant_id ? "" : "(nur mit ausgewählter Variante buchbar)"}
+                      </label>
+                      <select value={movForm.location_id} disabled={!movForm.variant_id}
+                        onChange={e => setMovForm(p => ({ ...p, location_id: e.target.value }))}
+                        className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 bg-white disabled:bg-gray-100 disabled:text-gray-400">
+                        <option value="">— ohne Lagerort (nur Gesamtbestand) —</option>
+                        {allLocations.map(l => (
+                          <option key={l.id} value={l.id}>{locationLabel(l.id)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className="text-xs text-gray-500 block mb-1">Notiz</label>
                     <input type="text" value={movForm.note}
@@ -1187,6 +1277,94 @@ export default function ProduktDetailPage() {
                     <button onClick={() => setShowAddMovement(false)}
                       className="text-sm px-3 py-1.5 text-gray-500 hover:text-gray-700">Abbrechen</button>
                   </div>
+                </div>
+              )}
+
+              {/* Bestand je Lagerort */}
+              {allLocations.length > 0 && Object.values(stockByLocation).some(rows => rows.length > 0) && (
+                <div className="px-5 py-4 border-b border-gray-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Bestand je Lagerort</p>
+                    <button onClick={() => setShowTransfer(!showTransfer)}
+                      className="text-xs text-blue-600 hover:text-blue-700">+ Umbuchen</button>
+                  </div>
+
+                  {product.variants?.map((v: any) => {
+                    const rows = stockByLocation[v.id] ?? [];
+                    if (rows.length === 0) return null;
+                    return (
+                      <div key={v.id} className="text-xs">
+                        {variants.length > 1 && (
+                          <p className="text-gray-500 mb-1">{Object.values(v.option_values ?? {}).join(" / ") || "—"}</p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          {rows.filter(r => r.quantity > 0).map(r => (
+                            <span key={r.location_id} className="inline-flex items-center gap-1 bg-gray-100 rounded-full px-2.5 py-1">
+                              <span className="text-gray-600">{r.location?.name ?? locationLabel(r.location_id)}</span>
+                              <span className="font-semibold text-gray-800">{r.quantity}</span>
+                            </span>
+                          ))}
+                          {rows.every(r => r.quantity === 0) && <span className="text-gray-400">Kein Bestand an einem Lagerort</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {showTransfer && (
+                    <div className="bg-gray-50 rounded-md p-3 space-y-3">
+                      {variants.length > 0 && (
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">Variante</label>
+                          <select value={transferForm.variant_id}
+                            onChange={e => setTransferForm(p => ({ ...p, variant_id: e.target.value }))}
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 bg-white">
+                            <option value="">— wählen —</option>
+                            {product.variants?.map((v: any) => (
+                              <option key={v.id} value={v.id}>{Object.values(v.option_values ?? {}).join(" / ") || "Standard"}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">Von</label>
+                          <select value={transferForm.from_location_id}
+                            onChange={e => setTransferForm(p => ({ ...p, from_location_id: e.target.value }))}
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 bg-white">
+                            <option value="">—</option>
+                            {allLocations.map(l => <option key={l.id} value={l.id}>{locationLabel(l.id)}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">Nach</label>
+                          <select value={transferForm.to_location_id}
+                            onChange={e => setTransferForm(p => ({ ...p, to_location_id: e.target.value }))}
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1.5 bg-white">
+                            <option value="">—</option>
+                            {allLocations.map(l => <option key={l.id} value={l.id}>{locationLabel(l.id)}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">Menge</label>
+                          <input type="number" min="1" value={transferForm.quantity}
+                            onChange={e => setTransferForm(p => ({ ...p, quantity: e.target.value }))}
+                            className="w-full text-sm border border-gray-200 rounded px-2 py-1.5" />
+                        </div>
+                      </div>
+                      <input type="text" placeholder="Notiz (optional)" value={transferForm.note}
+                        onChange={e => setTransferForm(p => ({ ...p, note: e.target.value }))}
+                        className="w-full text-sm border border-gray-200 rounded px-2 py-1.5" />
+                      <div className="flex gap-2">
+                        <button onClick={addTransfer}
+                          disabled={!transferForm.variant_id || !transferForm.from_location_id || !transferForm.to_location_id || !transferForm.quantity || saving === "transfer"}
+                          className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+                          {saving === "transfer" ? "..." : "Umbuchen"}
+                        </button>
+                        <button onClick={() => setShowTransfer(false)}
+                          className="text-sm px-3 py-1.5 text-gray-500 hover:text-gray-700">Abbrechen</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
