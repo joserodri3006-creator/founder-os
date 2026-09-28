@@ -2,13 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { activeVariantStocks } from "@/lib/product-stock";
 
+// Google-artige Volltextsuche über alle relevanten Freitext-/Identifikationsfelder
+// eines Produkts (nicht nur den Namen) — spiegelt das Suchmuster aus /api/leads.
+const SEARCH_COLUMNS = [
+  "name", "sku", "internal_number", "short_description", "description", "notes",
+];
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const venture = searchParams.get("venture");
   const status = searchParams.get("status");
   const type_id = searchParams.get("type_id");
   const category_id = searchParams.get("category_id");
-  const search = searchParams.get("search");
+  const search = searchParams.get("search")?.trim();
 
   let query = supabaseAdmin
     .from("products")
@@ -28,7 +34,10 @@ export async function GET(req: NextRequest) {
   if (status) query = query.eq("status", status);
   if (searchParams.get("source_type")) query = query.eq("source_type", searchParams.get("source_type"));
   if (type_id) query = query.eq("product_type_id", type_id);
-  if (search) query = query.ilike("name", `%${search}%`);
+  if (search) {
+    const term = search.replace(/[%,]/g, "");
+    query = query.or(SEARCH_COLUMNS.map((col) => `${col}.ilike.%${term}%`).join(","));
+  }
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

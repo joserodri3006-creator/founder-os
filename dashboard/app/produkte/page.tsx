@@ -75,22 +75,41 @@ export default function ProdukteListPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [types, setTypes] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<{ id: string; name: string; level: number }[]>([]);
   const [modal, setModal] = useState<Modal>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   async function load() {
     setLoading(true);
     const params = new URLSearchParams({ venture });
     if (statusFilter) params.set("status", statusFilter);
     if (sourceFilter) params.set("source_type", sourceFilter);
-    if (search) params.set("search", search);
+    if (typeFilter) params.set("type_id", typeFilter);
+    if (categoryFilter) params.set("category_id", categoryFilter);
+    if (debouncedSearch) params.set("search", debouncedSearch);
     const data = await fetch(`/api/produkte?${params}`).then((r) => r.json());
     setProducts(Array.isArray(data) ? data : []);
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [venture, statusFilter, sourceFilter]);
+  useEffect(() => { load(); }, [venture, statusFilter, sourceFilter, typeFilter, categoryFilter, debouncedSearch]);
+
+  useEffect(() => {
+    setTypeFilter("");
+    setCategoryFilter("");
+    fetch(`/api/produkt-typen?venture=${venture}`).then(r => r.json()).then(d => setTypes(Array.isArray(d) ? d : []));
+    fetch(`/api/produkt-kategorien?venture=${venture}`).then(r => r.json()).then(d => setCategories(Array.isArray(d) ? d : []));
+  }, [venture]);
 
   async function handleArchive(id: string) {
     await fetch(`/api/produkte/${id}`, {
@@ -157,10 +176,9 @@ export default function ProdukteListPage() {
       >
         <input
           type="text"
-          placeholder="Suche..."
+          placeholder="Suche — Name, SKU, Interne Nr., Beschreibung, Notizen…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && load()}
           style={{
             fontSize: "13px",
             border: "1px solid #D1D5E8",
@@ -170,7 +188,7 @@ export default function ProdukteListPage() {
             color: "#14193A",
             outline: "none",
             fontFamily: "var(--font-sans)",
-            width: "260px",
+            width: "300px",
           }}
         />
         <select
@@ -209,6 +227,44 @@ export default function ProdukteListPage() {
           <option value="">Alle Produktarten</option>
           <option value="own">Eigene Produkte</option>
           <option value="affiliate">Affiliate</option>
+        </select>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          style={{
+            fontSize: "13px",
+            border: "1px solid #D1D5E8",
+            borderRadius: "8px",
+            padding: "7px 12px",
+            background: "#FFFFFF",
+            color: "#14193A",
+            outline: "none",
+            fontFamily: "var(--font-sans)",
+          }}
+        >
+          <option value="">Alle Typen</option>
+          {types.map((t) => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          style={{
+            fontSize: "13px",
+            border: "1px solid #D1D5E8",
+            borderRadius: "8px",
+            padding: "7px 12px",
+            background: "#FFFFFF",
+            color: "#14193A",
+            outline: "none",
+            fontFamily: "var(--font-sans)",
+          }}
+        >
+          <option value="">Alle Kategorien</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{"—".repeat(c.level - 1)}{c.level > 1 ? " " : ""}{c.name}</option>
+          ))}
         </select>
         <div className="ml-auto flex items-center gap-3">
           <Link href="/produkte/sync-log" className="text-xs text-gray-500 hover:text-[#1B2A5E] flex items-center gap-1">

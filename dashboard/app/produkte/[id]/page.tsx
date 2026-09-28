@@ -131,6 +131,10 @@ export default function ProduktDetailPage() {
   const [showAddSupplier, setShowAddSupplier] = useState(false);
   const [supForm, setSupForm] = useState({ supplier_id: "", purchase_price: "", lead_time_days: "", is_primary: false, notes: "" });
 
+  // Lagerorte
+  const [allLocations, setAllLocations] = useState<{ id: string; name: string; parent_id: string | null }[]>([]);
+  const [editLocationId, setEditLocationId] = useState<string | null>(null);
+
   // Image upload
   const [uploading, setUploading] = useState(false);
 
@@ -140,7 +144,7 @@ export default function ProduktDetailPage() {
       fetch(`/api/produkte/${id}/lager`).then(r => r.json()),
       fetch(`/api/produkte/${id}/lieferanten`).then(r => r.json()),
     ]);
-    // Load tax + return classes + all suppliers for this venture
+    // Load tax classes + all suppliers for this venture
     if (p.venture) {
       fetch(`/api/steuerklassen?venture=${p.venture}`)
         .then(r => r.json())
@@ -156,7 +160,11 @@ export default function ProduktDetailPage() {
       fetch(`/api/produkt-kategorien?venture=${p.venture}`)
         .then(r => r.json())
         .then(data => setAllCategories(Array.isArray(data) ? data : []));
+      fetch(`/api/produkt-lagerorte?venture=${p.venture}`)
+        .then(r => r.json())
+        .then(data => setAllLocations(Array.isArray(data) ? data : []));
     }
+    setEditLocationId(p.location_id ?? null);
     setEditName(p.name ?? "");
     setEditStatus(p.status ?? "draft");
     setEditPrice(p.price != null ? String(p.price) : "");
@@ -954,7 +962,7 @@ export default function ProduktDetailPage() {
           </div>
 
           {/* Varianten */}
-          {hasVariants && (
+          {hasVariants ? (
             <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1067,6 +1075,59 @@ export default function ProduktDetailPage() {
                     </tbody>
                   </table>
                 </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg border border-gray-200 px-5 py-4">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Varianten</p>
+              <p className="text-xs text-gray-400">
+                Dieser Produkttyp hat keine Varianten aktiviert.{" "}
+                <a href="/einstellungen/produkttypen" className="text-blue-500 hover:underline">
+                  Jetzt in den Produkttypen aktivieren →
+                </a>
+              </p>
+            </div>
+          )}
+
+          {/* Lagerort */}
+          {(hasInventory || editTrackInventory) && (
+            <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-3">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Lagerort</p>
+              {allLocations.length === 0 ? (
+                <p className="text-xs text-gray-400">
+                  Noch keine Lagerorte.{" "}
+                  <a href="/produkte/lagerorte" className="text-blue-500 hover:underline">
+                    Jetzt anlegen →
+                  </a>
+                </p>
+              ) : (
+                <>
+                  <select
+                    value={editLocationId ?? ""}
+                    onChange={async e => {
+                      const val = e.target.value || null;
+                      setEditLocationId(val);
+                      await patch({ location_id: val }, "location");
+                    }}
+                    className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">— Kein Lagerort —</option>
+                    {allLocations.map(l => {
+                      let depth = 0;
+                      let current = l;
+                      while (current.parent_id) {
+                        const parent = allLocations.find(p2 => p2.id === current.parent_id);
+                        if (!parent) break;
+                        depth += 1;
+                        current = parent;
+                      }
+                      return (
+                        <option key={l.id} value={l.id}>{"—".repeat(depth)}{depth > 0 ? " " : ""}{l.name}</option>
+                      );
+                    })}
+                  </select>
+                  {saving === "location" && <p className="text-xs text-gray-400">Gespeichert…</p>}
+                </>
               )}
             </div>
           )}
@@ -1227,69 +1288,87 @@ export default function ProduktDetailPage() {
           </div>
 
           {/* Steuerklasse */}
-          {taxClasses.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-3">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Steuerklasse</p>
-              <select
-                value={editTaxClassId ?? ""}
-                onChange={async e => {
-                  const val = e.target.value || null;
-                  setEditTaxClassId(val);
-                  await patch({ tax_class_id: val }, "tax");
-                }}
-                className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="">— Keine —</option>
-                {taxClasses.map(tc => {
-                  const rate = tc.rates?.[0]?.rate;
-                  const rateLabel = rate != null ? ` (${(Number(rate) * 100).toFixed(0)}%)` : "";
-                  return (
-                    <option key={tc.id} value={tc.id}>{tc.name}{rateLabel}</option>
-                  );
-                })}
-              </select>
-              {saving === "tax" && <p className="text-xs text-gray-400">Gespeichert…</p>}
-            </div>
-          )}
+          <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 space-y-3">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Steuerklasse</p>
+            {taxClasses.length === 0 ? (
+              <p className="text-xs text-gray-400">
+                Noch keine Steuerklassen.{" "}
+                <a href="/einstellungen/steuern" className="text-blue-500 hover:underline">
+                  Jetzt anlegen →
+                </a>
+              </p>
+            ) : (
+              <>
+                <select
+                  value={editTaxClassId ?? ""}
+                  onChange={async e => {
+                    const val = e.target.value || null;
+                    setEditTaxClassId(val);
+                    await patch({ tax_class_id: val }, "tax");
+                  }}
+                  className="w-full text-sm border border-gray-200 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">— Keine —</option>
+                  {taxClasses.map(tc => {
+                    const rate = tc.rates?.[0]?.rate;
+                    const rateLabel = rate != null ? ` (${(Number(rate) * 100).toFixed(0)}%)` : "";
+                    return (
+                      <option key={tc.id} value={tc.id}>{tc.name}{rateLabel}</option>
+                    );
+                  })}
+                </select>
+                {saving === "tax" && <p className="text-xs text-gray-400">Gespeichert…</p>}
+              </>
+            )}
+          </div>
 
           {/* Retoureklasse: seit Umstellung auf Gewichtsstaffelung (analog
               Versandklassen) global berechnet — keine Zuordnung pro Produkt
               mehr nötig. Verwaltung unter /einstellungen/retoureklassen. */}
 
           {/* Kategorien */}
-          {allCategories.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 px-5 py-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Kategorien</p>
-              <div className="flex flex-wrap gap-1.5">
-                {allCategories.map(c => {
-                  const active = selectedCategories.includes(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={async () => {
-                        const updated = active
-                          ? selectedCategories.filter(x => x !== c.id)
-                          : [...selectedCategories, c.id];
-                        setSelectedCategories(updated);
-                        await patch({ category_ids: updated }, "categories");
-                      }}
-                      className="text-xs px-2.5 py-1 rounded-full border transition-colors"
-                      style={{
-                        background: active ? "#1B2A5E" : "#FFFFFF",
-                        color: active ? "#FFFFFF" : "#6B7280",
-                        borderColor: active ? "#1B2A5E" : "#D1D5E8",
-                      }}
-                    >
-                      {c.level > 1 ? "↳ " : ""}{c.name}
-                    </button>
-                  );
-                })}
-              </div>
-              {saving === "categories" && (
-                <p className="text-xs text-gray-400 mt-2">Gespeichert…</p>
-              )}
-            </div>
-          )}
+          <div className="bg-white rounded-lg border border-gray-200 px-5 py-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Kategorien</p>
+            {allCategories.length === 0 ? (
+              <p className="text-xs text-gray-400">
+                Noch keine Kategorien.{" "}
+                <a href="/produkte/kategorien" className="text-blue-500 hover:underline">
+                  Jetzt anlegen →
+                </a>
+              </p>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-1.5">
+                  {allCategories.map(c => {
+                    const active = selectedCategories.includes(c.id);
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={async () => {
+                          const updated = active
+                            ? selectedCategories.filter(x => x !== c.id)
+                            : [...selectedCategories, c.id];
+                          setSelectedCategories(updated);
+                          await patch({ category_ids: updated }, "categories");
+                        }}
+                        className="text-xs px-2.5 py-1 rounded-full border transition-colors"
+                        style={{
+                          background: active ? "#1B2A5E" : "#FFFFFF",
+                          color: active ? "#FFFFFF" : "#6B7280",
+                          borderColor: active ? "#1B2A5E" : "#D1D5E8",
+                        }}
+                      >
+                        {c.level > 1 ? "↳ " : ""}{c.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                {saving === "categories" && (
+                  <p className="text-xs text-gray-400 mt-2">Gespeichert…</p>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Tags */}
           <div className="bg-white rounded-lg border border-gray-200 px-5 py-4">

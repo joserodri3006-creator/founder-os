@@ -168,6 +168,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - `/produkte/[id]` — Produktdetail (→ siehe Produktverwaltung unten)
 - `/produkte/neu` — Neues Produkt anlegen
 - `/produkte/kategorien` — Kategorie-Baum verwalten (3-stufig, P1.2 ✅)
+- `/produkte/lagerorte` — frei konfigurierbare Lagerort-Hierarchie pro Venture (beliebige Tiefe, kein Level-Cap wie bei Kategorien), auf Produkten mit Lagerbestand zuweisbar
 - `/produkte/sync-log` — WooCommerce Sync-Log (P1.5 ✅)
 - `/einstellungen` — KI-Suche, Venture-Infos (Firmendaten für Rechnungen), WooCommerce-Config, allg. Config
 - `/einstellungen/zahlungsmodelle` — Zahlungsmodelle pro Venture verwalten
@@ -206,8 +207,8 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 
 #### Produktliste (`/produkte`)
 - Alle Produkte des aktiven Ventures anzeigen
-- Filter: Freitextsuche (Name/SKU), Status (Entwurf / Aktiv / Archiviert)
-- Spalten: Produktbild, Name, Marke, Typ, SKU, Preis (mit Streichpreis), Status
+- Filter: Volltextsuche (Name/SKU/Interne Nr./Kurzbeschreibung/Beschreibung/Notizen, serverseitig, 300ms debounced, analog `/leads`), Status (Entwurf/Aktiv/Archiviert), Produkttyp, Kategorie
+- Spalten: Produktbild, Name, Marke, Typ, SKU, Preis (mit Streichpreis), Channel, Status
 - Aktionen pro Zeile: **Bearbeiten** (→ Detailseite), **Kopieren** (Duplikat mit neuem Namen, Status Entwurf), **Archivieren** (Bestätigung), **Löschen** (Bestätigung, inkl. Storage-Images)
 
 #### Neues Produkt (`/produkte/neu`)
@@ -257,6 +258,11 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - Pro Variante editierbar: SKU, Preis, Lagerbestand, Aktiv-Toggle
 - Varianten-Daten per PATCH `/api/produkte/[id]/varianten` gespeichert
 
+**Lagerort (nur wenn `has_inventory = true` oder Lagerbestand-Toggle aktiv):**
+- Zuweisung eines Lagerorts aus der venture-eigenen, frei konfigurierbaren Lagerort-Hierarchie (`/produkte/lagerorte`, beliebige Tiefe)
+- Ein Lagerort pro Produkt (nicht pro Variante), per PATCH `/api/produkte/[id]` (`location_id`) gespeichert
+- Leerer Zustand zeigt „Jetzt anlegen →"-Link statt die Karte auszublenden
+
 **Lagerbewegungen (nur wenn `has_inventory = true`):**
 - Bewegungshistorie der letzten 100 Einträge (Typ, Menge, Vorher/Nachher-Bestand, Notiz, Datum)
 - Neue Bewegung erfassen: Typ (Eingang/Ausgang/Korrektur/Retoure), Menge, Variante auswählen, Notiz
@@ -293,6 +299,14 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 - Bearbeiten-Modal: Name, Beschreibung, Meta-Titel (60 Zeichen), Meta-Description (160 Zeichen)
 - Löschen nur möglich wenn keine Unterkategorien vorhanden
 
+#### Lagerorte (`/produkte/lagerorte`)
+- **Beliebig tiefe** Hierarchie, venture-eigen konfigurierbar (kein Level-Cap wie bei Kategorien — deckt sowohl "ein Raum, zwei Regale" als auch mehrstöckige Lagerhallen ab)
+- Kein Slug/Pfad in der DB: Tiefe + Breadcrumb-Pfad werden clientseitig aus `parent_id` berechnet, nicht per DB-Trigger
+- Expand/Collapse, Sortierung per ▲▼ (swap sort_order)
+- Bearbeiten-Modal: Name, optionale Notiz
+- Löschen nur möglich wenn keine Unterorte vorhanden
+- Zuweisung auf Produktebene über die Lagerort-Karte in `/produkte/[id]` (nur sichtbar bei `has_inventory`/Lagerbestand-Toggle)
+
 #### Produkttypen (`/einstellungen/produkttypen`)
 - Produkttypen pro Venture definieren
 - Flags: `has_variants` (Varianten-Tab erscheint), `has_inventory` (Lager-Tab erscheint), `has_weight` (Gewichtsfeld erscheint)
@@ -308,7 +322,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 
 | Tabelle | Zweck |
 |---|---|
-| `products` | Kernprodukt-Daten inkl. `images` JSONB-Array |
+| `products` | Kernprodukt-Daten inkl. `images` JSONB-Array, `location_id` (Lagerort, optional) |
 | `product_types` | Typ-Definitionen pro Venture (Flags) |
 | `product_brands` | Marken pro Venture |
 | `product_categories` | Kategorie-Hierarchie (parent_id, level, path, slug, SEO-Felder) |
@@ -318,6 +332,7 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 | `inventory_movements` | Lager-Bewegungshistorie |
 | `product_category_map` | Produkt ↔ Kategorie (n:m) |
 | `product_tag_map` | Produkt ↔ Tag (n:m) |
+| `product_locations` | Lagerort-Hierarchie pro Venture (parent_id, beliebige Tiefe, kein Slug/Level/Path — clientseitig berechnet) |
 | `tax_classes` | Steuerklassen pro Venture (Standard 19%, Ermäßigt 7%, Steuerfrei 0%) |
 | `tax_rates` | Steuersätze pro Klasse + Land |
 | `product_sync_log` | WooCommerce Sync-Protokoll pro Produkt |
@@ -341,6 +356,8 @@ Deployment-Secret-Store liegen und niemals in diesem Repository dokumentiert wer
 | `/api/produkte/[id]/bilder` | POST, PATCH, DELETE | Bild hochladen, sortieren, löschen |
 | `/api/produkt-typen` | GET, POST | Produkttypen |
 | `/api/produkt-typen/[id]` | PATCH, DELETE | Produkttyp bearbeiten/löschen |
+| `/api/produkt-lagerorte` | GET, POST | Lagerorte |
+| `/api/produkt-lagerorte/[id]` | PATCH, DELETE | Lagerort bearbeiten/löschen (blockiert bei Unterorten) |
 | `/api/produkt-marken` | GET, POST | Marken |
 | `/api/produkt-marken/[id]` | PATCH, DELETE | Marke bearbeiten/löschen |
 | `/api/produkt-kategorien` | GET, POST | Kategorien |
@@ -382,6 +399,7 @@ ELEVENLABS_API_KEY
 
 ## Offene Punkte (Phase 1)
 
+- [ ] `supabase/migrations/product_locations.sql` in Supabase ausfuehren (neue `product_locations`-Tabelle + `products.location_id` fuer die Lagerort-Verwaltung unter `/produkte/lagerorte`)
 - [ ] `supabase/migrations/lead_customer_tags.sql` und `supabase/migrations/reporting.sql` in Supabase ausfuehren, danach Edge Function `reporting-query` deployen (`supabase functions deploy reporting-query`)
 - [ ] `supabase/migrations/outreach_templates.sql` in Supabase ausfuehren
 - [ ] `supabase/migrations/tasks.sql` in Supabase ausfuehren, falls noch nicht geschehen (Code ist bereits in `main` gemergt — Commit `8d9303d` — die Migration selbst wurde in diesem Dokument aber noch nicht als ausgefuehrt bestaetigt)

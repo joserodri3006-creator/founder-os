@@ -65,6 +65,10 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       items: [
         { href: "/produkte", label: "Produkte", show: canView("products") },
         { href: "/produkte/kategorien", label: "Kategorien", show: canView("products") },
+        { href: "/produkte/lagerorte", label: "Lagerorte", show: canView("products") },
+        { href: "/einstellungen/produkttypen", label: "Produkttypen", show: canEdit("settings") && venture !== "itaba" },
+        { href: "/einstellungen/marken", label: "Marken", show: canEdit("settings") && venture !== "itaba" },
+        { href: "/einstellungen/steuern", label: "Steuern", show: canEdit("settings") && venture !== "itaba" },
         { href: "/produkte/sync-log", label: "Sync-Log", show: canView("products") && venture !== "itaba" },
         { href: "/auftraege", label: isItabaManagerAccount ? "Bestellungen" : "Aufträge", show: canView("orders") },
         { href: "/retouren", label: "Retouren", show: canView("orders") },
@@ -98,9 +102,6 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       label: "Shop-Einstellungen",
       items: [
         { href: "/einstellungen/zahlungsmodelle", label: "Zahlungsmodelle", show: canEdit("settings") && venture !== "itaba" },
-        { href: "/einstellungen/produkttypen", label: "Produkttypen", show: canEdit("settings") && venture !== "itaba" },
-        { href: "/einstellungen/marken", label: "Marken", show: canEdit("settings") && venture !== "itaba" },
-        { href: "/einstellungen/steuern", label: "Steuern", show: canEdit("settings") && venture !== "itaba" },
         { href: "/einstellungen/retoureklassen", label: "Retoureklassen", show: canEdit("settings") },
         { href: "/einstellungen/lieferanten", label: "Lieferanten", show: canEdit("settings") && venture !== "itaba" },
       ],
