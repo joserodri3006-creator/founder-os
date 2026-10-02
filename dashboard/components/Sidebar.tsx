@@ -40,6 +40,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       items: [
         { href: "/dashboard", label: "Dashboard", show: !isItabaManagerAccount },
         { href: "/private-os/messages", label: "Private OS", show: user?.role === "founder" },
+        { href: "/portfolio", label: "Portfolio", show: user?.role === "founder" },
       ],
     },
     {
