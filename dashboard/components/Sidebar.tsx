@@ -77,6 +77,12 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       ],
     },
     {
+      label: "Finanzen",
+      items: [
+        { href: "/finanzen", label: "Finanzen", show: canView("finances") },
+      ],
+    },
+    {
       label: "Website",
       items: [
         { href: "/website/startseite", label: "Startseite", show: venture === "itaba" && canView("settings") },

@@ -7,6 +7,7 @@ export type Section =
   | "products"
   | "drafts"
   | "invoices"
+  | "finances"
   | "settings";
 
 export type Permissions = Record<Section, PermissionLevel>;
@@ -14,7 +15,7 @@ export type Permissions = Record<Section, PermissionLevel>;
 export type Role = "founder" | "manager" | "employee";
 
 export const SECTIONS: Section[] = [
-  "leads", "customers", "orders", "products", "drafts", "invoices", "settings",
+  "leads", "customers", "orders", "products", "drafts", "invoices", "finances", "settings",
 ];
 
 export const SECTION_LABELS: Record<Section, string> = {
@@ -24,22 +25,23 @@ export const SECTION_LABELS: Record<Section, string> = {
   products: "Produkte",
   drafts: "KI-Drafts",
   invoices: "Rechnungen",
+  finances: "Finanzen",
   settings: "Einstellungen",
 };
 
 export const FOUNDER_PERMISSIONS: Permissions = {
   leads: "edit", customers: "edit", orders: "edit",
-  products: "edit", drafts: "edit", invoices: "edit", settings: "edit",
+  products: "edit", drafts: "edit", invoices: "edit", finances: "edit", settings: "edit",
 };
 
 export const MANAGER_PERMISSIONS: Permissions = {
   leads: "edit", customers: "edit", orders: "edit",
-  products: "edit", drafts: "edit", invoices: "edit", settings: "none",
+  products: "edit", drafts: "edit", invoices: "edit", finances: "edit", settings: "none",
 };
 
 export const EMPLOYEE_DEFAULT_PERMISSIONS: Permissions = {
   leads: "none", customers: "view", orders: "edit",
-  products: "edit", drafts: "none", invoices: "none", settings: "none",
+  products: "edit", drafts: "none", invoices: "none", finances: "none", settings: "none",
 };
 
 export function canEdit(permissions: Permissions, section: Section): boolean {
