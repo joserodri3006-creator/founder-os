@@ -21,6 +21,7 @@ interface Occurrence {
   amount: number;
   status: "offen" | "bezahlt" | "storniert";
   paid_date: string | null;
+  lexware_erfasst: boolean;
 }
 
 interface Entry {
@@ -108,12 +109,12 @@ function EntryForm({ venture, onSaved, onCancel, editEntry }: {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-white rounded-t-2xl sm:rounded-xl shadow-xl w-full sm:max-w-xl p-5 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto">
         <h2 className="text-base font-semibold text-[#14193A]">{editEntry ? "Buchung bearbeiten" : "Neue Buchung"}</h2>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="flex rounded-lg border border-gray-200 overflow-hidden col-span-2">
             <button onClick={() => setType("einnahme")}
               className={`flex-1 text-sm py-2 font-medium ${type === "einnahme" ? "bg-emerald-50 text-emerald-700" : "text-gray-500"}`}>
@@ -287,6 +288,15 @@ export default function FinanzenPage() {
     await load();
   }
 
+  async function toggleLexware(occId: string, current: boolean) {
+    await fetch(`/api/finanzen/vorkommen/${occId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lexware_erfasst: !current }),
+    });
+    await load();
+  }
+
   // Flache Liste aller sichtbaren (Buchung, Vorkommen)-Paare im Zeitraum.
   const rows = useMemo(() => {
     const list: { entry: Entry; occ: Occurrence }[] = [];
@@ -351,21 +361,21 @@ export default function FinanzenPage() {
           </div>
           {editable && (
             <button onClick={() => { setEditEntry(null); setShowForm(true); }}
-              className="text-sm px-4 py-2 bg-[#1B2A5E] text-white rounded-lg hover:bg-[#14193A] font-medium">
+              className="text-sm px-4 py-2.5 bg-[#1B2A5E] text-white rounded-lg hover:bg-[#14193A] font-medium w-full sm:w-auto">
               + Neue Buchung
             </button>
           )}
         </div>
 
         {/* Sichten-Umschalter + Zeitraum */}
-        <div className="flex flex-wrap items-center gap-3 mb-5">
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex flex-wrap items-center gap-2 mb-5">
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden flex-1 sm:flex-none min-w-[220px]">
             <button onClick={() => setView("monat")}
-              className={`text-sm px-4 py-2 font-medium ${view === "monat" ? "bg-[#1B2A5E] text-white" : "bg-white text-gray-600"}`}>
+              className={`flex-1 sm:flex-none text-sm px-4 py-2.5 font-medium ${view === "monat" ? "bg-[#1B2A5E] text-white" : "bg-white text-gray-600"}`}>
               Monatsansicht
             </button>
             <button onClick={() => setView("jahr")}
-              className={`text-sm px-4 py-2 font-medium ${view === "jahr" ? "bg-[#1B2A5E] text-white" : "bg-white text-gray-600"}`}>
+              className={`flex-1 sm:flex-none text-sm px-4 py-2.5 font-medium ${view === "jahr" ? "bg-[#1B2A5E] text-white" : "bg-white text-gray-600"}`}>
               Jahresansicht
             </button>
           </div>
@@ -445,62 +455,84 @@ export default function FinanzenPage() {
           ) : (
             <div className="divide-y divide-gray-100">
               {rows.map(({ entry, occ }) => (
-                <div key={occ.id} className="px-5 py-3 flex items-center gap-3 group">
-                  <span className={`shrink-0 text-xs font-bold px-1.5 py-0.5 rounded ${entry.type === "einnahme" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
-                    {entry.type === "einnahme" ? "EIN" : "AUS"}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-[#14193A] truncate">{entry.description}</span>
-                      {entry.is_recurring && (
-                        <span className="text-[10px] text-gray-400 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 shrink-0">
-                          ↻ {entry.recurrence_interval}
-                        </span>
-                      )}
+                <div key={occ.id} className="px-4 py-3.5 sm:px-5">
+                  {/* Zeile 1: Typ-Badge, Beschreibung, Betrag — immer sichtbar, auch mobil */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span className={`shrink-0 mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded ${entry.type === "einnahme" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                        {entry.type === "einnahme" ? "EIN" : "AUS"}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-[#14193A] leading-snug break-words">{entry.description}</p>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-400 mt-0.5">
+                          <span>{occ.occurrence_date}</span>
+                          {entry.is_recurring && (
+                            <span className="text-gray-500 bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5">
+                              ↻ {entry.recurrence_interval}
+                            </span>
+                          )}
+                          {entry.category && <span>· {entry.category}</span>}
+                          {entry.account && <span>· {entry.account}</span>}
+                        </div>
+                        {entry.finance_entry_shares?.length > 0 && (
+                          <p className="text-[11px] text-gray-500 mt-1">
+                            👥 {entry.finance_entry_shares.map(s => `${s.partner_name}: ${money(s.paid_amount)} / ${money(s.share_amount)}`).join(" · ")}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-0.5">
-                      <span>{occ.occurrence_date}</span>
-                      {entry.category && <span>· {entry.category}</span>}
-                      {entry.account && <span>· {entry.account}</span>}
-                      {entry.finance_entry_shares?.length > 0 && (
-                        <span>· {entry.finance_entry_shares.map(s => s.partner_name).join(", ")}</span>
-                      )}
-                    </div>
-                  </div>
-                  <span className={`text-sm font-semibold shrink-0 ${entry.type === "einnahme" ? "text-emerald-600" : "text-red-600"}`}>
-                    {money(Number(occ.amount))}
-                  </span>
-                  {editable ? (
-                    <select value={occ.status} onChange={e => markOccurrence(occ.id, e.target.value as any)}
-                      className={`text-xs border rounded-lg px-2 py-1 shrink-0 ${
-                        occ.status === "bezahlt" ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
-                        occ.status === "storniert" ? "border-gray-200 bg-gray-50 text-gray-400" :
-                        "border-amber-200 bg-amber-50 text-amber-700"
-                      }`}>
-                      <option value="offen">Offen</option>
-                      <option value="bezahlt">Bezahlt</option>
-                      <option value="storniert">Storniert</option>
-                    </select>
-                  ) : (
-                    <span className={`text-xs shrink-0 px-2 py-1 rounded-lg ${
-                      occ.status === "bezahlt" ? "bg-emerald-50 text-emerald-700" :
-                      occ.status === "storniert" ? "bg-gray-50 text-gray-400" : "bg-amber-50 text-amber-700"
-                    }`}>
-                      {occ.status === "bezahlt" ? "Bezahlt" : occ.status === "storniert" ? "Storniert" : "Offen"}
+                    <span className={`shrink-0 text-base sm:text-sm font-bold ${entry.type === "einnahme" ? "text-emerald-600" : "text-red-600"}`}>
+                      {money(Number(occ.amount))}
                     </span>
-                  )}
-                  {editable && (
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                      <button onClick={() => { setEditEntry(entry); setShowForm(true); }}
-                        className="text-xs text-gray-400 hover:text-[#1B2A5E] px-2 py-1 rounded hover:bg-gray-100">
-                        Bearbeiten
-                      </button>
-                      <button onClick={() => deleteEntry(entry.id, entry.description)}
-                        className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50">
-                        Löschen
-                      </button>
-                    </div>
-                  )}
+                  </div>
+
+                  {/* Zeile 2: Status, Lexware, Aktionen — eigene Zeile, mobil gut antippbar */}
+                  <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                    {editable ? (
+                      <select value={occ.status} onChange={e => markOccurrence(occ.id, e.target.value as any)}
+                        className={`text-xs border rounded-lg px-2 py-1.5 ${
+                          occ.status === "bezahlt" ? "border-emerald-200 bg-emerald-50 text-emerald-700" :
+                          occ.status === "storniert" ? "border-gray-200 bg-gray-50 text-gray-400" :
+                          "border-amber-200 bg-amber-50 text-amber-700"
+                        }`}>
+                        <option value="offen">Offen</option>
+                        <option value="bezahlt">Bezahlt</option>
+                        <option value="storniert">Storniert</option>
+                      </select>
+                    ) : (
+                      <span className={`text-xs px-2 py-1.5 rounded-lg ${
+                        occ.status === "bezahlt" ? "bg-emerald-50 text-emerald-700" :
+                        occ.status === "storniert" ? "bg-gray-50 text-gray-400" : "bg-amber-50 text-amber-700"
+                      }`}>
+                        {occ.status === "bezahlt" ? "Bezahlt" : occ.status === "storniert" ? "Storniert" : "Offen"}
+                      </span>
+                    )}
+
+                    <button
+                      onClick={() => editable && toggleLexware(occ.id, occ.lexware_erfasst)}
+                      disabled={!editable}
+                      title="In Lexware erfasst?"
+                      className={`text-xs px-2 py-1.5 rounded-lg border flex items-center gap-1 ${
+                        occ.lexware_erfasst
+                          ? "border-sky-200 bg-sky-50 text-sky-700"
+                          : "border-gray-200 bg-gray-50 text-gray-400"
+                      } ${editable ? "hover:opacity-80" : ""}`}>
+                      {occ.lexware_erfasst ? "✓" : "○"} Lexware
+                    </button>
+
+                    {editable && (
+                      <div className="flex items-center gap-1 ml-auto">
+                        <button onClick={() => { setEditEntry(entry); setShowForm(true); }}
+                          className="text-xs text-gray-500 hover:text-[#1B2A5E] px-2 py-1.5 rounded hover:bg-gray-100">
+                          Bearbeiten
+                        </button>
+                        <button onClick={() => deleteEntry(entry.id, entry.description)}
+                          className="text-xs text-red-400 hover:text-red-600 px-2 py-1.5 rounded hover:bg-red-50">
+                          Löschen
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -512,7 +544,8 @@ export default function FinanzenPage() {
           <ul className="space-y-0.5 text-blue-600 list-disc list-inside">
             <li>„Ist" zählt nur bezahlte Buchungen, „Soll" alle offenen + bezahlten (ohne Stornos)</li>
             <li>Wiederkehrende Buchungen erzeugen automatisch ein Vorkommen pro Intervall — jedes einzeln als bezahlt markierbar</li>
-            <li>Partneranteile zeigen, wer von mehreren Partnern wie viel eingezahlt/bezahlt hat</li>
+            <li>Partneranteile zeigen, wer von mehreren Partnern wie viel eingezahlt/bezahlt hat (bezahlt / vereinbarter Anteil)</li>
+            <li>„Lexware"-Button zeigt, ob die Buchung bereits in Lexware erfasst ist — unabhängig vom Zahlstatus</li>
             <li>Nur Venture-Manager und Founder sehen und bearbeiten diese Seite</li>
           </ul>
         </div>

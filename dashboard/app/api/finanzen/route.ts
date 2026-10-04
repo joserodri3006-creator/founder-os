@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
       id, venture, type, description, category, account, amount, currency,
       status, entry_date, paid_date, is_recurring, recurrence_interval,
       recurrence_end_date, order_id, notes, created_at,
-      finance_entry_occurrences(id, occurrence_date, amount, status, paid_date),
+      finance_entry_occurrences(id, occurrence_date, amount, status, paid_date, lexware_erfasst),
       finance_entry_shares(id, occurrence_id, partner_name, partner_user_id, share_amount, paid_amount, paid_date, notes)
     `)
     .eq("venture", venture)
