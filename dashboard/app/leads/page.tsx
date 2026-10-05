@@ -17,6 +17,7 @@ import CsvImportModal from "@/components/CsvImportModal";
 import EditLeadModal from "@/components/EditLeadModal";
 import CopyLeadModal from "@/components/CopyLeadModal";
 import GoogleLeadSearchModal from "@/components/GoogleLeadSearchModal";
+import SwipeView from "@/components/SwipeView";
 
 // ─── Typen ────────────────────────────────────────────────────────────────────
 
@@ -28,7 +29,7 @@ type Modal =
   | { type: "delete"; id: string; name: string }
   | null;
 
-type ViewMode = "tabelle" | "pipeline";
+type ViewMode = "tabelle" | "pipeline" | "swipe";
 type SortKey = "name" | "company" | "status" | "source" | "created_at" | "follow_up_date";
 type SortDir = "asc" | "desc";
 
@@ -221,7 +222,7 @@ export default function LeadsPage() {
             className="flex rounded-lg overflow-hidden"
             style={{ border: "1px solid #D1D5E8", background: "#F7F8FC" }}
           >
-            {(["tabelle", "pipeline"] as ViewMode[]).map((v) => (
+            {(["tabelle", "pipeline", "swipe"] as ViewMode[]).map((v) => (
               <button
                 key={v}
                 onClick={() => setViewMode(v)}
@@ -232,7 +233,7 @@ export default function LeadsPage() {
                   border: "none",
                 }}
               >
-                {v === "tabelle" ? "☰ Tabelle" : "⊞ Pipeline"}
+                {v === "tabelle" ? "☰ Tabelle" : v === "pipeline" ? "⊞ Pipeline" : "🔥 Swipe"}
               </button>
             ))}
           </div>
@@ -321,13 +322,19 @@ export default function LeadsPage() {
           onArchive={handleArchive}
           onDelete={(l) => setModal({ type: "delete", id: l.id, name: `${l.first_name} ${l.last_name}` })}
         />
-      ) : (
+      ) : viewMode === "pipeline" ? (
         <PipelineView
           byStatus={pipelineByStatus}
           updatingId={updatingId}
           onUpdateStatus={updateStatus}
           onEdit={(id) => setModal({ type: "edit", id })}
           onDelete={(l) => setModal({ type: "delete", id: l.id, name: `${l.first_name} ${l.last_name}` })}
+        />
+      ) : (
+        <SwipeView
+          leads={displayLeads}
+          onUpdateStatus={updateStatus}
+          onArchive={handleArchive}
         />
       )}
 

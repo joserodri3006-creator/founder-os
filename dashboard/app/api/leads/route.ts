@@ -32,8 +32,8 @@ export async function GET(req: NextRequest) {
     "phone", "website", "city", "region", "industry", "contact_reason", "notes",
   ];
 
-  const baseSelect = "id,first_name,last_name,email,company_name,status,source,city,industry,follow_up_date,ai_draft_approved,archived_at,created_at,venture,is_duplicate";
-  const reviewSelect = `${baseSelect},review_status,lead_potential,contact_channel,next_action`;
+  const baseSelect = "id,first_name,last_name,email,phone,website,company_name,status,source,city,region,industry,contact_reason,notes,follow_up_date,ai_draft_approved,archived_at,created_at,venture,is_duplicate";
+  const reviewSelect = `${baseSelect},review_status,lead_potential,contact_channel,next_action,review_notes,reviewed_at`;
 
   function buildQuery(select: string) {
     let query = supabaseAdmin
@@ -77,6 +77,8 @@ export async function GET(req: NextRequest) {
       lead_potential: null,
       contact_channel: "unchecked",
       next_action: "website_pruefen",
+      review_notes: null,
+      reviewed_at: null,
     }))
   );
 }
