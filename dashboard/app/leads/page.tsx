@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   CONTACT_CHANNEL_LABELS,
   Lead,
@@ -18,6 +18,8 @@ import EditLeadModal from "@/components/EditLeadModal";
 import CopyLeadModal from "@/components/CopyLeadModal";
 import GoogleLeadSearchModal from "@/components/GoogleLeadSearchModal";
 
+// ─── Typen ────────────────────────────────────────────────────────────────────
+
 const ALL_STATUSES = Object.keys(STATUS_LABELS) as LeadStatus[];
 
 type Modal =
@@ -26,51 +28,110 @@ type Modal =
   | { type: "delete"; id: string; name: string }
   | null;
 
-const STATUS_DOT: Record<string, string> = {
-  neu: '#3A5BA0',
-  kontaktiert: '#C8A96E',
-  qualifiziert: '#1B2A5E',
-  angebot: '#7C3AED',
-  gewonnen: '#16A34A',
-  verloren: '#DC2626',
-  follow_up: '#EA580C',
-};
+type ViewMode = "tabelle" | "pipeline";
+type SortKey = "name" | "company" | "status" | "source" | "created_at" | "follow_up_date";
+type SortDir = "asc" | "desc";
+
+// ─── Konstanten ───────────────────────────────────────────────────────────────
 
 const STATUS_BG: Record<string, string> = {
-  neu: '#EEF0F7',
-  kontaktiert: 'rgba(200,169,110,0.12)',
-  qualifiziert: '#EEF0F7',
-  angebot: 'rgba(124,58,237,0.08)',
-  gewonnen: 'rgba(22,163,74,0.1)',
-  verloren: 'rgba(220,38,38,0.08)',
-  follow_up: 'rgba(234,88,12,0.1)',
+  neu: "#EEF0F7",
+  in_bearbeitung: "rgba(200,169,110,0.12)",
+  kontaktiert: "rgba(200,169,110,0.18)",
+  follow_up: "rgba(234,88,12,0.1)",
+  nachgefasst: "rgba(234,88,12,0.08)",
+  erstgespraech: "rgba(99,102,241,0.1)",
+  qualifiziert: "#EEF0F7",
+  sales_gespraech: "rgba(6,182,212,0.1)",
+  angebot_gesendet: "rgba(236,72,153,0.08)",
+  gewonnen: "rgba(22,163,74,0.1)",
+  verloren: "rgba(220,38,38,0.08)",
+  nachfassen_zukunft: "#F3F4F6",
 };
 
 const STATUS_TEXT: Record<string, string> = {
-  neu: '#1B2A5E',
-  kontaktiert: '#A07840',
-  qualifiziert: '#14193A',
-  angebot: '#5B21B6',
-  gewonnen: '#15803D',
-  verloren: '#B91C1C',
-  follow_up: '#C2410C',
+  neu: "#1B2A5E",
+  in_bearbeitung: "#A07840",
+  kontaktiert: "#A07840",
+  follow_up: "#C2410C",
+  nachgefasst: "#C2410C",
+  erstgespraech: "#4F46E5",
+  qualifiziert: "#14193A",
+  sales_gespraech: "#0E7490",
+  angebot_gesendet: "#BE185D",
+  gewonnen: "#15803D",
+  verloren: "#B91C1C",
+  nachfassen_zukunft: "#6B7280",
 };
+
+// Pipeline-Spalten-Definition: Key + Label + Farbe der Spaltenüberschrift
+const PIPELINE_COLS: { key: LeadStatus; label: string; accent: string; headerBg: string }[] = [
+  { key: "neu",               label: "Neu",               accent: "#3A5BA0", headerBg: "#EEF0F7" },
+  { key: "in_bearbeitung",    label: "In Bearbeitung",    accent: "#C8A96E", headerBg: "rgba(200,169,110,0.12)" },
+  { key: "kontaktiert",       label: "Kontaktiert",       accent: "#C8A96E", headerBg: "rgba(200,169,110,0.18)" },
+  { key: "follow_up",         label: "Follow-up",         accent: "#EA580C", headerBg: "rgba(234,88,12,0.1)" },
+  { key: "nachgefasst",       label: "Nachgefasst",       accent: "#EA580C", headerBg: "rgba(234,88,12,0.08)" },
+  { key: "erstgespraech",     label: "Erstgespräch",      accent: "#4F46E5", headerBg: "rgba(99,102,241,0.1)" },
+  { key: "qualifiziert",      label: "Qualifiziert",      accent: "#1B2A5E", headerBg: "#EEF0F7" },
+  { key: "sales_gespraech",   label: "Sales-Gespräch",    accent: "#0E7490", headerBg: "rgba(6,182,212,0.1)" },
+  { key: "angebot_gesendet",  label: "Angebot gesendet",  accent: "#BE185D", headerBg: "rgba(236,72,153,0.08)" },
+  { key: "gewonnen",          label: "Gewonnen",          accent: "#16A34A", headerBg: "rgba(22,163,74,0.1)" },
+  { key: "verloren",          label: "Verloren",          accent: "#DC2626", headerBg: "rgba(220,38,38,0.08)" },
+  { key: "nachfassen_zukunft",label: "Nachfassen (Zukunft)", accent: "#6B7280", headerBg: "#F3F4F6" },
+];
+
+const selectStyle: React.CSSProperties = {
+  fontSize: "13px",
+  border: "1px solid #D1D5E8",
+  borderRadius: "8px",
+  padding: "7px 12px",
+  background: "#FFFFFF",
+  color: "#14193A",
+  outline: "none",
+  fontFamily: "var(--font-sans)",
+};
+
+// ─── Hilfs-Hooks / -Funktionen ────────────────────────────────────────────────
+
+function sortLeads(leads: Lead[], key: SortKey, dir: SortDir): Lead[] {
+  return [...leads].sort((a, b) => {
+    let av: string = "";
+    let bv: string = "";
+    if (key === "name")          { av = `${a.first_name} ${a.last_name}`; bv = `${b.first_name} ${b.last_name}`; }
+    else if (key === "company")  { av = a.company_name ?? ""; bv = b.company_name ?? ""; }
+    else if (key === "status")   { av = a.status; bv = b.status; }
+    else if (key === "source")   { av = a.source; bv = b.source; }
+    else if (key === "created_at")    { av = a.created_at; bv = b.created_at; }
+    else if (key === "follow_up_date") { av = a.follow_up_date ?? ""; bv = b.follow_up_date ?? ""; }
+    const cmp = av.localeCompare(bv, "de");
+    return dir === "asc" ? cmp : -cmp;
+  });
+}
+
+// ─── Haupt-Komponente ─────────────────────────────────────────────────────────
 
 export default function LeadsPage() {
   const { venture } = useVenture();
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<LeadStatus | "alle">("alle");
-  const [filterSource, setFilterSource] = useState<string>("alle");
-  const [showArchived, setShowArchived] = useState(false);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [showNewLead, setShowNewLead] = useState(false);
-  const [showCsvImport, setShowCsvImport] = useState(false);
-  const [showGoogleSearch, setShowGoogleSearch] = useState(false);
-  const [modal, setModal] = useState<Modal>(null);
 
+  const [leads, setLeads]                   = useState<Lead[]>([]);
+  const [loading, setLoading]               = useState(true);
+  const [filterStatus, setFilterStatus]     = useState<LeadStatus | "alle">("alle");
+  const [filterSource, setFilterSource]     = useState<string>("alle");
+  const [showArchived, setShowArchived]     = useState(false);
+  const [search, setSearch]                 = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [updatingId, setUpdatingId]         = useState<string | null>(null);
+  const [showNewLead, setShowNewLead]       = useState(false);
+  const [showCsvImport, setShowCsvImport]   = useState(false);
+  const [showGoogleSearch, setShowGoogleSearch] = useState(false);
+  const [modal, setModal]                   = useState<Modal>(null);
+
+  // Ansicht & Sortierung
+  const [viewMode, setViewMode]             = useState<ViewMode>("tabelle");
+  const [sortKey, setSortKey]               = useState<SortKey>("created_at");
+  const [sortDir, setSortDir]               = useState<SortDir>("desc");
+
+  // ── Laden ──────────────────────────────────────────────────────────────────
   async function load() {
     const params = new URLSearchParams();
     if (filterStatus !== "alle") params.set("status", filterStatus);
@@ -85,12 +146,13 @@ export default function LeadsPage() {
   }
 
   useEffect(() => {
-    const timeout = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(timeout);
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
   }, [search]);
 
   useEffect(() => { load(); }, [filterStatus, filterSource, showArchived, debouncedSearch, venture]);
 
+  // ── Status-Update ──────────────────────────────────────────────────────────
   async function updateStatus(id: string, status: LeadStatus) {
     setUpdatingId(id);
     await fetch("/api/leads", {
@@ -113,93 +175,102 @@ export default function LeadsPage() {
     setLeads((prev) => prev.filter((l) => l.id !== id));
   }
 
-  const selectStyle: React.CSSProperties = {
-    fontSize: '13px',
-    border: '1px solid #D1D5E8',
-    borderRadius: '8px',
-    padding: '7px 12px',
-    background: '#FFFFFF',
-    color: '#14193A',
-    outline: 'none',
-    fontFamily: 'var(--font-sans)',
-  };
+  // ── Sortier-Handler ────────────────────────────────────────────────────────
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
-  // Verloren-Leads ans Ende sortieren, Rest bleibt in API-Reihenfolge
-  const sortedLeads = [
-    ...leads.filter((l) => l.status !== 'verloren'),
-    ...leads.filter((l) => l.status === 'verloren'),
-  ];
+  // ── Berechnete Listen ──────────────────────────────────────────────────────
+  const displayLeads = useMemo(() => {
+    const sorted = sortLeads(leads, sortKey, sortDir);
+    // Verloren immer ans Ende, unabhängig vom aktiven Sort
+    return [
+      ...sorted.filter((l) => l.status !== "verloren"),
+      ...sorted.filter((l) => l.status === "verloren"),
+    ];
+  }, [leads, sortKey, sortDir]);
 
+  const pipelineByStatus = useMemo<Record<LeadStatus, Lead[]>>(() => {
+    const map = {} as Record<LeadStatus, Lead[]>;
+    ALL_STATUSES.forEach((s) => { map[s] = []; });
+    leads.forEach((l) => { map[l.status]?.push(l); });
+    return map;
+  }, [leads]);
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="px-4 py-5 sm:p-8 max-w-7xl mx-auto">
-      {/* Page Header */}
+
+      {/* ── Page Header ────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-7">
         <div>
-          <h1
-            style={{
-              fontFamily: 'var(--font-serif)',
-              fontWeight: 300,
-              fontSize: '28px',
-              color: '#14193A',
-              letterSpacing: '-0.02em',
-              lineHeight: 1.2,
-            }}
-          >
+          <h1 style={{ fontFamily: "var(--font-serif)", fontWeight: 300, fontSize: "28px", color: "#14193A", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
             Lead Pipeline
           </h1>
-          <p className="text-sm mt-0.5" style={{ color: '#6B7280' }}>{leads.length} Leads</p>
+          <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>{leads.length} Leads</p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap justify-end">
+
+          {/* View Toggle */}
+          <div
+            className="flex rounded-lg overflow-hidden"
+            style={{ border: "1px solid #D1D5E8", background: "#F7F8FC" }}
+          >
+            {(["tabelle", "pipeline"] as ViewMode[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => setViewMode(v)}
+                className="text-sm px-3 py-2 font-medium transition-colors"
+                style={{
+                  background: viewMode === v ? "#1B2A5E" : "transparent",
+                  color: viewMode === v ? "#FFFFFF" : "#6B7280",
+                  border: "none",
+                }}
+              >
+                {v === "tabelle" ? "☰ Tabelle" : "⊞ Pipeline"}
+              </button>
+            ))}
+          </div>
+
           <button
             onClick={() => setShowGoogleSearch(true)}
             className="text-sm px-4 py-2 rounded-lg transition-colors font-medium"
-            style={{
-              border: '1.5px solid #D1D5E8',
-              background: '#FFFFFF',
-              color: '#14193A',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#EEF0F7')}
-            onMouseLeave={e => (e.currentTarget.style.background = '#FFFFFF')}
+            style={{ border: "1.5px solid #D1D5E8", background: "#FFFFFF", color: "#14193A" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#EEF0F7")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#FFFFFF")}
           >
             Google Leads suchen
           </button>
           <button
             onClick={() => setShowCsvImport(true)}
             className="text-sm px-4 py-2 rounded-lg transition-colors font-medium"
-            style={{
-              border: '1.5px solid #D1D5E8',
-              background: 'transparent',
-              color: '#14193A',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#EEF0F7')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            style={{ border: "1.5px solid #D1D5E8", background: "transparent", color: "#14193A" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#EEF0F7")}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
           >
             CSV Import
           </button>
           <button
             onClick={() => setShowNewLead(true)}
             className="text-sm px-4 py-2 rounded-lg font-semibold transition-colors"
-            style={{
-              background: '#1B2A5E',
-              color: '#FFFFFF',
-              border: 'none',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#243672')}
-            onMouseLeave={e => (e.currentTarget.style.background = '#1B2A5E')}
+            style={{ background: "#1B2A5E", color: "#FFFFFF", border: "none" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#243672")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#1B2A5E")}
           >
             + Neuer Lead
           </button>
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* ── Filter Bar ──────────────────────────────────────────────────────── */}
       <div
         className="flex gap-2.5 mb-5 flex-wrap items-center p-3 rounded-xl"
-        style={{
-          background: '#FFFFFF',
-          border: '1px solid #D1D5E8',
-          boxShadow: '0 2px 12px rgba(27,42,94,0.08)',
-        }}
+        style={{ background: "#FFFFFF", border: "1px solid #D1D5E8", boxShadow: "0 2px 12px rgba(27,42,94,0.08)" }}
       >
         <input
           type="text"
@@ -208,19 +279,11 @@ export default function LeadsPage() {
           placeholder="Suche — Name, Firma, E-Mail, Telefon, Ort, Notizen…"
           style={{ ...selectStyle, flex: "1 1 260px", minWidth: "220px" }}
         />
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value as LeadStatus | "alle")}
-          style={selectStyle}
-        >
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as LeadStatus | "alle")} style={selectStyle}>
           <option value="alle">Alle Status</option>
           {ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
         </select>
-        <select
-          value={filterSource}
-          onChange={(e) => setFilterSource(e.target.value)}
-          style={selectStyle}
-        >
+        <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} style={selectStyle}>
           <option value="alle">Alle Quellen</option>
           {["website", "linkedin", "empfehlung", "kaltakquise", "csv_import", "ki_suche"].map((s) => (
             <option key={s} value={s}>{s}</option>
@@ -230,174 +293,45 @@ export default function LeadsPage() {
           onClick={() => setShowArchived((v) => !v)}
           className="text-sm px-3 py-1.5 rounded-lg transition-colors font-medium"
           style={{
-            border: showArchived ? '1.5px solid #1B2A5E' : '1px solid #D1D5E8',
-            background: showArchived ? '#EEF0F7' : 'transparent',
-            color: showArchived ? '#1B2A5E' : '#6B7280',
+            border: showArchived ? "1.5px solid #1B2A5E" : "1px solid #D1D5E8",
+            background: showArchived ? "#EEF0F7" : "transparent",
+            color: showArchived ? "#1B2A5E" : "#6B7280",
           }}
         >
           {showArchived ? "← Aktive" : "Archiv"}
         </button>
       </div>
 
+      {/* ── Laden ───────────────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="flex items-center gap-2 py-8" style={{ color: '#6B7280' }}>
-          <div
-            className="w-4 h-4 rounded-full border-2 animate-spin"
-            style={{ borderColor: '#D1D5E8', borderTopColor: '#1B2A5E' }}
-          />
+        <div className="flex items-center gap-2 py-8" style={{ color: "#6B7280" }}>
+          <div className="w-4 h-4 rounded-full border-2 animate-spin" style={{ borderColor: "#D1D5E8", borderTopColor: "#1B2A5E" }} />
           <span className="text-sm">Laden...</span>
         </div>
+      ) : viewMode === "tabelle" ? (
+        <TabelleView
+          leads={displayLeads}
+          sortKey={sortKey}
+          sortDir={sortDir}
+          onSort={handleSort}
+          updatingId={updatingId}
+          onUpdateStatus={updateStatus}
+          onEdit={(id) => setModal({ type: "edit", id })}
+          onCopy={(l) => setModal({ type: "copy", id: l.id, name: `${l.first_name} ${l.last_name}`, venture: l.venture ?? "online_first" })}
+          onArchive={handleArchive}
+          onDelete={(l) => setModal({ type: "delete", id: l.id, name: `${l.first_name} ${l.last_name}` })}
+        />
       ) : (
-        <div
-          className="rounded-2xl overflow-hidden"
-          style={{
-            background: '#FFFFFF',
-            border: '1px solid #D1D5E8',
-            boxShadow: '0 2px 12px rgba(27,42,94,0.08)',
-          }}
-        >
-          <div className="overflow-x-auto">
-          <table className="w-full" style={{ minWidth: '880px' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #EEF0F7', background: '#F7F8FC' }}>
-                {["Name", "Unternehmen", "Status", "Review", "Nächste Aktion", "Quelle", "Draft", "Erstellt", "Aktionen"].map(h => (
-                  <th
-                    key={h}
-                    className="px-4 py-3 text-left font-semibold uppercase"
-                    style={{ fontSize: '11px', letterSpacing: '0.07em', color: '#6B7280' }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedLeads.map((lead) => (
-                <tr
-                  key={lead.id}
-                  style={{ borderBottom: '1px solid #F7F8FC', opacity: lead.status === 'verloren' ? 0.55 : 1 }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#F7F8FC'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-                >
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-1.5">
-                      <Link
-                        href={`/leads/${lead.id}`}
-                        className="font-medium transition-colors"
-                        style={{ color: '#14193A', fontSize: '14px' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#1B2A5E'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#14193A'}
-                      >
-                        {lead.first_name} {lead.last_name}
-                      </Link>
-                      {(lead as any).is_duplicate && (
-                        <span
-                          className="text-xs px-1.5 py-0.5 rounded font-semibold shrink-0"
-                          style={{ background: 'rgba(234,88,12,0.1)', color: '#C2410C' }}
-                        >
-                          Duplikat
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs mt-0.5" style={{ color: '#6B7280' }}>{lead.email}</div>
-                  </td>
-                  <td className="px-4 py-3.5 text-sm" style={{ color: '#6B7280' }}>{lead.company_name ?? "—"}</td>
-                  <td className="px-4 py-3.5">
-                    <select
-                      value={lead.status}
-                      disabled={updatingId === lead.id}
-                      onChange={(e) => updateStatus(lead.id, e.target.value as LeadStatus)}
-                      className="text-xs font-semibold rounded-full cursor-pointer"
-                      style={{
-                        background: STATUS_BG[lead.status] ?? '#F3F4F6',
-                        color: STATUS_TEXT[lead.status] ?? '#374151',
-                        border: 'none',
-                        padding: '4px 10px',
-                        fontFamily: 'var(--font-sans)',
-                        outline: 'none',
-                      }}
-                    >
-                      {ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-                    </select>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <div className="flex flex-col gap-1">
-                      <span
-                        className="w-fit rounded-full px-2 py-0.5 text-xs font-semibold"
-                        style={{
-                          background: lead.review_status === "ready_for_outreach"
-                            ? "rgba(22,163,74,0.1)"
-                            : lead.review_status === "blocked"
-                              ? "rgba(220,38,38,0.08)"
-                              : "#EEF0F7",
-                          color: lead.review_status === "ready_for_outreach"
-                            ? "#15803D"
-                            : lead.review_status === "blocked"
-                              ? "#B91C1C"
-                              : "#1B2A5E",
-                        }}
-                      >
-                        {REVIEW_STATUS_LABELS[lead.review_status ?? "unreviewed"]}
-                      </span>
-                      <span className="text-xs" style={{ color: '#6B7280' }}>
-                        {CONTACT_CHANNEL_LABELS[lead.contact_channel ?? "unchecked"]}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-sm" style={{ color: '#6B7280' }}>
-                    {NEXT_ACTION_LABELS[lead.next_action ?? "website_pruefen"]}
-                  </td>
-                  <td className="px-4 py-3.5 text-sm capitalize" style={{ color: '#6B7280' }}>{lead.source}</td>
-                  <td className="px-4 py-3.5">
-                    {lead.ai_draft_approved === true && (
-                      <span className="text-xs font-semibold" style={{ color: '#16A34A' }}>Freigegeben</span>
-                    )}
-                    {lead.ai_draft_approved === false && (
-                      <span className="text-xs font-semibold" style={{ color: '#C8A96E' }}>Offen</span>
-                    )}
-                    {lead.ai_draft_approved === null && (
-                      <span className="text-xs" style={{ color: '#D1D5E8' }}>—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3.5 text-xs" style={{ color: '#6B7280' }}>
-                    {new Date(lead.created_at).toLocaleDateString("de-DE")}
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center gap-1">
-                      <ActionBtn onClick={() => setModal({ type: "edit", id: lead.id })}>
-                        Bearbeiten
-                      </ActionBtn>
-                      <ActionBtn onClick={() => setModal({ type: "copy", id: lead.id, name: `${lead.first_name} ${lead.last_name}`, venture: lead.venture ?? "online_first" })}>
-                        Kopieren
-                      </ActionBtn>
-                      {!lead.archived_at && (
-                        <ActionBtn onClick={() => handleArchive(lead.id)}>
-                          Archiv
-                        </ActionBtn>
-                      )}
-                      <ActionBtn
-                        onClick={() => setModal({ type: "delete", id: lead.id, name: `${lead.first_name} ${lead.last_name}` })}
-                        danger
-                      >
-                        Löschen
-                      </ActionBtn>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {leads.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-sm" style={{ color: '#6B7280' }}>
-                    Keine Leads gefunden
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          </div>
-        </div>
+        <PipelineView
+          byStatus={pipelineByStatus}
+          updatingId={updatingId}
+          onUpdateStatus={updateStatus}
+          onEdit={(id) => setModal({ type: "edit", id })}
+          onDelete={(l) => setModal({ type: "delete", id: l.id, name: `${l.first_name} ${l.last_name}` })}
+        />
       )}
 
+      {/* ── Modals ──────────────────────────────────────────────────────────── */}
       {showNewLead && (
         <NewLeadModal onClose={() => setShowNewLead(false)} onCreated={() => { setShowNewLead(false); setTimeout(load, 500); }} />
       )}
@@ -415,61 +349,398 @@ export default function LeadsPage() {
           onClose={() => setModal(null)} onCopied={() => setTimeout(load, 300)} />
       )}
       {modal?.type === "delete" && (
-        <div
-          className="fixed inset-0 flex items-center justify-center z-50 p-4"
-          style={{ background: 'rgba(20,25,58,0.5)', backdropFilter: 'blur(4px)' }}
-        >
-          <div
-            className="w-full max-w-sm p-6 space-y-4 rounded-2xl"
-            style={{
-              background: '#FFFFFF',
-              boxShadow: '0 20px 56px rgba(27,42,94,0.24)',
-              border: '1px solid #D1D5E8',
-            }}
-          >
-            <h2
-              style={{
-                fontFamily: 'var(--font-serif)',
-                fontWeight: 400,
-                fontSize: '20px',
-                color: '#14193A',
-              }}
-            >
-              Lead löschen
-            </h2>
-            <p className="text-sm" style={{ color: '#6B7280' }}>
-              <span className="font-semibold" style={{ color: '#14193A' }}>{modal.name}</span> wird unwiderruflich gelöscht.
-            </p>
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={() => handleDelete(modal.id)}
-                className="flex-1 py-2.5 text-sm font-semibold rounded-lg transition-colors"
-                style={{ background: '#DC2626', color: '#FFFFFF', border: 'none' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#B91C1C')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#DC2626')}
-              >
-                Löschen
-              </button>
-              <button
-                onClick={() => setModal(null)}
-                className="flex-1 py-2.5 text-sm font-medium rounded-lg transition-colors"
+        <DeleteConfirm name={modal.name} onConfirm={() => handleDelete(modal.id)} onCancel={() => setModal(null)} />
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Sub-Komponente: Tabellen-Ansicht
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const SORT_COLS: { key: SortKey; label: string }[] = [
+  { key: "name",            label: "Name" },
+  { key: "company",         label: "Unternehmen" },
+  { key: "status",          label: "Status" },
+  { key: "source",          label: "Quelle" },
+  { key: "follow_up_date",  label: "Follow-up" },
+  { key: "created_at",      label: "Erstellt" },
+];
+
+// Nicht-sortierbare Spalten
+const EXTRA_COLS = ["Review", "Nächste Aktion", "Draft", "Aktionen"];
+
+function SortTh({
+  col, sortKey, sortDir, onSort,
+}: {
+  col: { key: SortKey; label: string };
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (k: SortKey) => void;
+}) {
+  const active = sortKey === col.key;
+  return (
+    <th
+      className="px-4 py-3 text-left font-semibold uppercase cursor-pointer select-none"
+      style={{ fontSize: "11px", letterSpacing: "0.07em", color: active ? "#1B2A5E" : "#6B7280" }}
+      onClick={() => onSort(col.key)}
+    >
+      <span className="flex items-center gap-1">
+        {col.label}
+        <span style={{ opacity: active ? 1 : 0.3, fontSize: "10px" }}>
+          {active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}
+        </span>
+      </span>
+    </th>
+  );
+}
+
+function TabelleView({
+  leads, sortKey, sortDir, onSort, updatingId,
+  onUpdateStatus, onEdit, onCopy, onArchive, onDelete,
+}: {
+  leads: Lead[];
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (k: SortKey) => void;
+  updatingId: string | null;
+  onUpdateStatus: (id: string, s: LeadStatus) => void;
+  onEdit: (id: string) => void;
+  onCopy: (l: Lead) => void;
+  onArchive: (id: string) => void;
+  onDelete: (l: Lead) => void;
+}) {
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: "#FFFFFF", border: "1px solid #D1D5E8", boxShadow: "0 2px 12px rgba(27,42,94,0.08)" }}>
+      <div className="overflow-x-auto">
+        <table className="w-full" style={{ minWidth: "960px" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid #EEF0F7", background: "#F7F8FC" }}>
+              {SORT_COLS.map((col) => (
+                <SortTh key={col.key} col={col} sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+              ))}
+              {EXTRA_COLS.map((h) => (
+                <th
+                  key={h}
+                  className="px-4 py-3 text-left font-semibold uppercase"
+                  style={{ fontSize: "11px", letterSpacing: "0.07em", color: "#6B7280" }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {leads.map((lead) => (
+              <tr
+                key={lead.id}
                 style={{
-                  background: 'transparent',
-                  color: '#14193A',
-                  border: '1.5px solid #D1D5E8',
+                  borderBottom: "1px solid #F7F8FC",
+                  opacity: lead.status === "verloren" ? 0.55 : 1,
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#EEF0F7')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#F7F8FC"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
               >
-                Abbrechen
-              </button>
+                {/* Name */}
+                <td className="px-4 py-3.5">
+                  <div className="flex items-center gap-1.5">
+                    <Link
+                      href={`/leads/${lead.id}`}
+                      className="font-medium transition-colors"
+                      style={{ color: "#14193A", fontSize: "14px" }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#1B2A5E"}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "#14193A"}
+                    >
+                      {lead.first_name} {lead.last_name}
+                    </Link>
+                    {(lead as any).is_duplicate && (
+                      <span className="text-xs px-1.5 py-0.5 rounded font-semibold shrink-0" style={{ background: "rgba(234,88,12,0.1)", color: "#C2410C" }}>
+                        Duplikat
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs mt-0.5" style={{ color: "#6B7280" }}>{lead.email}</div>
+                </td>
+
+                {/* Unternehmen */}
+                <td className="px-4 py-3.5 text-sm" style={{ color: "#6B7280" }}>{lead.company_name ?? "—"}</td>
+
+                {/* Status */}
+                <td className="px-4 py-3.5">
+                  <select
+                    value={lead.status}
+                    disabled={updatingId === lead.id}
+                    onChange={(e) => onUpdateStatus(lead.id, e.target.value as LeadStatus)}
+                    className="text-xs font-semibold rounded-full cursor-pointer"
+                    style={{
+                      background: STATUS_BG[lead.status] ?? "#F3F4F6",
+                      color: STATUS_TEXT[lead.status] ?? "#374151",
+                      border: "none",
+                      padding: "4px 10px",
+                      fontFamily: "var(--font-sans)",
+                      outline: "none",
+                    }}
+                  >
+                    {ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+                  </select>
+                </td>
+
+                {/* Quelle */}
+                <td className="px-4 py-3.5 text-sm capitalize" style={{ color: "#6B7280" }}>{lead.source}</td>
+
+                {/* Follow-up */}
+                <td className="px-4 py-3.5 text-xs" style={{ color: "#6B7280" }}>
+                  {lead.follow_up_date
+                    ? new Date(lead.follow_up_date).toLocaleDateString("de-DE")
+                    : "—"}
+                </td>
+
+                {/* Erstellt */}
+                <td className="px-4 py-3.5 text-xs" style={{ color: "#6B7280" }}>
+                  {new Date(lead.created_at).toLocaleDateString("de-DE")}
+                </td>
+
+                {/* Review */}
+                <td className="px-4 py-3.5">
+                  <div className="flex flex-col gap-1">
+                    <span
+                      className="w-fit rounded-full px-2 py-0.5 text-xs font-semibold"
+                      style={{
+                        background: lead.review_status === "ready_for_outreach" ? "rgba(22,163,74,0.1)" : lead.review_status === "blocked" ? "rgba(220,38,38,0.08)" : "#EEF0F7",
+                        color: lead.review_status === "ready_for_outreach" ? "#15803D" : lead.review_status === "blocked" ? "#B91C1C" : "#1B2A5E",
+                      }}
+                    >
+                      {REVIEW_STATUS_LABELS[lead.review_status ?? "unreviewed"]}
+                    </span>
+                    <span className="text-xs" style={{ color: "#6B7280" }}>
+                      {CONTACT_CHANNEL_LABELS[lead.contact_channel ?? "unchecked"]}
+                    </span>
+                  </div>
+                </td>
+
+                {/* Nächste Aktion */}
+                <td className="px-4 py-3.5 text-sm" style={{ color: "#6B7280" }}>
+                  {NEXT_ACTION_LABELS[lead.next_action ?? "website_pruefen"]}
+                </td>
+
+                {/* Draft */}
+                <td className="px-4 py-3.5">
+                  {lead.ai_draft_approved === true  && <span className="text-xs font-semibold" style={{ color: "#16A34A" }}>Freigegeben</span>}
+                  {lead.ai_draft_approved === false && <span className="text-xs font-semibold" style={{ color: "#C8A96E" }}>Offen</span>}
+                  {lead.ai_draft_approved === null  && <span className="text-xs" style={{ color: "#D1D5E8" }}>—</span>}
+                </td>
+
+                {/* Aktionen */}
+                <td className="px-4 py-3.5">
+                  <div className="flex items-center gap-1">
+                    <ActionBtn onClick={() => onEdit(lead.id)}>Bearbeiten</ActionBtn>
+                    <ActionBtn onClick={() => onCopy(lead)}>Kopieren</ActionBtn>
+                    {!lead.archived_at && <ActionBtn onClick={() => onArchive(lead.id)}>Archiv</ActionBtn>}
+                    <ActionBtn onClick={() => onDelete(lead)} danger>Löschen</ActionBtn>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {leads.length === 0 && (
+              <tr>
+                <td colSpan={10} className="px-4 py-12 text-center text-sm" style={{ color: "#6B7280" }}>
+                  Keine Leads gefunden
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Sub-Komponente: Pipeline-Ansicht (Kanban)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function PipelineView({
+  byStatus, updatingId, onUpdateStatus, onEdit, onDelete,
+}: {
+  byStatus: Record<LeadStatus, Lead[]>;
+  updatingId: string | null;
+  onUpdateStatus: (id: string, s: LeadStatus) => void;
+  onEdit: (id: string) => void;
+  onDelete: (l: Lead) => void;
+}) {
+  // Nur Spalten anzeigen, die mindestens 1 Lead haben — leere Spalten ausblenden
+  const visibleCols = PIPELINE_COLS.filter((col) => (byStatus[col.key]?.length ?? 0) > 0);
+
+  if (visibleCols.length === 0) {
+    return (
+      <div className="py-16 text-center text-sm" style={{ color: "#6B7280" }}>
+        Keine Leads vorhanden
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto pb-4">
+      <div className="flex gap-3" style={{ minWidth: `${visibleCols.length * 260}px` }}>
+        {visibleCols.map((col) => {
+          const colLeads = byStatus[col.key] ?? [];
+          return (
+            <div key={col.key} className="flex-shrink-0" style={{ width: "248px" }}>
+              {/* Spaltenheader */}
+              <div
+                className="flex items-center justify-between px-3 py-2.5 rounded-t-xl"
+                style={{ background: col.headerBg, borderBottom: `2px solid ${col.accent}20` }}
+              >
+                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: col.accent }}>
+                  {col.label}
+                </span>
+                <span
+                  className="text-xs font-semibold rounded-full px-2 py-0.5"
+                  style={{ background: `${col.accent}20`, color: col.accent }}
+                >
+                  {colLeads.length}
+                </span>
+              </div>
+
+              {/* Karten */}
+              <div
+                className="flex flex-col gap-2 p-2 rounded-b-xl"
+                style={{
+                  background: "#F7F8FC",
+                  border: "1px solid #D1D5E8",
+                  borderTop: "none",
+                  minHeight: "80px",
+                  maxHeight: "calc(100vh - 280px)",
+                  overflowY: "auto",
+                }}
+              >
+                {colLeads.map((lead) => (
+                  <PipelineCard
+                    key={lead.id}
+                    lead={lead}
+                    accent={col.accent}
+                    updatingId={updatingId}
+                    onUpdateStatus={onUpdateStatus}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                  />
+                ))}
+              </div>
             </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PipelineCard({
+  lead, accent, updatingId, onUpdateStatus, onEdit, onDelete,
+}: {
+  lead: Lead;
+  accent: string;
+  updatingId: string | null;
+  onUpdateStatus: (id: string, s: LeadStatus) => void;
+  onEdit: (id: string) => void;
+  onDelete: (l: Lead) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div
+      className="rounded-xl p-3 cursor-default"
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid #E5E7F0",
+        boxShadow: "0 1px 4px rgba(27,42,94,0.06)",
+        opacity: lead.status === "verloren" ? 0.6 : 1,
+      }}
+    >
+      {/* Name + Firma */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <Link
+            href={`/leads/${lead.id}`}
+            className="text-sm font-semibold block truncate transition-colors"
+            style={{ color: "#14193A" }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#1B2A5E"}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "#14193A"}
+          >
+            {lead.first_name} {lead.last_name}
+          </Link>
+          {lead.company_name && (
+            <span className="text-xs truncate block" style={{ color: "#6B7280" }}>{lead.company_name}</span>
+          )}
+        </div>
+        {/* Expand-Toggle */}
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="shrink-0 text-xs rounded-md px-1.5 py-0.5 transition-colors"
+          style={{ color: "#9CA3AF", background: "transparent", border: "none" }}
+          onMouseEnter={e => (e.currentTarget.style.background = "#EEF0F7")}
+          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+          title={expanded ? "Weniger" : "Mehr"}
+        >
+          {expanded ? "▲" : "▼"}
+        </button>
+      </div>
+
+      {/* Immer sichtbar: Status-Dropdown */}
+      <div className="mt-2">
+        <select
+          value={lead.status}
+          disabled={updatingId === lead.id}
+          onChange={(e) => onUpdateStatus(lead.id, e.target.value as LeadStatus)}
+          className="text-xs font-semibold rounded-full cursor-pointer w-full"
+          style={{
+            background: STATUS_BG[lead.status] ?? "#F3F4F6",
+            color: STATUS_TEXT[lead.status] ?? "#374151",
+            border: "none",
+            padding: "3px 8px",
+            fontFamily: "var(--font-sans)",
+            outline: "none",
+          }}
+        >
+          {ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+        </select>
+      </div>
+
+      {/* Expanded-Bereich */}
+      {expanded && (
+        <div className="mt-2.5 pt-2.5 space-y-1.5" style={{ borderTop: "1px solid #F0F1F8" }}>
+          {lead.email && (
+            <div className="text-xs truncate" style={{ color: "#6B7280" }}>✉ {lead.email}</div>
+          )}
+          {lead.city && (
+            <div className="text-xs" style={{ color: "#6B7280" }}>📍 {lead.city}</div>
+          )}
+          {lead.follow_up_date && (
+            <div className="text-xs" style={{ color: "#EA580C" }}>
+              📅 {new Date(lead.follow_up_date).toLocaleDateString("de-DE")}
+            </div>
+          )}
+          {lead.ai_draft_approved === false && (
+            <div className="text-xs font-semibold" style={{ color: "#C8A96E" }}>Draft offen</div>
+          )}
+          {lead.ai_draft_approved === true && (
+            <div className="text-xs font-semibold" style={{ color: "#16A34A" }}>Draft freigegeben</div>
+          )}
+
+          {/* Aktionen */}
+          <div className="flex gap-1 pt-1">
+            <ActionBtn onClick={() => onEdit(lead.id)}>Bearbeiten</ActionBtn>
+            <ActionBtn onClick={() => onDelete(lead)} danger>Löschen</ActionBtn>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Shared Sub-Komponenten
+// ═══════════════════════════════════════════════════════════════════════════════
 
 function ActionBtn({ onClick, children, danger }: {
   onClick: () => void;
@@ -480,20 +751,62 @@ function ActionBtn({ onClick, children, danger }: {
     <button
       onClick={onClick}
       className="text-xs px-2 py-1 rounded-md transition-colors font-medium"
-      style={{
-        color: danger ? '#B91C1C' : '#6B7280',
-        background: 'transparent',
-      }}
+      style={{ color: danger ? "#B91C1C" : "#6B7280", background: "transparent" }}
       onMouseEnter={e => {
-        (e.currentTarget as HTMLElement).style.background = danger ? 'rgba(220,38,38,0.08)' : '#EEF0F7';
-        (e.currentTarget as HTMLElement).style.color = danger ? '#B91C1C' : '#14193A';
+        (e.currentTarget as HTMLElement).style.background = danger ? "rgba(220,38,38,0.08)" : "#EEF0F7";
+        (e.currentTarget as HTMLElement).style.color = danger ? "#B91C1C" : "#14193A";
       }}
       onMouseLeave={e => {
-        (e.currentTarget as HTMLElement).style.background = 'transparent';
-        (e.currentTarget as HTMLElement).style.color = danger ? '#B91C1C' : '#6B7280';
+        (e.currentTarget as HTMLElement).style.background = "transparent";
+        (e.currentTarget as HTMLElement).style.color = danger ? "#B91C1C" : "#6B7280";
       }}
     >
       {children}
     </button>
+  );
+}
+
+function DeleteConfirm({ name, onConfirm, onCancel }: {
+  name: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      style={{ background: "rgba(20,25,58,0.5)", backdropFilter: "blur(4px)" }}
+    >
+      <div
+        className="w-full max-w-sm p-6 space-y-4 rounded-2xl"
+        style={{ background: "#FFFFFF", boxShadow: "0 20px 56px rgba(27,42,94,0.24)", border: "1px solid #D1D5E8" }}
+      >
+        <h2 style={{ fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: "20px", color: "#14193A" }}>
+          Lead löschen
+        </h2>
+        <p className="text-sm" style={{ color: "#6B7280" }}>
+          <span className="font-semibold" style={{ color: "#14193A" }}>{name}</span> wird unwiderruflich gelöscht.
+        </p>
+        <div className="flex gap-3 pt-1">
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 text-sm font-semibold rounded-lg transition-colors"
+            style={{ background: "#DC2626", color: "#FFFFFF", border: "none" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#B91C1C")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#DC2626")}
+          >
+            Löschen
+          </button>
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 text-sm font-medium rounded-lg transition-colors"
+            style={{ background: "transparent", color: "#14193A", border: "1.5px solid #D1D5E8" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#EEF0F7")}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+          >
+            Abbrechen
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
