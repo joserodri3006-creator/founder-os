@@ -124,6 +124,12 @@ export default function LeadsPage() {
     fontFamily: 'var(--font-sans)',
   };
 
+  // Verloren-Leads ans Ende sortieren, Rest bleibt in API-Reihenfolge
+  const sortedLeads = [
+    ...leads.filter((l) => l.status !== 'verloren'),
+    ...leads.filter((l) => l.status === 'verloren'),
+  ];
+
   return (
     <div className="px-4 py-5 sm:p-8 max-w-7xl mx-auto">
       {/* Page Header */}
@@ -266,10 +272,10 @@ export default function LeadsPage() {
               </tr>
             </thead>
             <tbody>
-              {leads.map((lead) => (
+              {sortedLeads.map((lead) => (
                 <tr
                   key={lead.id}
-                  style={{ borderBottom: '1px solid #F7F8FC' }}
+                  style={{ borderBottom: '1px solid #F7F8FC', opacity: lead.status === 'verloren' ? 0.55 : 1 }}
                   onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#F7F8FC'}
                   onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
                 >

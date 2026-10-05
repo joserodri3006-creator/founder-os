@@ -2,9 +2,9 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const VENTURE_SENDERS: Record<string, { name: string; email: string }> = {
   online_first:      { name: "Online First",         email: "info@onlinefirst.eu" },
-  brandary:          { name: "Brandary Print Studio", email: "info@onlinefirst.eu" },
+  brandary:          { name: "Brandary Print Studio", email: "info@brandary.de" },
   droplane:          { name: "Droplane",              email: "info@onlinefirst.eu" },
-  blazed_outfitters: { name: "Blazed Outfitters",    email: "info@onlinefirst.eu" },
+  blazed_outfitters: { name: "Blazed Outfitters",    email: "info@blazedoutfitters.com" },
   itaba:             { name: "ITABA",                 email: "info@onlinefirst.eu" },
   worknest:          { name: "Worknest",              email: "info@onlinefirst.eu" },
 };
