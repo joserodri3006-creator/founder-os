@@ -1,113 +1,111 @@
-"use client";
+import type { Metadata } from "next";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { hashReviewToken } from "@/lib/review-domain";
+import { getBranding } from "@/lib/venture-branding";
+import ReviewForm from "./ReviewForm";
 
-import { use, useEffect, useState } from "react";
+// Kundenseitige Seite: nie indexieren, nie cachen (Token im Pfad).
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Bewertung abgeben",
+  robots: { index: false, follow: false },
+  referrer: "no-referrer",
+};
 
-type Invitation = { venture: string; customer_name: string | null; order_title: string | null };
+type Props = { params: Promise<{ token: string }> };
 
-const CATEGORIES: Array<[string, string]> = [["quality", "Qualität"], ["communication", "Kommunikation"], ["delivery", "Lieferung"]];
+type State =
+  | { kind: "ok"; venture: string; customerName: string | null; orderTitle: string | null }
+  | { kind: "invalid" | "used" | "expired"; venture: string | null };
 
-function StarInput({ value, onChange, label }: { value: number; onChange: (v: number) => void; label: string }) {
-  return (
-    <div role="radiogroup" aria-label={label} className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button key={n} type="button" role="radio" aria-checked={value === n} aria-label={`${n} Sterne`} onClick={() => onChange(n)}
-          className="text-3xl leading-none" style={{ color: n <= value ? "#C8A96E" : "#D1D5DB" }}>★</button>
-      ))}
-    </div>
-  );
+async function resolve(token: string): Promise<State> {
+  if (!/^[a-f0-9]{64}$/.test(token)) return { kind: "invalid", venture: null };
+  const { data } = await supabaseAdmin
+    .from("review_invitations")
+    .select("id,venture,customer_name,status,expires_at,orders(title)")
+    .eq("token_hash", hashReviewToken(token))
+    .maybeSingle();
+  if (!data) return { kind: "invalid", venture: null };
+  if (data.status === "completed") return { kind: "used", venture: data.venture };
+  if (["expired", "cancelled"].includes(data.status) || new Date(data.expires_at) < new Date()) {
+    return { kind: "expired", venture: data.venture };
+  }
+  if (data.status === "pending" || data.status === "sent") {
+    await supabaseAdmin.from("review_invitations").update({ status: "opened", opened_at: new Date().toISOString() }).eq("id", data.id);
+  }
+  return {
+    kind: "ok",
+    venture: data.venture,
+    customerName: data.customer_name,
+    orderTitle: (data.orders as unknown as { title?: string } | null)?.title ?? null,
+  };
 }
 
-export default function BewertenPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = use(params);
-  const [invite, setInvite] = useState<Invitation | null>(null);
-  const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
-  const [rating, setRating] = useState(0);
-  const [categories, setCategories] = useState<Record<string, number>>({});
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
-  const [name, setName] = useState("");
-  const [consent, setConsent] = useState(false);
-  const [busy, setBusy] = useState(false);
+export default async function BewertenPage({ params }: Props) {
+  const { token } = await params;
+  const state = await resolve(token);
+  const b = getBranding(state.venture);
+  const c = b.colors;
 
-  useEffect(() => {
-    fetch(`/api/public/reviews/${token}`).then(async (r) => {
-      const d = await r.json();
-      if (!r.ok) setError(d.error ?? "Einladung nicht verfügbar.");
-      else { setInvite(d); setName(d.customer_name ?? ""); }
-    }).catch(() => setError("Einladung konnte nicht geladen werden."));
-  }, [token]);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true); setError("");
-    const res = await fetch(`/api/public/reviews/${token}`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rating, title, body, author_name: name, public_consent: consent, category_ratings: categories }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (!res.ok) setError(data.error ?? "Bewertung konnte nicht gesendet werden.");
-    else setDone(true);
-  }
+  const message: Record<string, [string, string]> = {
+    invalid: ["Link nicht gefunden", "Dieser Bewertungslink ist ungültig. Bitte prüfe, ob du den vollständigen Link aus der E-Mail verwendet hast."],
+    used: ["Schon bewertet", "Zu diesem Link wurde bereits eine Bewertung abgegeben. Vielen Dank dafür!"],
+    expired: ["Link abgelaufen", "Dieser Bewertungslink ist nicht mehr gültig."],
+  };
 
   return (
-    <main className="min-h-screen bg-[#F7F5F0] flex items-start justify-center p-4 md:p-10">
-      <div className="w-full max-w-xl bg-white rounded-xl border border-gray-200 p-6 md:p-8">
-        <p className="text-xs tracking-[0.2em] text-gray-500 mb-2">BLAZED OUTFITTERS</p>
-        {done ? (
-          <>
-            <h1 className="text-2xl font-semibold mb-3">Vielen Dank für Ihre Bewertung</h1>
-            <p className="text-gray-600">Wir lesen jede Rückmeldung persönlich. {consent ? "Ihre Bewertung wird nach einer kurzen Prüfung veröffentlicht." : "Ihre Bewertung bleibt intern und wird nicht veröffentlicht."}</p>
-          </>
-        ) : !invite ? (
-          <p className="text-gray-600">{error || "Lade …"}</p>
-        ) : (
-          <form onSubmit={submit} className="space-y-5">
-            <div>
-              <h1 className="text-2xl font-semibold mb-1">Wie war Ihre Erfahrung?</h1>
-              <p className="text-sm text-gray-600">Ihre ehrliche Meinung hilft uns – positiv, neutral oder kritisch. Es gibt keine Belohnung für Bewertungen.</p>
-              {invite.order_title && <p className="text-xs text-gray-500 mt-2">Zu Ihrer Bestellung: {invite.order_title}</p>}
+    <>
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link rel="stylesheet" href={b.fonts.googleFontsUrl} />
+      <main style={{ minHeight: "100vh", background: c.page, color: c.ink, fontFamily: b.fonts.body, display: "flex", flexDirection: "column" }}>
+        <header style={{ padding: "28px 20px 8px", textAlign: "center" }}>
+          {b.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <a href={b.siteUrl}><img src={b.logoUrl} alt={b.name} style={{ height: 64, width: "auto" }} /></a>
+          ) : (
+            <p style={{ fontFamily: b.fonts.heading, letterSpacing: "0.14em", textTransform: "uppercase", fontSize: 20, margin: 0 }}>{b.name}</p>
+          )}
+        </header>
+
+        <section style={{ flex: 1, display: "flex", justifyContent: "center", padding: "16px 16px 40px" }}>
+          <div style={{ width: "100%", maxWidth: 560 }}>
+            <div style={{ textAlign: "center", margin: "12px 0 24px" }}>
+              <p style={{ margin: 0, fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: c.accent }}>
+                {state.kind === "ok" ? "Deine Meinung zählt" : "Bewertung"}
+              </p>
+              <h1 style={{ fontFamily: b.fonts.heading, fontStyle: "italic", fontWeight: 500, fontSize: "clamp(2rem, 6vw, 2.8rem)", lineHeight: 1.1, margin: "10px 0 0" }}>
+                {state.kind === "ok"
+                  ? b.address === "du" ? "Wie war deine Erfahrung?" : "Wie war Ihre Erfahrung?"
+                  : message[state.kind][0]}
+              </h1>
+              {state.kind === "ok" && (
+                <p style={{ margin: "12px auto 0", maxWidth: 440, color: c.muted, lineHeight: 1.6, fontSize: 15 }}>
+                  {b.address === "du"
+                    ? "Ehrlich, positiv, neutral oder kritisch: Dein Feedback hilft uns, besser zu werden. Es gibt keine Belohnung für Bewertungen."
+                    : "Ehrlich, positiv, neutral oder kritisch: Ihr Feedback hilft uns, besser zu werden. Es gibt keine Belohnung für Bewertungen."}
+                </p>
+              )}
             </div>
-            <div>
-              <p className="text-sm font-medium mb-1">Gesamtbewertung *</p>
-              <StarInput value={rating} onChange={setRating} label="Gesamtbewertung" />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {CATEGORIES.map(([key, label]) => (
-                <div key={key}>
-                  <p className="text-xs text-gray-600 mb-1">{label} (optional)</p>
-                  <div role="radiogroup" aria-label={label} className="flex gap-0.5">
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <button key={n} type="button" role="radio" aria-checked={categories[key] === n} aria-label={`${label}: ${n} Sterne`}
-                        onClick={() => setCategories((c) => ({ ...c, [key]: n }))} className="text-xl leading-none" style={{ color: n <= (categories[key] ?? 0) ? "#C8A96E" : "#D1D5DB" }}>★</button>
-                    ))}
-                  </div>
+
+            <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 2, padding: "28px 24px" }}>
+              {state.kind === "ok" ? (
+                <ReviewForm token={token} branding={b} customerName={state.customerName} orderTitle={state.orderTitle} />
+              ) : (
+                <div style={{ textAlign: "center" }}>
+                  <p style={{ margin: "0 0 20px", color: c.muted, lineHeight: 1.6 }}>{message[state.kind][1]}</p>
+                  <a href={b.siteUrl} style={{ display: "inline-block", padding: "12px 28px", background: c.accent, color: c.accentText, textDecoration: "none", fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase" }}>
+                    Zu {b.name}
+                  </a>
                 </div>
-              ))}
+              )}
             </div>
-            <div>
-              <label className="text-sm font-medium" htmlFor="title">Überschrift (optional)</label>
-              <input id="title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={160} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
-            </div>
-            <div>
-              <label className="text-sm font-medium" htmlFor="body">Ihre Erfahrung *</label>
-              <textarea id="body" required value={body} onChange={(e) => setBody(e.target.value)} rows={5} maxLength={4000} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
-            </div>
-            <div>
-              <label className="text-sm font-medium" htmlFor="name">Name (öffentlich gekürzt, z. B. „Anna M.“)</label>
-              <input id="name" value={name} onChange={(e) => setName(e.target.value)} maxLength={160} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" />
-            </div>
-            <label className="flex items-start gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-1" />
-              <span>Meine Bewertung darf nach Prüfung öffentlich auf der Website von Blazed Outfitters erscheinen (mit gekürztem Namen).</span>
-            </label>
-            <p className="text-xs text-gray-500">Mit dem Absenden stimme ich der Speicherung meiner Bewertung zur Qualitätssicherung zu. E-Mail-Adresse und Bestelldaten werden nicht veröffentlicht.</p>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <button disabled={busy || rating < 1 || !body.trim()} className="w-full py-2.5 rounded-md bg-gray-900 text-white font-medium disabled:opacity-40">{busy ? "Sende …" : "Bewertung absenden"}</button>
-          </form>
-        )}
-      </div>
-    </main>
+          </div>
+        </section>
+
+        <footer style={{ padding: "16px 20px 28px", textAlign: "center", fontSize: 12, color: c.muted }}>
+          {b.name}{b.contactEmail ? <> · <a href={`mailto:${b.contactEmail}`} style={{ color: c.muted }}>{b.contactEmail}</a></> : null}
+        </footer>
+      </main>
+    </>
   );
 }

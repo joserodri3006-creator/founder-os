@@ -4,7 +4,7 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 
-const SHELL_FREE_PATHS = ["/login", "/invite", "/auth", "/online-first", "/brandary"];
+const SHELL_FREE_PATHS = ["/login", "/invite", "/auth", "/online-first", "/brandary", "/bewerten"];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
