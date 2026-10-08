@@ -5,7 +5,7 @@ Verifizierte Erstanbieter-Bewertungen, ventureübergreifend angelegt (`venture`-
 ## Ablauf
 1. Auftrag wechselt auf `abgeschlossen` (`PATCH /api/auftraege/[id]`) und der Kunde hat eine E-Mail.
 2. Founder OS merkt pro Auftrag genau eine Einladung vor (`review_invitations`, Platzhalter-Hash `unissued:<uuid>`, `send_after` = Abschluss + `REVIEW_INVITE_DELAY_DAYS`, Standard 3 Tage). Es entsteht noch kein Token.
-3. Der Hermes-Worker `scripts/blazed_review_invites_send.py` (Cron „Blazed Bewertungseinladungen versenden“, täglich 10:23 UTC, no_agent, stumm bei leerer Queue) erzeugt den 256-Bit-Token, speichert nur dessen SHA-256-Hash (60 Tage gültig) und versendet die neutrale Mail (ohne Belohnung) mit Link `/bewerten/<token>` über das KAS-Postfach `info@blazedoutfitters.com`. Eine Kopie landet in „Gesendet“. Doppelversand ist ausgeschlossen (Token wird atomar reserviert).
+3. Der Hermes-Worker `scripts/blazed_review_invites_send.py` (Cron „Blazed Bewertungseinladungen versenden“, täglich 10:23 UTC, no_agent, stumm bei leerer Queue) erzeugt den 256-Bit-Token, speichert nur dessen SHA-256-Hash (60 Tage gültig) und versendet die neutrale Mail (ohne Belohnung) mit Link `https://www.blazedoutfitters.com/bewerten/<token>` (HTML-Mail im Blazed-Design mit Button und Text-Fallback; die URL leitet per 307 auf das Founder-OS-Formular weiter) über das KAS-Postfach `info@blazedoutfitters.com`. Eine Kopie landet in „Gesendet“. Doppelversand ist ausgeschlossen (Token wird atomar reserviert).
    Vercel braucht dafür weder Resend-Domain noch Postfach-Zugangsdaten.
 4. Kunde bewertet 1–5 Sterne, Text, optional Qualität/Kommunikation/Lieferung, entscheidet über öffentliche Freigabe. Namen werden gekürzt („Anna M.“).
 5. Bewertung landet als `pending` in `/bewertungen` (Founder OS). Veröffentlichen nur mit Kundenfreigabe. Ablehnen/Markieren nur mit dokumentiertem Grund. Kritische Bewertungen werden nicht gelöscht.
@@ -21,3 +21,9 @@ Das Vormerken ist standardmäßig AUS. Aktivieren: Vercel-Variable `REVIEW_INVIT
 
 ## Migration
 `supabase/migrations/20261008_blazed_reviews_mvp.sql` (bereits angewendet).
+
+## Branding
+Das Formular `/bewerten/<token>` wird serverseitig gerendert, ohne Founder-OS-Rahmen, und übernimmt das Branding des Ventures aus der Einladung (`lib/venture-branding.ts`: Logo, Farben, Schriften, Anrede du/Sie, Footer). Neues Venture = ein Eintrag in `BRANDINGS`; ohne Eintrag greift das neutrale Founder-OS-Fallback. Die Seite ist `noindex`, `no-store` und per `robots.txt` auf Blazed ausgeschlossen.
+
+## Gültigkeit
+Ein Link ist einmal verwendbar und läuft 60 Tage nach dem frühesten Versandzeitpunkt ab (`expires_at` = Abschluss + Wartezeit + 60 Tage, Standard also 63 Tage nach Auftragsabschluss). Danach zeigt die Seite „Link abgelaufen“.
