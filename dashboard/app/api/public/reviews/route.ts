@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { REVIEW_VENTURES } from "@/lib/review-domain";
 
 const ALLOWED_ORIGINS = new Set([
   "https://blazedoutfitters.com",
@@ -25,8 +26,22 @@ export async function OPTIONS(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const venture = new URL(req.url).searchParams.get("venture") || "blazed_outfitters";
-  if (venture !== "blazed_outfitters") {
+  if (!REVIEW_VENTURES.includes(venture)) {
     return NextResponse.json({ error: "Öffentliches Bewertungsprofil nicht freigeschaltet." }, { status: 404, headers: cors(req) });
+  }
+  const productId = new URL(req.url).searchParams.get("product_id");
+  if (productId) {
+    const { data: rows, error: pErr } = await supabaseAdmin
+      .from("review_product_ratings")
+      .select("rating, reviews!inner(status,public_consent,venture,title,body,author_display_name,published_at)")
+      .eq("product_id", productId)
+      .eq("venture", venture)
+      .eq("reviews.status", "published")
+      .eq("reviews.public_consent", true);
+    if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500, headers: cors(req) });
+    const list = rows ?? [];
+    const avg = list.length ? Number((list.reduce((sum, r) => sum + r.rating, 0) / list.length).toFixed(1)) : null;
+    return NextResponse.json({ venture, product_id: productId, average: avg, count: list.length }, { headers: cors(req) });
   }
   const { data, error } = await supabaseAdmin
     .from("reviews")

@@ -8,6 +8,7 @@ type Props = {
   branding: VentureBranding;
   customerName: string | null;
   orderTitle: string | null;
+  products: Array<{ product_id: string; product_name: string }>;
 };
 
 const CATEGORIES: Array<[string, string]> = [
@@ -48,12 +49,13 @@ function Stars({
   );
 }
 
-export default function ReviewForm({ token, branding: b, customerName, orderTitle }: Props) {
+export default function ReviewForm({ token, branding: b, customerName, orderTitle, products }: Props) {
   const c = b.colors;
   const [rating, setRating] = useState(0);
   const [categories, setCategories] = useState<Record<string, number>>({});
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [productRatings, setProductRatings] = useState<Record<string, number>>({});
   const [name, setName] = useState(customerName ?? "");
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -74,7 +76,7 @@ export default function ReviewForm({ token, branding: b, customerName, orderTitl
       const res = await fetch(`/api/public/reviews/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rating, title, body, author_name: name, public_consent: consent, category_ratings: categories }),
+        body: JSON.stringify({ rating, title, body, author_name: name, public_consent: consent, category_ratings: categories, product_ratings: Object.entries(productRatings).map(([product_id, r]) => ({ product_id, rating: r })) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) setError(data.error ?? "Die Bewertung konnte nicht gesendet werden.");
@@ -128,6 +130,20 @@ export default function ReviewForm({ token, branding: b, customerName, orderTitl
           </div>
         ))}
       </div>
+
+      {products.length > 0 && (
+        <div>
+          <div style={label}>{t(b, "Wie gefallen dir die Produkte?", "Wie gefallen Ihnen die Produkte?")} <span style={{ color: c.muted, fontWeight: 400 }}>(optional)</span></div>
+          <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+            {products.map((p) => (
+              <div key={p.product_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 14, color: c.ink }}>{p.product_name}</span>
+                <Stars value={productRatings[p.product_id] ?? 0} onChange={(v) => setProductRatings((s) => ({ ...s, [p.product_id]: v }))} label={p.product_name} size={22} b={b} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <label style={label}>
         {t(b, "Überschrift", "Überschrift")} <span style={{ color: c.muted, fontWeight: 400 }}>(optional)</span>

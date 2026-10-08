@@ -1,18 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { createServerClient } from "@supabase/ssr";
+import { denyUnlessVenture, getActor } from "@/lib/review-access";
 
 type Params = { params: Promise<{ id: string }> };
-
-async function currentUserId(req: NextRequest) {
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => req.cookies.getAll(), setAll: () => {} } }
-  );
-  const { data } = await supabase.auth.getUser();
-  return data.user?.id ?? null;
-}
 
 export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params;
@@ -25,6 +15,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const { data: review, error } = await supabaseAdmin.from("reviews").select("id,venture,status,public_consent,rating").eq("id", id).maybeSingle();
   if (error || !review) return NextResponse.json({ error: "Bewertung nicht gefunden" }, { status: 404 });
+
+  const denied = await denyUnlessVenture(req, review.venture);
+  if (denied) return denied;
 
   const now = new Date().toISOString();
   const update: Record<string, unknown> = { updated_at: now };
@@ -48,7 +41,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!text) return NextResponse.json({ error: "Antwort darf nicht leer sein." }, { status: 400 });
     update.response_text = text.slice(0, 1500);
     update.response_at = now;
-    update.response_by = await currentUserId(req);
+    update.response_by = (await getActor(req))?.id ?? null;
   } else {
     return NextResponse.json({ error: "Unbekannte Aktion" }, { status: 400 });
   }

@@ -15,7 +15,9 @@ export type ReviewValidationResult =
 export function hashReviewToken(token: string): string;
 export function publicReviewName(name: string): string;
 export function validateReviewSubmission(input: unknown): ReviewValidationResult;
+export const REVIEW_VENTURES: string[];
 export function shouldCreateReviewInvitation(input: {
+  enabledVentures?: string[];
   venture: string;
   previousStatus: string | null;
   nextStatus: string | null;

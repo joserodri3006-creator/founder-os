@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { shouldCreateReviewInvitation } from "@/lib/review-domain";
+import { REVIEW_VENTURES, shouldCreateReviewInvitation } from "@/lib/review-domain";
 import { createReviewInvitation } from "@/lib/review-service";
 
 type Params = { params: Promise<{ id: string }> };
@@ -31,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   let review: unknown = null;
   const invitesEnabled = ["true", "1", "yes"].includes((process.env.REVIEW_INVITES_ENABLED ?? "").trim().toLowerCase());
   const customer = before?.customer as unknown as { id: string; first_name: string | null; last_name: string | null; email: string | null } | null;
-  if (before && !invitesEnabled && before.venture === "blazed_outfitters" && body?.status === "abgeschlossen" && before.status !== "abgeschlossen") {
+  if (before && !invitesEnabled && REVIEW_VENTURES.includes(before.venture) && body?.status === "abgeschlossen" && before.status !== "abgeschlossen") {
     review = { created: false, skipped: "REVIEW_INVITES_ENABLED ist in dieser Umgebung nicht aktiv" };
   } else if (before && invitesEnabled && shouldCreateReviewInvitation({
     venture: before.venture,

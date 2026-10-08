@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useVenture } from "@/context/VentureContext";
+import { useAuth } from "@/context/AuthContext";
 
 type Review = {
   id: string;
@@ -19,7 +20,11 @@ type Review = {
   category_ratings: Record<string, number>;
   customer: { first_name: string | null; last_name: string | null; email: string | null } | null;
   order: { title: string | null } | null;
+  product_ratings?: Array<{ product_name: string; rating: number }>;
 };
+
+type Overview = { venture: string; total: number; pending: number; published: number; average: number | null; critical_open: number };
+const VENTURE_LABEL: Record<string, string> = { blazed_outfitters: "Blazed Outfitters" };
 
 type Stats = {
   total: number; pending: number; published: number; average: number | null;
@@ -36,7 +41,9 @@ function Stars({ value }: { value: number }) {
 }
 
 export default function BewertungenPage() {
-  const { venture } = useVenture();
+  const { venture, setVenture } = useVenture() as ReturnType<typeof useVenture> & { setVenture?: (v: string) => void };
+  const { user } = useAuth();
+  const [overview, setOverview] = useState<Overview[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [filter, setFilter] = useState<"alle" | Review["status"]>("alle");
@@ -58,6 +65,10 @@ export default function BewertungenPage() {
   }, [venture, filter]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (user?.role !== "founder") return;
+    fetch("/api/reviews?overview=1").then((r) => r.json()).then((d) => setOverview(d.ventures ?? [])).catch(() => {});
+  }, [user?.role]);
 
   async function act(id: string, payload: Record<string, string>) {
     setError("");
@@ -77,6 +88,21 @@ export default function BewertungenPage() {
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
       <h1 className="text-2xl font-semibold mb-1">Bewertungen</h1>
       <p className="text-sm text-gray-500 mb-5">Verifizierte Kundenbewertungen. Negative Bewertungen werden nicht gelöscht; Ablehnung nur mit dokumentiertem Regelverstoß.</p>
+
+      {overview.length > 0 && (
+        <div className="mb-5">
+          <p className="text-xs uppercase tracking-wider text-gray-500 mb-2">Alle Ventures</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {overview.map((o) => (
+              <button key={o.venture} type="button" onClick={() => setVenture?.(o.venture)} className={`text-left rounded-lg border bg-white p-3 ${o.venture === venture ? "border-gray-900" : "border-gray-200"}`}>
+                <p className="text-sm font-medium">{VENTURE_LABEL[o.venture] ?? o.venture}</p>
+                <p className="text-lg font-semibold">{o.average ? `${String(o.average).replace(".", ",")} / 5` : "–"} <span className="text-xs font-normal text-gray-500">({o.published} veröffentlicht)</span></p>
+                <p className="text-xs text-gray-500">{o.pending} zu prüfen · {o.critical_open} kritisch offen</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
@@ -120,6 +146,9 @@ export default function BewertungenPage() {
                 {!r.public_consent && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Keine Veröffentlichungsfreigabe</span>}
               </div>
               <p className="text-sm mt-2 whitespace-pre-wrap">{r.body}</p>
+              {(r.product_ratings?.length ?? 0) > 0 && (
+                <p className="text-xs text-gray-500 mt-2">Produkte: {r.product_ratings!.map((p) => `${p.product_name} ${p.rating}/5`).join(" · ")}</p>
+              )}
               {Object.keys(r.category_ratings ?? {}).length > 0 && (
                 <p className="text-xs text-gray-500 mt-2">{Object.entries(r.category_ratings).map(([k, v]) => `${CATEGORY_LABEL[k] ?? k}: ${v}/5`).join(" · ")}</p>
               )}

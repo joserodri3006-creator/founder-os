@@ -15,14 +15,14 @@ export const metadata: Metadata = {
 type Props = { params: Promise<{ token: string }> };
 
 type State =
-  | { kind: "ok"; venture: string; customerName: string | null; orderTitle: string | null }
+  | { kind: "ok"; venture: string; customerName: string | null; orderTitle: string | null; products: Array<{ product_id: string; product_name: string }> }
   | { kind: "invalid" | "used" | "expired"; venture: string | null };
 
 async function resolve(token: string): Promise<State> {
   if (!/^[a-f0-9]{64}$/.test(token)) return { kind: "invalid", venture: null };
   const { data } = await supabaseAdmin
     .from("review_invitations")
-    .select("id,venture,customer_name,status,expires_at,orders(title)")
+    .select("id,venture,customer_name,status,expires_at,order_id,orders(title)")
     .eq("token_hash", hashReviewToken(token))
     .maybeSingle();
   if (!data) return { kind: "invalid", venture: null };
@@ -33,8 +33,13 @@ async function resolve(token: string): Promise<State> {
   if (data.status === "pending" || data.status === "sent") {
     await supabaseAdmin.from("review_invitations").update({ status: "opened", opened_at: new Date().toISOString() }).eq("id", data.id);
   }
+  const { data: items } = data.order_id
+    ? await supabaseAdmin.from("order_items").select("product_id,product_name").eq("order_id", data.order_id)
+    : { data: [] as Array<{ product_id: string | null; product_name: string }> };
+  const products = Array.from(new Map((items ?? []).filter((i) => i.product_id).map((i) => [i.product_id as string, { product_id: i.product_id as string, product_name: i.product_name }])).values());
   return {
     kind: "ok",
+    products,
     venture: data.venture,
     customerName: data.customer_name,
     orderTitle: (data.orders as unknown as { title?: string } | null)?.title ?? null,
@@ -89,7 +94,7 @@ export default async function BewertenPage({ params }: Props) {
 
             <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 2, padding: "28px 24px" }}>
               {state.kind === "ok" ? (
-                <ReviewForm token={token} branding={b} customerName={state.customerName} orderTitle={state.orderTitle} />
+                <ReviewForm token={token} branding={b} customerName={state.customerName} orderTitle={state.orderTitle} products={state.products} />
               ) : (
                 <div style={{ textAlign: "center" }}>
                   <p style={{ margin: "0 0 20px", color: c.muted, lineHeight: 1.6 }}>{message[state.kind][1]}</p>

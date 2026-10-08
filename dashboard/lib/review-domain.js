@@ -36,11 +36,13 @@ function validateReviewSubmission(input) {
   };
 }
 
-function shouldCreateReviewInvitation({ venture, previousStatus, nextStatus, customerEmail }) {
-  return venture === 'blazed_outfitters'
+const REVIEW_VENTURES = ['blazed_outfitters'];
+
+function shouldCreateReviewInvitation({ venture, previousStatus, nextStatus, customerEmail, enabledVentures = REVIEW_VENTURES }) {
+  return enabledVentures.includes(venture)
     && previousStatus !== 'abgeschlossen'
     && nextStatus === 'abgeschlossen'
     && Boolean(String(customerEmail ?? '').trim());
 }
 
-module.exports = { hashReviewToken, publicReviewName, validateReviewSubmission, shouldCreateReviewInvitation };
+module.exports = { REVIEW_VENTURES, hashReviewToken, publicReviewName, validateReviewSubmission, shouldCreateReviewInvitation };
