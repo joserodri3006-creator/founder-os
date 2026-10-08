@@ -75,7 +75,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       review_type: invitation.review_type,
       ...validation.value,
       category_ratings: categoryRatings,
-      is_verified: true,
+      // Nur mit verknüpftem Auftrag verifiziert (Newsletter-Einladungen haben keinen).
+      is_verified: Boolean(invitation.order_id),
       status: "pending",
       source: "founder_os",
     })
