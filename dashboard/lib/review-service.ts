@@ -78,7 +78,8 @@ export async function createReviewInvitation(input: ReviewInvitationInput) {
       sent = true;
       await supabaseAdmin.from("review_invitations").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", invitation.id);
     } else {
-      warning = `Einladung gespeichert, E-Mail-Versand fehlgeschlagen (${response.status})`;
+      const detail = (await response.text().catch(() => "")).slice(0, 300);
+      warning = `Einladung gespeichert, E-Mail-Versand fehlgeschlagen (${response.status}) von ${sender.email}: ${detail}`;
     }
   } else {
     warning = "Einladung gespeichert, RESEND_API_KEY fehlt";
