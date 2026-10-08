@@ -1,11 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PAGE_PREFIXES = ["/login", "/auth", "/invite", "/online-first", "/brandary"];
+const PUBLIC_PAGE_PREFIXES = ["/login", "/auth", "/invite", "/online-first", "/brandary", "/bewerten"];
 const PUBLIC_API_PREFIXES = ["/api/invite", "/api/public"];
 
 type PermissionLevel = "edit" | "view" | "none";
-type Section = "leads" | "customers" | "orders" | "products" | "drafts" | "invoices" | "settings";
+type Section = "leads" | "customers" | "orders" | "products" | "drafts" | "invoices" | "reviews" | "settings";
 
 const API_SECTIONS: Array<{ prefix: string; section: Section }> = [
   { prefix: "/api/leads", section: "leads" },
@@ -14,6 +14,7 @@ const API_SECTIONS: Array<{ prefix: string; section: Section }> = [
   { prefix: "/api/customer-tags", section: "customers" },
   { prefix: "/api/auftraege", section: "orders" },
   { prefix: "/api/drafts", section: "drafts" },
+  { prefix: "/api/reviews", section: "reviews" },
   { prefix: "/api/produkte", section: "products" },
   { prefix: "/api/produkt-", section: "products" },
   { prefix: "/api/steuerklassen", section: "settings" },

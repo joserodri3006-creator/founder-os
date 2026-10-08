@@ -59,6 +59,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
         { href: "/inbox", label: "Inbox", show: (canView("leads") || canView("customers")) && !isItabaManagerAccount },
         { href: "/aufgaben", label: "Aufgaben", show: canView("leads") || canView("customers") },
         { href: "/drafts", label: "KI-Drafts", show: canView("drafts") && venture !== "itaba" },
+        { href: "/bewertungen", label: "Bewertungen", show: canView("reviews") && venture === "blazed_outfitters" },
       ],
     },
     {
