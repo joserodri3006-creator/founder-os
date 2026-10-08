@@ -27,3 +27,11 @@ Das Formular `/bewerten/<token>` wird serverseitig gerendert, ohne Founder-OS-Ra
 
 ## Gültigkeit
 Ein Link ist einmal verwendbar und läuft 60 Tage nach dem frühesten Versandzeitpunkt ab (`expires_at` = Abschluss + Wartezeit + 60 Tage, Standard also 63 Tage nach Auftragsabschluss). Danach zeigt die Seite „Link abgelaufen“.
+
+## Erweiterungen (Okt 2026)
+- **Venture-Prüfung:** `/api/reviews*` erlaubt nur Founder oder Nutzer des jeweiligen Ventures (`lib/review-access.ts`), sonst 403/401.
+- **Rollenrechte:** Permission-Section `reviews`. Manager von Blazed haben `edit`, alle anderen Manager `none`; Migration `20261008_review_products_roles.sql`.
+- **Erinnerung:** `blazed_review_invites_send.py` sendet 7 Tage nach Versand einmalig eine Erinnerung an unbewertete Einladungen. Der Link wird dabei erneuert (alter Link ungültig). Danach keine weitere Nachricht.
+- **Kritische Bewertungen (1 bis 2 Sterne):** automatische Aufgabe (hoch, Frist 24 h bzw. 48 h, am Kunden) plus Benachrichtigung `critical_review` an Founder und Venture-Manager.
+- **Produktbewertungen:** optional im Formular für die Produkte der Bestellung (`review_product_ratings`). Blazed gibt pro Produkt `aggregateRating` im JSON-LD nur aus, wenn veröffentlichte Produktbewertungen vorliegen. Ob Google daraus Sterne zeigt, entscheidet Google.
+- **Ventureübersicht:** `/bewertungen` zeigt dem Founder alle Ventures mit Durchschnitt, offenen und kritischen Bewertungen. Weitere Ventures: in `REVIEW_VENTURES` (`lib/review-domain.js`), `venture-branding.ts` und `Sidebar.tsx` ergänzen sowie einen Versand-Worker mit eigenem Postfach anlegen.
