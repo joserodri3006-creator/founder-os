@@ -1,7 +1,5 @@
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getSender, sendMail } from "@/lib/mail-helpers";
-import { hashReviewToken } from "@/lib/review-domain";
 
 export type ReviewInvitationInput = {
   venture: string;
@@ -12,10 +10,15 @@ export type ReviewInvitationInput = {
   orderTitle: string;
 };
 
-function siteUrl() {
-  return (process.env.NEXT_PUBLIC_SITE_URL || "https://founder-os-theta.vercel.app").replace(/\/$/, "");
-}
+/** Tage zwischen Auftragsabschluss und Einladung (Konzept: 3 bis 7 Tage). */
+const DEFAULT_DELAY_DAYS = 3;
 
+/**
+ * Legt eine Einladung ohne ausgegebenen Token an. Der Versand erfolgt durch den
+ * Hermes-Worker (KAS-Postfach des Ventures): Er erzeugt den Einmal-Token, speichert
+ * nur dessen SHA-256-Hash und versendet den Link. So liegt der Link nie im Klartext
+ * in der Datenbank und Vercel braucht keine Postfach-Zugangsdaten.
+ */
 export async function createReviewInvitation(input: ReviewInvitationInput) {
   const existing = await supabaseAdmin
     .from("review_invitations")
@@ -28,9 +31,10 @@ export async function createReviewInvitation(input: ReviewInvitationInput) {
   if (existing.error) throw new Error(existing.error.message);
   if (existing.data) return { created: false, invitation: existing.data, reason: "exists" as const };
 
-  const token = crypto.randomBytes(32).toString("hex");
-  const tokenHash = hashReviewToken(token);
-  const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+  const delayDays = Number(process.env.REVIEW_INVITE_DELAY_DAYS ?? DEFAULT_DELAY_DAYS);
+  const sendAfter = new Date(Date.now() + Math.max(0, delayDays) * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + (Math.max(0, delayDays) + 60) * 24 * 60 * 60 * 1000).toISOString();
+
   const { data: invitation, error } = await supabaseAdmin
     .from("review_invitations")
     .insert({
@@ -39,51 +43,15 @@ export async function createReviewInvitation(input: ReviewInvitationInput) {
       order_id: input.orderId,
       email: input.email.trim().toLowerCase(),
       customer_name: input.customerName || null,
-      token_hash: tokenHash,
+      token_hash: `unissued:${crypto.randomUUID()}`,
       review_type: "order",
       status: "pending",
+      send_after: sendAfter,
       expires_at: expiresAt,
     })
-    .select("id,status,expires_at")
+    .select("id,status,send_after,expires_at")
     .single();
   if (error || !invitation) throw new Error(error?.message || "Bewertungseinladung konnte nicht angelegt werden");
 
-  const url = `${siteUrl()}/bewerten/${token}`;
-  const apiKey = process.env.RESEND_API_KEY;
-  let sent = false;
-  let warning: string | null = null;
-  if (apiKey) {
-    const sender = getSender(input.venture);
-    const firstName = input.customerName.trim().split(/\s+/)[0] || "Hallo";
-    const text = [
-      `Hallo ${firstName},`,
-      "",
-      `vielen Dank für Ihre Bestellung bei ${sender.name}.`,
-      "Wir möchten ehrlich erfahren, wie Sie Ihre Erfahrung bewerten. Ihre Rückmeldung darf positiv, neutral oder kritisch sein und hilft uns, unseren Service zu verbessern.",
-      "",
-      `Bewertung abgeben: ${url}`,
-      "",
-      "Die Teilnahme ist freiwillig. Es gibt keine Belohnung und die Bewertung wird erst nach Ihrer ausdrücklichen Freigabe öffentlich angezeigt.",
-      "",
-      `Viele Grüße`,
-      sender.name,
-    ].join("\n");
-    const response = await sendMail(apiKey, {
-      from: `${sender.name} <${sender.email}>`,
-      to: [input.email],
-      subject: `Wie war Ihre Erfahrung mit ${sender.name}?`,
-      text,
-    });
-    if (response.ok) {
-      sent = true;
-      await supabaseAdmin.from("review_invitations").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", invitation.id);
-    } else {
-      const detail = (await response.text().catch(() => "")).slice(0, 300);
-      warning = `Einladung gespeichert, E-Mail-Versand fehlgeschlagen (${response.status}) von ${sender.email}: ${detail}`;
-    }
-  } else {
-    warning = "Einladung gespeichert, RESEND_API_KEY fehlt";
-  }
-
-  return { created: true, invitation, token, url, sent, warning };
+  return { created: true, invitation, queued: true as const, send_after: sendAfter };
 }

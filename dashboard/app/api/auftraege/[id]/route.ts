@@ -48,12 +48,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         customerName: [customer?.first_name, customer?.last_name].filter(Boolean).join(" "),
         orderTitle: before.title ?? "Bestellung",
       });
-      review = { created: result.created, sent: "sent" in result ? result.sent : false, warning: "warning" in result ? result.warning : null };
+      review = { created: result.created, queued: "queued" in result, send_after: "send_after" in result ? result.send_after : null };
       if (result.created) {
         await supabaseAdmin.from("order_activities").insert({
           order_id: id,
           activity_type: "review_invited",
-          description: result.sent ? "Neutrale Bewertungseinladung versendet" : "Bewertungseinladung angelegt (nicht versendet)",
+          description: "Neutrale Bewertungseinladung vorgemerkt (Versand über Blazed-Postfach)",
         });
       }
     } catch (err) {
