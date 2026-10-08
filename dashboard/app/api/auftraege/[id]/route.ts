@@ -29,8 +29,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   let review: unknown = null;
+  const invitesEnabled = ["true", "1", "yes"].includes((process.env.REVIEW_INVITES_ENABLED ?? "").trim().toLowerCase());
   const customer = before?.customer as unknown as { id: string; first_name: string | null; last_name: string | null; email: string | null } | null;
-  if (before && process.env.REVIEW_INVITES_ENABLED === "true" && shouldCreateReviewInvitation({
+  if (before && !invitesEnabled && before.venture === "blazed_outfitters" && body?.status === "abgeschlossen" && before.status !== "abgeschlossen") {
+    review = { created: false, skipped: "REVIEW_INVITES_ENABLED ist in dieser Umgebung nicht aktiv" };
+  } else if (before && invitesEnabled && shouldCreateReviewInvitation({
     venture: before.venture,
     previousStatus: before.status,
     nextStatus: body?.status ?? before.status,
