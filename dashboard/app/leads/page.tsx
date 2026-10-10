@@ -564,8 +564,21 @@ function TabelleView({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Sub-Komponente: Pipeline-Ansicht (Kanban)
+// Sub-Komponente: Pipeline-Ansicht (Kanban) — mit Drag & Drop via @dnd-kit
 // ═══════════════════════════════════════════════════════════════════════════════
+
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  useDraggable,
+  type DragStartEvent,
+  type DragEndEvent,
+} from "@dnd-kit/core";
 
 function PipelineView({
   byStatus, updatingId, onUpdateStatus, onEdit, onDelete,
@@ -576,7 +589,34 @@ function PipelineView({
   onEdit: (id: string) => void;
   onDelete: (l: Lead) => void;
 }) {
-  // Nur Spalten anzeigen, die mindestens 1 Lead haben — leere Spalten ausblenden
+  const [activeLead, setActiveLead] = useState<Lead | null>(null);
+
+  // Alle Leads flach für den Overlay-Lookup
+  const allLeads = useMemo(
+    () => Object.values(byStatus).flat(),
+    [byStatus]
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor,   { activationConstraint: { delay: 200, tolerance: 8 } })
+  );
+
+  function handleDragStart({ active }: DragStartEvent) {
+    const lead = allLeads.find((l) => l.id === active.id);
+    setActiveLead(lead ?? null);
+  }
+
+  function handleDragEnd({ active, over }: DragEndEvent) {
+    setActiveLead(null);
+    if (!over || active.id === over.id) return;
+    const targetStatus = over.id as LeadStatus;
+    const lead = allLeads.find((l) => l.id === active.id);
+    if (!lead || lead.status === targetStatus) return;
+    onUpdateStatus(String(active.id), targetStatus);
+  }
+
+  // Nur Spalten anzeigen, die Leads haben — leere als Drop-Targets aber trotzdem
   const visibleCols = PIPELINE_COLS.filter((col) => (byStatus[col.key]?.length ?? 0) > 0);
 
   if (visibleCols.length === 0) {
@@ -588,159 +628,242 @@ function PipelineView({
   }
 
   return (
-    <div className="overflow-x-auto pb-4">
-      <div className="flex gap-3" style={{ minWidth: `${visibleCols.length * 260}px` }}>
-        {visibleCols.map((col) => {
-          const colLeads = byStatus[col.key] ?? [];
-          return (
-            <div key={col.key} className="flex-shrink-0" style={{ width: "248px" }}>
-              {/* Spaltenheader */}
-              <div
-                className="flex items-center justify-between px-3 py-2.5 rounded-t-xl"
-                style={{ background: col.headerBg, borderBottom: `2px solid ${col.accent}20` }}
-              >
-                <span className="text-xs font-bold uppercase tracking-wider" style={{ color: col.accent }}>
-                  {col.label}
-                </span>
-                <span
-                  className="text-xs font-semibold rounded-full px-2 py-0.5"
-                  style={{ background: `${col.accent}20`, color: col.accent }}
-                >
-                  {colLeads.length}
-                </span>
-              </div>
-
-              {/* Karten */}
-              <div
-                className="flex flex-col gap-2 p-2 rounded-b-xl"
-                style={{
-                  background: "#F7F8FC",
-                  border: "1px solid #D1D5E8",
-                  borderTop: "none",
-                  minHeight: "80px",
-                  maxHeight: "calc(100vh - 280px)",
-                  overflowY: "auto",
-                }}
-              >
-                {colLeads.map((lead) => (
-                  <PipelineCard
-                    key={lead.id}
-                    lead={lead}
-                    accent={col.accent}
-                    updatingId={updatingId}
-                    onUpdateStatus={onUpdateStatus}
-                    onEdit={onEdit}
-                    onDelete={onDelete}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="overflow-x-auto pb-4">
+        <div className="flex gap-3" style={{ minWidth: `${visibleCols.length * 260}px` }}>
+          {visibleCols.map((col) => (
+            <DroppableColumn
+              key={col.key}
+              col={col}
+              leads={byStatus[col.key] ?? []}
+              activeId={activeLead?.id ?? null}
+              updatingId={updatingId}
+              onUpdateStatus={onUpdateStatus}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+
+      {/* Overlay: schwebende Karte während des Drags */}
+      <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>
+        {activeLead ? (
+          <div
+            className="rounded-xl p-3"
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid #1B2A5E",
+              boxShadow: "0 12px 32px rgba(27,42,94,0.22)",
+              width: "240px",
+              opacity: 0.97,
+              cursor: "grabbing",
+            }}
+          >
+            <p className="text-sm font-semibold truncate" style={{ color: "#14193A" }}>
+              {activeLead.first_name} {activeLead.last_name}
+            </p>
+            {activeLead.company_name && (
+              <p className="text-xs truncate mt-0.5" style={{ color: "#6B7280" }}>
+                {activeLead.company_name}
+              </p>
+            )}
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
 
-function PipelineCard({
-  lead, accent, updatingId, onUpdateStatus, onEdit, onDelete,
+// ── Droppable Spalte ──────────────────────────────────────────────────────────
+
+function DroppableColumn({
+  col, leads, activeId, updatingId, onUpdateStatus, onEdit, onDelete,
 }: {
-  lead: Lead;
-  accent: string;
+  col: typeof PIPELINE_COLS[number];
+  leads: Lead[];
+  activeId: string | null;
   updatingId: string | null;
   onUpdateStatus: (id: string, s: LeadStatus) => void;
   onEdit: (id: string) => void;
   onDelete: (l: Lead) => void;
 }) {
+  const { setNodeRef, isOver } = useDroppable({ id: col.key });
+
+  return (
+    <div className="flex-shrink-0" style={{ width: "248px" }}>
+      {/* Spaltenheader */}
+      <div
+        className="flex items-center justify-between px-3 py-2.5 rounded-t-xl"
+        style={{ background: col.headerBg, borderBottom: `2px solid ${col.accent}20` }}
+      >
+        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: col.accent }}>
+          {col.label}
+        </span>
+        <span
+          className="text-xs font-semibold rounded-full px-2 py-0.5"
+          style={{ background: `${col.accent}20`, color: col.accent }}
+        >
+          {leads.length}
+        </span>
+      </div>
+
+      {/* Karten-Container — ist das Drop-Target */}
+      <div
+        ref={setNodeRef}
+        className="flex flex-col gap-2 p-2 rounded-b-xl"
+        style={{
+          background: isOver ? `${col.accent}08` : "#F7F8FC",
+          border: `1px solid ${isOver ? col.accent : "#D1D5E8"}`,
+          borderTop: "none",
+          minHeight: "80px",
+          maxHeight: "calc(100vh - 280px)",
+          overflowY: "auto",
+          transition: "background 0.15s, border-color 0.15s",
+        }}
+      >
+        {leads.map((lead) => (
+          <DraggableCard
+            key={lead.id}
+            lead={lead}
+            accent={col.accent}
+            isDragging={activeId === lead.id}
+            updatingId={updatingId}
+            onUpdateStatus={onUpdateStatus}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ))}
+        {/* Leerer Bereich als visueller Drop-Hinweis */}
+        {isOver && leads.length === 0 && (
+          <div
+            className="rounded-lg text-center py-4 text-xs"
+            style={{ border: `2px dashed ${col.accent}`, color: col.accent }}
+          >
+            Hier ablegen
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Draggable Karte ───────────────────────────────────────────────────────────
+
+function DraggableCard({
+  lead, accent, isDragging, updatingId, onUpdateStatus, onEdit, onDelete,
+}: {
+  lead: Lead;
+  accent: string;
+  isDragging: boolean;
+  updatingId: string | null;
+  onUpdateStatus: (id: string, s: LeadStatus) => void;
+  onEdit: (id: string) => void;
+  onDelete: (l: Lead) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: lead.id });
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div
-      className="rounded-xl p-3 cursor-default"
+      ref={setNodeRef}
       style={{
-        background: "#FFFFFF",
-        border: "1px solid #E5E7F0",
-        boxShadow: "0 1px 4px rgba(27,42,94,0.06)",
-        opacity: lead.status === "verloren" ? 0.6 : 1,
+        // Während des Drags: Platzhalter bleibt, wird aber transparent
+        opacity: isDragging ? 0.3 : lead.status === "verloren" ? 0.6 : 1,
+        transition: "opacity 0.15s",
       }}
     >
-      {/* Name + Firma */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <Link
-            href={`/leads/${lead.id}`}
-            className="text-sm font-semibold block truncate transition-colors"
-            style={{ color: "#14193A" }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#1B2A5E"}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "#14193A"}
+      <div
+        className="rounded-xl p-3"
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid #E5E7F0",
+          boxShadow: "0 1px 4px rgba(27,42,94,0.06)",
+        }}
+      >
+        {/* Drag-Handle + Name-Zeile */}
+        <div className="flex items-start gap-1.5">
+          {/* Drag-Handle — nur dieser Bereich löst den Drag aus */}
+          <div
+            {...listeners}
+            {...attributes}
+            className="shrink-0 mt-0.5 cursor-grab active:cursor-grabbing rounded"
+            style={{ color: "#C4C8D8", padding: "2px 1px", touchAction: "none" }}
+            title="Ziehen um Status zu ändern"
           >
-            {lead.first_name} {lead.last_name}
-          </Link>
-          {lead.company_name && (
-            <span className="text-xs truncate block" style={{ color: "#6B7280" }}>{lead.company_name}</span>
-          )}
-        </div>
-        {/* Expand-Toggle */}
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="shrink-0 text-xs rounded-md px-1.5 py-0.5 transition-colors"
-          style={{ color: "#9CA3AF", background: "transparent", border: "none" }}
-          onMouseEnter={e => (e.currentTarget.style.background = "#EEF0F7")}
-          onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-          title={expanded ? "Weniger" : "Mehr"}
-        >
-          {expanded ? "▲" : "▼"}
-        </button>
-      </div>
+            ⠿
+          </div>
 
-      {/* Immer sichtbar: Status-Dropdown */}
-      <div className="mt-2">
-        <select
-          value={lead.status}
-          disabled={updatingId === lead.id}
-          onChange={(e) => onUpdateStatus(lead.id, e.target.value as LeadStatus)}
-          className="text-xs font-semibold rounded-full cursor-pointer w-full"
-          style={{
-            background: STATUS_BG[lead.status] ?? "#F3F4F6",
-            color: STATUS_TEXT[lead.status] ?? "#374151",
-            border: "none",
-            padding: "3px 8px",
-            fontFamily: "var(--font-sans)",
-            outline: "none",
-          }}
-        >
-          {ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-        </select>
-      </div>
-
-      {/* Expanded-Bereich */}
-      {expanded && (
-        <div className="mt-2.5 pt-2.5 space-y-1.5" style={{ borderTop: "1px solid #F0F1F8" }}>
-          {lead.email && (
-            <div className="text-xs truncate" style={{ color: "#6B7280" }}>✉ {lead.email}</div>
-          )}
-          {lead.city && (
-            <div className="text-xs" style={{ color: "#6B7280" }}>📍 {lead.city}</div>
-          )}
-          {lead.follow_up_date && (
-            <div className="text-xs" style={{ color: "#EA580C" }}>
-              📅 {new Date(lead.follow_up_date).toLocaleDateString("de-DE")}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-1">
+              <div className="min-w-0">
+                <Link
+                  href={`/leads/${lead.id}`}
+                  className="text-sm font-semibold block truncate transition-colors"
+                  style={{ color: "#14193A" }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = "#1B2A5E"}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = "#14193A"}
+                  // Link-Klick soll nicht den Drag stören
+                  onClick={e => e.stopPropagation()}
+                >
+                  {lead.first_name} {lead.last_name}
+                </Link>
+                {lead.company_name && (
+                  <span className="text-xs truncate block" style={{ color: "#6B7280" }}>{lead.company_name}</span>
+                )}
+              </div>
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                className="shrink-0 text-xs rounded-md px-1.5 py-0.5"
+                style={{ color: "#9CA3AF", background: "transparent", border: "none" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "#EEF0F7")}
+                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+              >
+                {expanded ? "▲" : "▼"}
+              </button>
             </div>
-          )}
-          {lead.ai_draft_approved === false && (
-            <div className="text-xs font-semibold" style={{ color: "#C8A96E" }}>Draft offen</div>
-          )}
-          {lead.ai_draft_approved === true && (
-            <div className="text-xs font-semibold" style={{ color: "#16A34A" }}>Draft freigegeben</div>
-          )}
-
-          {/* Aktionen */}
-          <div className="flex gap-1 pt-1">
-            <ActionBtn onClick={() => onEdit(lead.id)}>Bearbeiten</ActionBtn>
-            <ActionBtn onClick={() => onDelete(lead)} danger>Löschen</ActionBtn>
           </div>
         </div>
-      )}
+
+        {/* Status-Dropdown */}
+        <div className="mt-2 pl-4">
+          <select
+            value={lead.status}
+            disabled={updatingId === lead.id}
+            onChange={(e) => onUpdateStatus(lead.id, e.target.value as LeadStatus)}
+            className="text-xs font-semibold rounded-full cursor-pointer w-full"
+            style={{
+              background: STATUS_BG[lead.status] ?? "#F3F4F6",
+              color: STATUS_TEXT[lead.status] ?? "#374151",
+              border: "none",
+              padding: "3px 8px",
+              fontFamily: "var(--font-sans)",
+              outline: "none",
+            }}
+          >
+            {ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+          </select>
+        </div>
+
+        {/* Expanded */}
+        {expanded && (
+          <div className="mt-2.5 pt-2.5 pl-4 space-y-1.5" style={{ borderTop: "1px solid #F0F1F8" }}>
+            {lead.email && <div className="text-xs truncate" style={{ color: "#6B7280" }}>✉ {lead.email}</div>}
+            {lead.city && <div className="text-xs" style={{ color: "#6B7280" }}>📍 {lead.city}</div>}
+            {lead.follow_up_date && (
+              <div className="text-xs" style={{ color: "#EA580C" }}>
+                📅 {new Date(lead.follow_up_date).toLocaleDateString("de-DE")}
+              </div>
+            )}
+            {lead.ai_draft_approved === false && <div className="text-xs font-semibold" style={{ color: "#C8A96E" }}>Draft offen</div>}
+            {lead.ai_draft_approved === true  && <div className="text-xs font-semibold" style={{ color: "#16A34A" }}>Draft freigegeben</div>}
+            <div className="flex gap-1 pt-1">
+              <ActionBtn onClick={() => onEdit(lead.id)}>Bearbeiten</ActionBtn>
+              <ActionBtn onClick={() => onDelete(lead)} danger>Löschen</ActionBtn>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -53,9 +53,14 @@ export default function SwipeView({ leads, onUpdateStatus, onArchive }: SwipeVie
   // Der Deck wird deshalb nur neu aufgebaut, wenn sich die MENGE der offenen
   // Lead-IDs von außen ändert (neuer Filter, frisch geladen) — nicht bei einer
   // Status-Änderung, die diese Komponente selbst ausgelöst hat.
-  const [deck, setDeck] = useState<Lead[]>(() =>
-    leads.filter((l) => l.status !== "verloren" && l.status !== "gewonnen")
-  );
+  const [deck, setDeck] = useState<Lead[]>(() => {
+    const open = leads.filter((l) => l.status !== "verloren" && l.status !== "gewonnen");
+    // in_bearbeitung zuerst, dann Rest in API-Reihenfolge
+    return [
+      ...open.filter((l) => l.status === "in_bearbeitung"),
+      ...open.filter((l) => l.status !== "in_bearbeitung"),
+    ];
+  });
   const seedIdsRef = useRef<string>(openLeadIds(leads));
   const [index, setIndex] = useState(0);
   const [dragX, setDragX] = useState(0);
@@ -69,7 +74,11 @@ export default function SwipeView({ leads, onUpdateStatus, onArchive }: SwipeVie
     const ids = openLeadIds(leads);
     if (ids !== seedIdsRef.current) {
       seedIdsRef.current = ids;
-      setDeck(leads.filter((l) => l.status !== "verloren" && l.status !== "gewonnen"));
+      const open = leads.filter((l) => l.status !== "verloren" && l.status !== "gewonnen");
+      setDeck([
+        ...open.filter((l) => l.status === "in_bearbeitung"),
+        ...open.filter((l) => l.status !== "in_bearbeitung"),
+      ]);
       setIndex(0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
