@@ -35,7 +35,7 @@ Use this Server URL in the ChatGPT “Neues Plugin” dialog:
 https://<deine-founder-os-domain>/mcp
 ```
 
-Select OAuth. ChatGPT discovers:
+Select OAuth. Claude (claude.ai) funktioniert mit derselben URL. ChatGPT discovers:
 
 ```text
 /.well-known/oauth-protected-resource/mcp
@@ -58,3 +58,12 @@ Available MCP tools:
 - `pipeline_stats`
 
 ChatGPT should use `batch_create_leads` for researched lead lists instead of Excel.
+
+## Sicherheit und Betrieb
+
+- `/mcp`, `/oauth/*` und `/.well-known/*` sind im Login-Schutz (`proxy.ts`) bewusst öffentlich, weil externe Clients ohne Founder-OS-Session ankommen. `/mcp` verlangt einen gültigen Bearer-Token (JWT, 1 Stunde), `/oauth/authorize` das Founder-Passwort. Ohne Token kommt ein 401 mit `resource_metadata`.
+- Die Client-Registrierung (`/oauth/register`) ist ohne Anmeldung möglich und akzeptiert deshalb nur https-Redirects auf `chatgpt.com`, `chat.openai.com`, `platform.openai.com`, `claude.ai` und `claude.com`. Weitere Clients: Liste `ALLOWED_HOSTS` in `app/oauth/register/route.ts` erweitern.
+- Der Zugriff gilt für das ganze Founder-OS-Lead-CRM aller Ventures. Widerruf: Tabelle `mcp_oauth_clients` leeren oder `MCP_OAUTH_SECRET` ändern (macht alle Tokens ungültig).
+- `NEXT_PUBLIC_SITE_URL` wird ohne abschließenden Schrägstrich normalisiert.
+- Getestet (Okt 2026): Discovery, Registrierung (gut und böse), PKCE-Ablauf, falsches Passwort, Code-Wiederverwendung, alle 6 Tools, ungültiger Token.
+- Offen: Ein Refresh-Token gibt es nicht, nach 1 Stunde ist eine neue Anmeldung nötig. Tools decken nur Leads ab (Aufträge, Kunden, Bewertungen, Aufgaben fehlen).
