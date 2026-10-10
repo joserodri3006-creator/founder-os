@@ -55,6 +55,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
       label: "CRM & Vertrieb",
       items: [
         { href: "/leads", label: "Leads", show: canView("leads") && !isItabaManagerAccount },
+        { href: "/leads/mail-queue", label: "Mail Queue", show: canView("leads") && !isItabaManagerAccount },
         { href: "/kunden", label: "Kunden", show: canView("customers") },
         { href: "/inbox", label: "Inbox", show: (canView("leads") || canView("customers")) && !isItabaManagerAccount },
         { href: "/aufgaben", label: "Aufgaben", show: canView("leads") || canView("customers") },

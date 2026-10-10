@@ -37,7 +37,7 @@ export default function SendMailModal({
   const [body, setBody] = useState(initialBody);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
+  const [queued, setQueued] = useState(false); // true nach erfolgreichem Queue-Eintrag
 
   useEffect(() => {
     fetch(`/api/outreach-templates?venture=${venture}`)
@@ -58,20 +58,27 @@ export default function SendMailModal({
     if (!subject.trim() || !body.trim()) return;
     setSending(true);
     setError(null);
-    const endpoint = entityType === "lead" ? `/api/leads/${entityId}/send-mail` : `/api/kunden/${entityId}/send-mail`;
+
+    // Leads: in Queue stellen (Hermes SMTP-Worker versendet)
+    // Kunden: direkt via Resend (kein eigenes Postfach nötig)
+    const endpoint = entityType === "lead"
+      ? `/api/leads/${entityId}/queue-mail`
+      : `/api/kunden/${entityId}/send-mail`;
+
     const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subject, body, is_ai_draft_send: isDraft }),
+      body: JSON.stringify({ subject, body, is_ai_draft: isDraft }),
     });
     setSending(false);
     if (res.ok) {
-      setSent(true);
+      setQueued(true);
       onSent?.();
     } else {
       const data = await res.json().catch(() => ({}));
-      // detail enthält den echten Resend-Fehlertext (z.B. "Domain not verified")
-      const msg = data.detail ? `${data.error ?? "Fehler"}: ${data.detail}` : (data.error ?? "E-Mail-Versand fehlgeschlagen.");
+      const msg = data.detail
+        ? `${data.error ?? "Fehler"}: ${data.detail}`
+        : (data.error ?? "Konnte nicht in Queue gestellt werden.");
       setError(msg);
     }
   }
@@ -99,11 +106,18 @@ export default function SendMailModal({
           <button onClick={onClose} style={{ color: "#6B7280", fontSize: "22px", lineHeight: 1, background: "none", border: "none", cursor: "pointer" }}>×</button>
         </div>
 
-        {sent ? (
-          <div className="px-6 py-8 text-center">
-            <p className="text-sm" style={{ color: "#15803D" }}>E-Mail wurde an {recipientEmail} gesendet.</p>
+        {queued ? (
+          <div className="px-6 py-8 text-center space-y-3">
+            <div className="text-3xl">📬</div>
+            <p className="text-sm font-medium" style={{ color: "#15803D" }}>
+              Mail in Queue gestellt
+            </p>
+            <p className="text-xs" style={{ color: "#6B7280" }}>
+              Hermes versendet sie in den nächsten Minuten von <strong>{recipientEmail}</strong>.
+              Status sichtbar in: <em>Leads → Mail Queue</em>
+            </p>
             <button onClick={onClose}
-              className="mt-4 text-sm px-4 py-2 rounded-lg"
+              className="mt-2 text-sm px-4 py-2 rounded-lg"
               style={{ background: "#1B2A5E", color: "#FFFFFF", border: "none", cursor: "pointer" }}>
               Schließen
             </button>
@@ -150,7 +164,7 @@ export default function SendMailModal({
                 disabled={sending || !recipientEmail || !subject.trim() || !body.trim()}
                 className="flex-1 py-2.5 text-sm font-semibold rounded-lg"
                 style={{ background: "#1B2A5E", color: "#FFFFFF", border: "none", cursor: sending ? "not-allowed" : "pointer", opacity: (sending || !recipientEmail) ? 0.6 : 1 }}>
-                {sending ? "Wird gesendet…" : isDraft ? "Entwurf senden" : "Senden"}
+                {sending ? "Wird eingestellt…" : isDraft ? "Entwurf in Queue stellen" : "In Queue stellen"}
               </button>
               <button onClick={onClose} type="button"
                 className="flex-1 py-2.5 text-sm font-medium rounded-lg"
