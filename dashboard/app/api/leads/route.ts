@@ -20,6 +20,8 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get("status");
   const source = searchParams.get("source");
   const venture = searchParams.get("venture");
+  const industry = searchParams.get("industry");
+  const lastContactedFilter = searchParams.get("last_contacted"); // "never" | "7d" | "30d" | "older_30d"
   const showArchived = searchParams.get("archived") === "true";
   const search = searchParams.get("search")?.trim();
 
@@ -32,7 +34,7 @@ export async function GET(req: NextRequest) {
     "phone", "website", "city", "region", "industry", "contact_reason", "notes",
   ];
 
-  const baseSelect = "id,first_name,last_name,email,phone,website,company_name,status,source,city,region,industry,contact_reason,notes,follow_up_date,ai_draft_approved,archived_at,created_at,venture,is_duplicate";
+  const baseSelect = "id,first_name,last_name,email,phone,website,company_name,status,source,city,region,industry,contact_reason,notes,last_contacted_at,follow_up_date,ai_draft_approved,archived_at,created_at,venture,is_duplicate";
   const reviewSelect = `${baseSelect},review_status,lead_potential,contact_channel,next_action,review_notes,reviewed_at`;
 
   function buildQuery(select: string) {
@@ -50,6 +52,22 @@ export async function GET(req: NextRequest) {
     if (status && status !== "alle") query = query.eq("status", status);
     if (source && source !== "alle") query = query.eq("source", source);
     if (venture && venture !== "alle") query = query.eq("venture", venture);
+    if (industry && industry !== "alle") query = query.eq("industry", industry);
+    if (lastContactedFilter && lastContactedFilter !== "alle") {
+      const now = new Date();
+      if (lastContactedFilter === "never") {
+        query = query.is("last_contacted_at", null);
+      } else if (lastContactedFilter === "7d") {
+        const d = new Date(now); d.setDate(d.getDate() - 7);
+        query = query.gte("last_contacted_at", d.toISOString());
+      } else if (lastContactedFilter === "30d") {
+        const d = new Date(now); d.setDate(d.getDate() - 30);
+        query = query.gte("last_contacted_at", d.toISOString());
+      } else if (lastContactedFilter === "older_30d") {
+        const d = new Date(now); d.setDate(d.getDate() - 30);
+        query = query.lt("last_contacted_at", d.toISOString()).not("last_contacted_at", "is", null);
+      }
+    }
     if (search) {
       const term = search.replace(/[%,]/g, "");
       query = query.or(SEARCH_COLUMNS.map((col) => `${col}.ilike.%${term}%`).join(","));

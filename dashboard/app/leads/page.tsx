@@ -30,7 +30,7 @@ type Modal =
   | null;
 
 type ViewMode = "tabelle" | "pipeline" | "swipe";
-type SortKey = "name" | "company" | "status" | "source" | "created_at" | "follow_up_date";
+type SortKey = "name" | "company" | "status" | "source" | "created_at" | "follow_up_date" | "last_contacted_at" | "industry";
 type SortDir = "asc" | "desc";
 
 // ─── Konstanten ───────────────────────────────────────────────────────────────
@@ -98,12 +98,14 @@ function sortLeads(leads: Lead[], key: SortKey, dir: SortDir): Lead[] {
   return [...leads].sort((a, b) => {
     let av: string = "";
     let bv: string = "";
-    if (key === "name")          { av = `${a.first_name} ${a.last_name}`; bv = `${b.first_name} ${b.last_name}`; }
-    else if (key === "company")  { av = a.company_name ?? ""; bv = b.company_name ?? ""; }
-    else if (key === "status")   { av = a.status; bv = b.status; }
-    else if (key === "source")   { av = a.source; bv = b.source; }
-    else if (key === "created_at")    { av = a.created_at; bv = b.created_at; }
+    if (key === "name")                { av = `${a.first_name} ${a.last_name}`; bv = `${b.first_name} ${b.last_name}`; }
+    else if (key === "company")        { av = a.company_name ?? ""; bv = b.company_name ?? ""; }
+    else if (key === "status")         { av = a.status; bv = b.status; }
+    else if (key === "source")         { av = a.source; bv = b.source; }
+    else if (key === "industry")       { av = a.industry ?? ""; bv = b.industry ?? ""; }
+    else if (key === "created_at")     { av = a.created_at; bv = b.created_at; }
     else if (key === "follow_up_date") { av = a.follow_up_date ?? ""; bv = b.follow_up_date ?? ""; }
+    else if (key === "last_contacted_at") { av = a.last_contacted_at ?? ""; bv = b.last_contacted_at ?? ""; }
     const cmp = av.localeCompare(bv, "de");
     return dir === "asc" ? cmp : -cmp;
   });
@@ -118,6 +120,8 @@ export default function LeadsPage() {
   const [loading, setLoading]               = useState(true);
   const [filterStatus, setFilterStatus]     = useState<LeadStatus | "alle">("alle");
   const [filterSource, setFilterSource]     = useState<string>("alle");
+  const [filterIndustry, setFilterIndustry] = useState<string>("alle");
+  const [filterLastContacted, setFilterLastContacted] = useState<string>("alle");
   const [showArchived, setShowArchived]     = useState(false);
   const [search, setSearch]                 = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -137,6 +141,8 @@ export default function LeadsPage() {
     const params = new URLSearchParams();
     if (filterStatus !== "alle") params.set("status", filterStatus);
     if (filterSource !== "alle") params.set("source", filterSource);
+    if (filterIndustry !== "alle") params.set("industry", filterIndustry);
+    if (filterLastContacted !== "alle") params.set("last_contacted", filterLastContacted);
     if (showArchived) params.set("archived", "true");
     if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
     params.set("venture", venture);
@@ -151,7 +157,7 @@ export default function LeadsPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => { load(); }, [filterStatus, filterSource, showArchived, debouncedSearch, venture]);
+  useEffect(() => { load(); }, [filterStatus, filterSource, filterIndustry, filterLastContacted, showArchived, debouncedSearch, venture]);
 
   // ── Status-Update ──────────────────────────────────────────────────────────
   async function updateStatus(id: string, status: LeadStatus) {
@@ -201,6 +207,13 @@ export default function LeadsPage() {
     ALL_STATUSES.forEach((s) => { map[s] = []; });
     leads.forEach((l) => { map[l.status]?.push(l); });
     return map;
+  }, [leads]);
+
+  // Branchenliste dynamisch aus geladenen Leads
+  const industryOptions = useMemo(() => {
+    const set = new Set<string>();
+    leads.forEach((l) => { if (l.industry) set.add(l.industry); });
+    return Array.from(set).sort();
   }, [leads]);
 
   // ─── Render ─────────────────────────────────────────────────────────────────
@@ -290,6 +303,17 @@ export default function LeadsPage() {
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
+        <select value={filterIndustry} onChange={(e) => setFilterIndustry(e.target.value)} style={selectStyle}>
+          <option value="alle">Alle Branchen</option>
+          {industryOptions.map((i) => <option key={i} value={i}>{i}</option>)}
+        </select>
+        <select value={filterLastContacted} onChange={(e) => setFilterLastContacted(e.target.value)} style={selectStyle}>
+          <option value="alle">Kontaktiert: alle</option>
+          <option value="never">Nie kontaktiert</option>
+          <option value="7d">Letzte 7 Tage</option>
+          <option value="30d">Letzte 30 Tage</option>
+          <option value="older_30d">Älter als 30 Tage</option>
+        </select>
         <button
           onClick={() => setShowArchived((v) => !v)}
           className="text-sm px-3 py-1.5 rounded-lg transition-colors font-medium"
@@ -367,12 +391,14 @@ export default function LeadsPage() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const SORT_COLS: { key: SortKey; label: string }[] = [
-  { key: "name",            label: "Name" },
-  { key: "company",         label: "Unternehmen" },
-  { key: "status",          label: "Status" },
-  { key: "source",          label: "Quelle" },
-  { key: "follow_up_date",  label: "Follow-up" },
-  { key: "created_at",      label: "Erstellt" },
+  { key: "name",               label: "Name" },
+  { key: "company",            label: "Unternehmen" },
+  { key: "status",             label: "Status" },
+  { key: "industry",           label: "Branche" },
+  { key: "source",             label: "Quelle" },
+  { key: "last_contacted_at",  label: "Zuletzt kontaktiert" },
+  { key: "follow_up_date",     label: "Follow-up" },
+  { key: "created_at",         label: "Erstellt" },
 ];
 
 // Nicht-sortierbare Spalten
@@ -496,6 +522,16 @@ function TabelleView({
                 {/* Quelle */}
                 <td className="px-4 py-3.5 text-sm capitalize" style={{ color: "#6B7280" }}>{lead.source}</td>
 
+                {/* Branche */}
+                <td className="px-4 py-3.5 text-xs" style={{ color: "#6B7280" }}>{lead.industry ?? "—"}</td>
+
+                {/* Zuletzt kontaktiert */}
+                <td className="px-4 py-3.5 text-xs" style={{ color: "#6B7280" }}>
+                  {lead.last_contacted_at
+                    ? new Date(lead.last_contacted_at).toLocaleDateString("de-DE")
+                    : <span style={{ color: "#D1D5E8" }}>—</span>}
+                </td>
+
                 {/* Follow-up */}
                 <td className="px-4 py-3.5 text-xs" style={{ color: "#6B7280" }}>
                   {lead.follow_up_date
@@ -551,7 +587,7 @@ function TabelleView({
             ))}
             {leads.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-12 text-center text-sm" style={{ color: "#6B7280" }}>
+                <td colSpan={12} className="px-4 py-12 text-center text-sm" style={{ color: "#6B7280" }}>
                   Keine Leads gefunden
                 </td>
               </tr>

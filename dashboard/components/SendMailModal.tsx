@@ -70,7 +70,9 @@ export default function SendMailModal({
       onSent?.();
     } else {
       const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "E-Mail-Versand fehlgeschlagen.");
+      // detail enthält den echten Resend-Fehlertext (z.B. "Domain not verified")
+      const msg = data.detail ? `${data.error ?? "Fehler"}: ${data.detail}` : (data.error ?? "E-Mail-Versand fehlgeschlagen.");
+      setError(msg);
     }
   }
 

@@ -47,6 +47,7 @@ export interface Lead {
   industry: string | null;
   notes: string | null;
   contact_reason: string | null;
+  last_contacted_at: string | null;
   review_status: LeadReviewStatus;
   lead_potential: LeadPotential | null;
   contact_channel: LeadContactChannel;

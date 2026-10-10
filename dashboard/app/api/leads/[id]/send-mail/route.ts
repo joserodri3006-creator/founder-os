@@ -30,16 +30,36 @@ export async function POST(req: NextRequest, { params }: Params) {
   const sender = getSender(lead.venture);
   const recipientName = `${lead.first_name} ${lead.last_name}`.trim();
 
+  // Resend erlaubt nur verifizierte Domains als from-Adresse.
+  // Falls die Venture-Domain (z.B. blazedoutfitters.com) noch nicht in Resend verifiziert
+  // ist, senden wir von info@onlinefirst.eu mit reply_to auf die richtige Adresse,
+  // damit Antworten trotzdem dort ankommen.
+  const isVerifiedDomain = sender.email.endsWith("@onlinefirst.eu");
+  const effectiveFrom  = isVerifiedDomain ? sender.email : "info@onlinefirst.eu";
+  const effectiveName  = sender.name;
+  const replyTo        = isVerifiedDomain ? undefined : sender.email;
+
   const resendRes = await sendMail(RESEND_API_KEY, {
-    from: `${sender.name} <${sender.email}>`,
+    from: `${effectiveName} <${effectiveFrom}>`,
     to: [recipientName ? `${recipientName} <${lead.email}>` : lead.email],
+    reply_to: replyTo,
     subject,
     text: body,
   });
 
   if (!resendRes.ok) {
-    const detail = await resendRes.text();
-    return NextResponse.json({ error: "E-Mail-Versand fehlgeschlagen", detail }, { status: 500 });
+    let raw = "";
+    try { raw = await resendRes.text(); } catch { /* ignore */ }
+    // Resend gibt JSON zurück: { name, message, statusCode } oder ähnlich
+    let userMsg = `Resend ${resendRes.status}`;
+    try {
+      const parsed = JSON.parse(raw);
+      userMsg = parsed?.message ?? parsed?.error ?? raw.slice(0, 200);
+    } catch { if (raw) userMsg = raw.slice(0, 200); }
+    return NextResponse.json(
+      { error: "E-Mail-Versand fehlgeschlagen", detail: userMsg },
+      { status: 500 }
+    );
   }
 
   const sentAt = new Date().toISOString();
@@ -49,15 +69,15 @@ export async function POST(req: NextRequest, { params }: Params) {
   const followUpDateUpdate = nextStatus === "follow_up"
     ? nextFollowUpDate.toISOString().split("T")[0]
     : nextStatus === "nachgefasst" ? null : undefined;
+
   const { error: updateError } = await supabaseAdmin
     .from("leads")
     .update({
       status: nextStatus,
       last_contacted_at: sentAt,
-      // Nur bei explizitem "KI-Entwurf senden" den Entwurf selbst als versendet markieren.
-      // Bei einer freien/manuellen Mail (SendMailModal ohne Draft-Kontext) einen eventuell
-      // noch offenen, unabhängigen KI-Entwurf NICHT stillschweigend überschreiben/genehmigen.
-      ...(is_ai_draft_send ? { ai_draft_subject: subject, ai_draft_body: body, ai_draft_approved: true } : {}),
+      ...(is_ai_draft_send
+        ? { ai_draft_subject: subject, ai_draft_body: body, ai_draft_approved: true }
+        : {}),
       ...(followUpDateUpdate !== undefined ? { follow_up_date: followUpDateUpdate } : {}),
     })
     .eq("id", id);

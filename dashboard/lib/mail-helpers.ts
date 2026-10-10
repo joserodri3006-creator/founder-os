@@ -16,6 +16,7 @@ export function getSender(venture: string) {
 export async function sendMail(apiKey: string, payload: {
   from: string;
   to: string[];
+  reply_to?: string;
   subject: string;
   text: string;
   html?: string;
