@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PAGE_PREFIXES = ["/login", "/auth", "/invite", "/online-first", "/brandary", "/bewerten"];
+// /mcp, /oauth und /.well-known sind öffentlich erreichbar, weil externe MCP-Clients (ChatGPT, Claude) dort ohne
+// Founder-OS-Session ankommen. /mcp schützt sich per OAuth-Bearer-Token, /oauth/authorize per Founder-Passwort.
+const PUBLIC_PAGE_PREFIXES = ["/login", "/auth", "/invite", "/online-first", "/brandary", "/bewerten", "/mcp", "/oauth", "/.well-known"];
 const PUBLIC_API_PREFIXES = ["/api/invite", "/api/public"];
 
 type PermissionLevel = "edit" | "view" | "none";
