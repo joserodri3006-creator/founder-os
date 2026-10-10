@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { getSender, sendMail } from "@/lib/mail-helpers";
+import { getSender, sendMail, usesResend } from "@/lib/mail-helpers";
 import { statusAfterSuccessfulEmailSend } from "@/lib/lead-mail-state";
 
 type Params = { params: Promise<{ id: string }> };
@@ -27,22 +27,21 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (error || !lead) return NextResponse.json({ error: "Lead nicht gefunden" }, { status: 404 });
   if (!lead.email) return NextResponse.json({ error: "Lead hat keine E-Mail-Adresse" }, { status: 400 });
 
+  // Nur für verifizierte Resend-Ventures (online_first, itaba)
+  // Alle anderen nutzen queue-mail → Hermes SMTP-Worker
+  if (!usesResend(lead.venture)) {
+    return NextResponse.json(
+      { error: `${lead.venture} nutzt die Hermes SMTP-Queue. Bitte queue-mail verwenden.` },
+      { status: 400 }
+    );
+  }
+
   const sender = getSender(lead.venture);
   const recipientName = `${lead.first_name} ${lead.last_name}`.trim();
 
-  // Resend erlaubt nur verifizierte Domains als from-Adresse.
-  // Falls die Venture-Domain (z.B. blazedoutfitters.com) noch nicht in Resend verifiziert
-  // ist, senden wir von info@onlinefirst.eu mit reply_to auf die richtige Adresse,
-  // damit Antworten trotzdem dort ankommen.
-  const isVerifiedDomain = sender.email.endsWith("@onlinefirst.eu");
-  const effectiveFrom  = isVerifiedDomain ? sender.email : "info@onlinefirst.eu";
-  const effectiveName  = sender.name;
-  const replyTo        = isVerifiedDomain ? undefined : sender.email;
-
   const resendRes = await sendMail(RESEND_API_KEY, {
-    from: `${effectiveName} <${effectiveFrom}>`,
+    from: `${sender.name} <${sender.email}>`,
     to: [recipientName ? `${recipientName} <${lead.email}>` : lead.email],
-    reply_to: replyTo,
     subject,
     text: body,
   });
@@ -50,7 +49,6 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!resendRes.ok) {
     let raw = "";
     try { raw = await resendRes.text(); } catch { /* ignore */ }
-    // Resend gibt JSON zurück: { name, message, statusCode } oder ähnlich
     let userMsg = `Resend ${resendRes.status}`;
     try {
       const parsed = JSON.parse(raw);
@@ -84,7 +82,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (updateError) {
     return NextResponse.json(
-      { error: `E-Mail wurde versendet, aber der Lead-Status konnte nicht aktualisiert werden: ${updateError.message}` },
+      { error: `E-Mail gesendet, Lead-Update fehlgeschlagen: ${updateError.message}` },
       { status: 500 }
     );
   }

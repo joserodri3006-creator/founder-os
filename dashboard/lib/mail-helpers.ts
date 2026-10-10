@@ -9,8 +9,16 @@ export const VENTURE_SENDERS: Record<string, { name: string; email: string }> = 
   worknest:          { name: "Worknest",              email: "info@onlinefirst.eu" },
 };
 
+// Ventures mit verifizierter Resend-Domain → direkt senden
+// Alle anderen → Hermes SMTP-Queue (lead_mail_worker.py)
+export const RESEND_VERIFIED_VENTURES = new Set(["online_first", "itaba"]);
+
 export function getSender(venture: string) {
   return VENTURE_SENDERS[venture] ?? VENTURE_SENDERS.online_first;
+}
+
+export function usesResend(venture: string): boolean {
+  return RESEND_VERIFIED_VENTURES.has(venture);
 }
 
 export async function sendMail(apiKey: string, payload: {
