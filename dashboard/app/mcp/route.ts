@@ -96,11 +96,11 @@ function createFounderServer(userId: string) {
 
 async function handle(req: Request) {
   const auth = req.headers.get("authorization") ?? "";
-  if (!auth.startsWith("Bearer ")) return new Response(JSON.stringify({ error: "Unauthorized", error_description: "Bearer token required" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": `Bearer resource_metadata="${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os.vercel.app")}/.well-known/oauth-protected-resource/mcp"` } });
+  if (!auth.startsWith("Bearer ")) return new Response(JSON.stringify({ error: "Unauthorized", error_description: "Bearer token required" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": `Bearer resource_metadata="${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os-theta.vercel.app").trim().replace(/\/+$/, "")}/.well-known/oauth-protected-resource/mcp"` } });
   try {
     await verifyAccessToken(auth.slice(7));
   } catch {
-    return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": `Bearer resource_metadata="${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os.vercel.app")}/.well-known/oauth-protected-resource/mcp"` } });
+    return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": `Bearer resource_metadata="${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os-theta.vercel.app").trim().replace(/\/+$/, "")}/.well-known/oauth-protected-resource/mcp"` } });
   }
 
   const token = auth.slice(7);

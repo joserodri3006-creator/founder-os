@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const ISSUER = process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os.vercel.app";
+const ISSUER = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os-theta.vercel.app").trim().replace(/\/+$/, "");
 
 export async function GET() {
   return NextResponse.json({

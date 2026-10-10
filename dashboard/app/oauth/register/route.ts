@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const issuer = process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os.vercel.app";
+  const issuer = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os-theta.vercel.app").trim().replace(/\/+$/, "");
   return NextResponse.json({
     client_id: clientId,
     client_name: body.client_name ?? "ChatGPT MCP Client",

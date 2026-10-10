@@ -2,7 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 
 export const DEFAULT_SCOPE = "leads:read leads:write stats:read";
-export const ISSUER = process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os.vercel.app";
+// Ohne abschliessenden Schrägstrich, egal wie die Variable in Vercel gesetzt ist (sonst entstehen "//oauth/token" und abweichende JWT-Issuer).
+export const ISSUER = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os-theta.vercel.app").trim().replace(/\/+$/, "");
 
 function secret() {
   const value = process.env.MCP_OAUTH_SECRET;
