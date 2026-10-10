@@ -222,11 +222,14 @@ export default function LeadsPage() {
 
       {/* ── Page Header ────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-7">
-        <div>
-          <h1 style={{ fontFamily: "var(--font-serif)", fontWeight: 300, fontSize: "28px", color: "#14193A", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
-            Lead Pipeline
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>{leads.length} Leads</p>
+        <div className="flex items-center gap-2.5">
+          <div>
+            <h1 style={{ fontFamily: "var(--font-serif)", fontWeight: 300, fontSize: "28px", color: "#14193A", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+              Lead Pipeline
+            </h1>
+            <p className="text-sm mt-0.5" style={{ color: "#6B7280" }}>{leads.length} Leads</p>
+          </div>
+          <PipelineInfoTooltip />
         </div>
         <div className="flex items-center gap-2.5 flex-wrap justify-end">
 
@@ -974,5 +977,240 @@ function DeleteConfirm({ name, onConfirm, onCancel }: {
         </div>
       </div>
     </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pipeline-Prozess-Tooltip — Dokumentation Lead → Kunde
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const PIPELINE_STEPS: {
+  status: string;
+  label: string;
+  dot: string;
+  aktion: string;
+  automatisch?: boolean;
+  hinweis?: string;
+}[] = [
+  {
+    status: "neu",
+    label: "Neu",
+    dot: "#3A5BA0",
+    aktion: "Lead eingegangen (manuell, CSV, KI-Suche oder Website). Review-Status setzen, Kontaktweg prüfen.",
+  },
+  {
+    status: "in_bearbeitung",
+    label: "In Bearbeitung",
+    dot: "#C8A96E",
+    aktion: "KI-Entwurf wurde erstellt. Mail noch nicht gesendet — Entwurf prüfen und freigeben.",
+    hinweis: "Blazed-Outreach-Leads landen oft hier, da der B2B-Agent Drafts vorformuliert.",
+  },
+  {
+    status: "kontaktiert",
+    label: "Kontaktiert",
+    dot: "#C8A96E",
+    aktion: "Erstkontakt wurde gesendet (Mail via Hermes/Resend). Automatisch gesetzt nach Mailversand.",
+    automatisch: true,
+  },
+  {
+    status: "follow_up",
+    label: "Follow-up",
+    dot: "#EA580C",
+    aktion: "Keine Antwort nach 5 Tagen — Follow-up-Mail gesendet. Follow-up-Datum wird automatisch auf +5 Tage gesetzt.",
+    automatisch: true,
+  },
+  {
+    status: "nachgefasst",
+    label: "Nachgefasst",
+    dot: "#EA580C",
+    aktion: "Zweite Nachfass-Mail versendet. Letzter aktiver Kontaktversuch vor Entscheidung.",
+    automatisch: true,
+  },
+  {
+    status: "erstgespraech",
+    label: "Erstgespräch",
+    dot: "#4F46E5",
+    aktion: "Lead hat geantwortet — erstes Gespräch vereinbart oder geführt. Manuell setzen.",
+  },
+  {
+    status: "qualifiziert",
+    label: "Qualifiziert",
+    dot: "#1B2A5E",
+    aktion: "Bedarf und Fit bestätigt. Lead ist bereit für konkretes Angebot.",
+  },
+  {
+    status: "sales_gespraech",
+    label: "Sales-Gespräch",
+    dot: "#0E7490",
+    aktion: "Detailliertes Verkaufsgespräch geführt. Konditionen besprochen.",
+  },
+  {
+    status: "angebot_gesendet",
+    label: "Angebot gesendet",
+    dot: "#BE185D",
+    aktion: "Konkretes Angebot/Preisliste an Lead gesendet. Auf Entscheidung warten.",
+  },
+  {
+    status: "gewonnen",
+    label: "Gewonnen ✓",
+    dot: "#16A34A",
+    aktion: "Lead hat zugesagt. Manuell als Kunden in der Kundenverwaltung anlegen (CRM → Kunden → Neu).",
+    hinweis: "Kein automatischer Kunden-Transfer — Kundendatensatz muss manuell angelegt werden.",
+  },
+  {
+    status: "nachfassen_zukunft",
+    label: "Nachfassen (Zukunft)",
+    dot: "#9CA3AF",
+    aktion: "Lead ist aktuell nicht interessiert, aber offen für später. Parkplatz-Status — Follow-up-Datum setzen.",
+  },
+  {
+    status: "verloren",
+    label: "Verloren",
+    dot: "#DC2626",
+    aktion: "Lead hat abgesagt oder reagiert dauerhaft nicht. In Tabelle ans Ende verschoben.",
+  },
+];
+
+function PipelineInfoTooltip() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center justify-center rounded-full transition-colors shrink-0"
+        style={{
+          width: "22px", height: "22px",
+          background: "#EEF0F7",
+          border: "1px solid #D1D5E8",
+          color: "#6B7280",
+          fontSize: "12px",
+          fontWeight: 700,
+          lineHeight: 1,
+          cursor: "pointer",
+          marginTop: "4px",
+        }}
+        onMouseEnter={e => { (e.currentTarget.style.background = "#1B2A5E"); (e.currentTarget.style.color = "#fff"); }}
+        onMouseLeave={e => { (e.currentTarget.style.background = "#EEF0F7"); (e.currentTarget.style.color = "#6B7280"); }}
+        title="Pipeline-Prozess anzeigen"
+      >
+        ?
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50 p-4"
+          style={{ background: "rgba(20,25,58,0.55)", backdropFilter: "blur(4px)" }}
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl"
+            style={{ background: "#FFFFFF", boxShadow: "0 24px 64px rgba(27,42,94,0.28)", border: "1px solid #D1D5E8" }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid #EEF0F7" }}>
+              <div>
+                <h2 style={{ fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: "20px", color: "#14193A" }}>
+                  Lead → Kunde: Prozess & Statusübergänge
+                </h2>
+                <p className="text-xs mt-0.5" style={{ color: "#9CA3AF" }}>
+                  Alle Statuswechsel · automatische Aktionen · manuelle Schritte
+                </p>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                style={{ color: "#9CA3AF", fontSize: "22px", lineHeight: 1, background: "none", border: "none", cursor: "pointer" }}
+              >×</button>
+            </div>
+
+            {/* Legende */}
+            <div className="px-6 pt-4 pb-2 flex gap-4 flex-wrap">
+              <span className="flex items-center gap-1.5 text-xs" style={{ color: "#6B7280" }}>
+                <span className="rounded px-2 py-0.5 text-[10px] font-semibold" style={{ background: "rgba(22,163,74,.12)", color: "#15803D" }}>Auto</span>
+                Automatisch nach Mailversand
+              </span>
+              <span className="flex items-center gap-1.5 text-xs" style={{ color: "#6B7280" }}>
+                <span className="rounded px-2 py-0.5 text-[10px] font-semibold" style={{ background: "#EEF0F7", color: "#1B2A5E" }}>Manuell</span>
+                Per Dropdown oder Swipe setzen
+              </span>
+            </div>
+
+            {/* Schritte */}
+            <div className="px-6 pb-6 pt-2">
+              <div className="relative">
+                {/* Verbindungslinie */}
+                <div
+                  className="absolute left-[9px] top-4 bottom-4"
+                  style={{ width: "2px", background: "linear-gradient(to bottom, #EEF0F7, #D1D5E8)" }}
+                />
+
+                <div className="space-y-0">
+                  {PIPELINE_STEPS.map((step, i) => (
+                    <div key={step.status} className="flex gap-4 relative">
+                      {/* Dot */}
+                      <div className="shrink-0 pt-3.5 z-10">
+                        <div
+                          className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                          style={{ background: "#FFFFFF", borderColor: step.dot }}
+                        >
+                          <div className="w-2 h-2 rounded-full" style={{ background: step.dot }} />
+                        </div>
+                      </div>
+
+                      {/* Inhalt */}
+                      <div className="flex-1 py-3" style={{ borderBottom: i < PIPELINE_STEPS.length - 1 ? "1px solid #F7F8FC" : "none" }}>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-sm font-semibold" style={{ color: "#14193A" }}>{step.label}</span>
+                          {step.automatisch && (
+                            <span className="rounded px-2 py-0.5 text-[10px] font-semibold" style={{ background: "rgba(22,163,74,.12)", color: "#15803D" }}>
+                              Auto
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs leading-relaxed" style={{ color: "#6B7280" }}>{step.aktion}</p>
+                        {step.hinweis && (
+                          <p className="text-xs mt-1 italic" style={{ color: "#C8A96E" }}>ℹ {step.hinweis}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mail-Versand-Erklärung */}
+              <div
+                className="mt-5 rounded-xl p-4 text-xs space-y-1.5"
+                style={{ background: "#F7F8FC", border: "1px solid #E5E7F0" }}
+              >
+                <p className="font-semibold" style={{ color: "#14193A" }}>📬 Automatische Status-Übergänge nach Mailversand</p>
+                <div className="space-y-1" style={{ color: "#6B7280" }}>
+                  <p>neu / in_bearbeitung → <strong style={{ color: "#14193A" }}>kontaktiert</strong></p>
+                  <p>kontaktiert → <strong style={{ color: "#14193A" }}>follow_up</strong> (Follow-up-Datum: +5 Tage)</p>
+                  <p>follow_up → <strong style={{ color: "#14193A" }}>nachgefasst</strong></p>
+                  <p className="pt-1" style={{ color: "#9CA3AF" }}>
+                    Gilt für Blazed (Hermes SMTP-Queue) und Online First/Itaba (Resend direkt).
+                    follow_up und nachgefasst können nicht manuell per Dropdown gesetzt werden — nur via Mailversand.
+                  </p>
+                </div>
+              </div>
+
+              {/* Gewonnen-Hinweis */}
+              <div
+                className="mt-3 rounded-xl p-4 text-xs"
+                style={{ background: "rgba(22,163,74,.06)", border: "1px solid rgba(22,163,74,.2)" }}
+              >
+                <p className="font-semibold mb-1" style={{ color: "#15803D" }}>✓ Lead gewonnen → Kunden anlegen</p>
+                <p style={{ color: "#374151" }}>
+                  Status auf <strong>Gewonnen</strong> setzen, dann manuell unter{" "}
+                  <strong>CRM → Kunden → Neuer Kunde</strong> anlegen.
+                  Der Lead-Datensatz bleibt erhalten (Aktivitäten, Mails, Notizen).
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
