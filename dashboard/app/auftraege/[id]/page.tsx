@@ -48,6 +48,11 @@ interface Order {
   invoice_generated_at: string | null;
   invoice_html: string | null;
   invoice_data: { delivery_method?: string } | null;
+  payment_status: string | null;
+  reserved_at: string | null;
+  reservation_expires_at: string | null;
+  paid_at: string | null;
+  picked_up_at: string | null;
   payment_model_id: string | null;
   payment_steps: PaymentStep[];
   pickup_ready: boolean;
@@ -75,6 +80,7 @@ interface Activity {
 
 const STATUS_LABELS: Record<string, string> = {
   neu: "Neu",
+  reserviert: "Reserviert",
   bezahlt: "Bezahlt",
   briefing: "Briefing",
   in_bearbeitung: "In Bearbeitung",
@@ -90,6 +96,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   neu: "bg-blue-100 text-blue-700",
+  reserviert: "bg-amber-100 text-amber-700",
   bezahlt: "bg-emerald-100 text-emerald-700",
   briefing: "bg-cyan-100 text-cyan-700",
   in_bearbeitung: "bg-yellow-100 text-yellow-700",
@@ -104,7 +111,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 // Visuelle Reihenfolge der Status-Timeline
-const STATUS_TIMELINE = ["neu", "briefing", "in_bearbeitung", "in_produktion", "versendet", "review", "abgeschlossen", "nachbetreuung"];
+const STATUS_TIMELINE = ["neu", "reserviert", "briefing", "in_bearbeitung", "in_produktion", "versendet", "review", "abgeschlossen", "nachbetreuung"];
 
 const ACTIVITY_COLORS: Record<string, string> = {
   status_change: "bg-blue-100 text-blue-700",
@@ -155,6 +162,8 @@ export default function AuftragDetailPage() {
   // Itaba: Abholbereit markieren (B2C Abholung)
   const [pickupReadySaving, setPickupReadySaving] = useState(false);
   const [pickupReadyMsg, setPickupReadyMsg] = useState<string | null>(null);
+  const [pickupCompleteSaving, setPickupCompleteSaving] = useState(false);
+  const [pickupCompleteMsg, setPickupCompleteMsg] = useState<string | null>(null);
 
   // Itaba: B2B-Bestellung bestätigen (Rechnung erst bei Bestätigung)
   const [b2bConfirmSaving, setB2bConfirmSaving] = useState(false);
@@ -472,6 +481,30 @@ export default function AuftragDetailPage() {
                 >
                   {pickupReadySaving ? "…" : "Als abholbereit markieren + Kunde benachrichtigen"}
                 </button>
+              )}
+              {order.status === "reserviert" && order.payment_status !== "bezahlt" && (
+                <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+                  <p className="text-xs text-amber-700">
+                    Zahlung offen · Reservierung bis {order.reservation_expires_at ? new Date(order.reservation_expires_at).toLocaleDateString("de-DE") : "—"}
+                  </p>
+                  {pickupCompleteMsg && <div className="text-xs px-3 py-2 rounded-md bg-blue-50 text-blue-700">{pickupCompleteMsg}</div>}
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Zahlung erhalten und Abholung abschließen? Die Rechnung wird danach erzeugt und versendet.")) return;
+                      setPickupCompleteSaving(true);
+                      setPickupCompleteMsg(null);
+                      const res = await fetch(`/api/auftraege/${id}/complete-pickup`, { method: "POST" });
+                      const data = await res.json();
+                      setPickupCompleteMsg(res.ok ? (data.already_paid ? "Bereits als bezahlt erfasst." : "Zahlung erfasst, Bestellung abgeschlossen und Rechnung versendet.") : (data.error ?? "Fehler beim Abschluss"));
+                      if (res.ok) await reload();
+                      setPickupCompleteSaving(false);
+                    }}
+                    disabled={pickupCompleteSaving}
+                    className="text-sm px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  >
+                    {pickupCompleteSaving ? "…" : "Zahlung erhalten + Abholung abschließen"}
+                  </button>
+                </div>
               )}
             </div>
           )}

@@ -18,6 +18,8 @@ interface Order {
   notes: string | null;
   archived_at: string | null;
   invoice_number: string | null;
+  payment_status: string | null;
+  reservation_expires_at: string | null;
   tracking_number: string | null;
   tracking_carrier: string | null;
   customer: {
@@ -31,6 +33,7 @@ interface Order {
 
 const STATUS_LABELS: Record<string, string> = {
   neu: "Neu",
+  reserviert: "Reserviert",
   briefing: "Briefing",
   in_bearbeitung: "In Bearbeitung",
   in_produktion: "In Produktion",
@@ -44,6 +47,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_DOT: Record<string, string> = {
   neu: "#3A5BA0",
+  reserviert: "#D97706",
   briefing: "#C8A96E",
   in_bearbeitung: "#C8A96E",
   in_produktion: "#1B2A5E",
@@ -57,6 +61,7 @@ const STATUS_DOT: Record<string, string> = {
 
 const STATUS_BG: Record<string, string> = {
   neu: "#EEF0F7",
+  reserviert: "#FEF3C7",
   briefing: "rgba(200,169,110,0.12)",
   in_bearbeitung: "rgba(200,169,110,0.12)",
   in_produktion: "#EEF0F7",
@@ -70,6 +75,7 @@ const STATUS_BG: Record<string, string> = {
 
 const STATUS_TEXT: Record<string, string> = {
   neu: "#1B2A5E",
+  reserviert: "#92400E",
   briefing: "#A07840",
   in_bearbeitung: "#A07840",
   in_produktion: "#14193A",
@@ -80,6 +86,13 @@ const STATUS_TEXT: Record<string, string> = {
   pausiert: "#374151",
   angebot_gesendet: "#C2410C",
 };
+
+function isReservationOverdue(order: Pick<Order, "status" | "payment_status" | "reservation_expires_at">) {
+  return order.status === "reserviert"
+    && order.payment_status === "offen"
+    && !!order.reservation_expires_at
+    && new Date(order.reservation_expires_at).getTime() < Date.now();
+}
 
 type Modal =
   | { type: "edit"; id: string }
@@ -314,6 +327,11 @@ export default function AuftraegePage() {
                       />
                       {STATUS_LABELS[o.status] ?? o.status}
                     </span>
+                    {isReservationOverdue(o) && (
+                      <span className="ml-2 inline-flex items-center text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-red-100 text-red-700">
+                        Überfällig
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3.5 text-sm" style={{ color: "#6B7280" }}>{o.package_type ?? "—"}</td>
                   <td className="px-4 py-3.5 text-sm font-semibold" style={{ color: "#14193A" }}>
