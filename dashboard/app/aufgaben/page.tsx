@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useVenture } from "@/context/VentureContext";
 import TasksPipeline, { type PipelineTask } from "@/components/TasksPipeline";
-import TasksList, { type ListTask, STATUS_LABELS } from "@/components/TasksList";
+import TasksList, { type ListTask, STATUS_LABELS, ChecklistEditor } from "@/components/TasksList";
 
 interface Task {
   id: string;
@@ -22,6 +22,9 @@ interface Task {
   entity_company: string | null;
   entity_href: string | null;
   created_at: string;
+  recurrence_rule: "daily" | "weekly" | "monthly" | "yearly" | null;
+  recurrence_end_date: string | null;
+  checklist: { id: string; text: string; done: boolean }[];
 }
 
 interface TeamMember { user_id: string; name: string; }
@@ -326,6 +329,9 @@ function NewTaskForm({ venture, members, onDone, onCancel }: {
   const [priority, setPriority] = useState<Task["priority"]>("medium");
   const [dueDate, setDueDate] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
+  const [recurrenceRule, setRecurrenceRule] = useState("");
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
+  const [checklist, setChecklist] = useState<{ id: string; text: string; done: boolean }[]>([]);
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -337,6 +343,7 @@ function NewTaskForm({ venture, members, onDone, onCancel }: {
       body: JSON.stringify({
         venture, entity_type: "lead", entity_id: FREE_TASK_ENTITY_ID,
         title, description: description || null, priority, due_date: dueDate || null, assigned_to: assignedTo || null,
+        recurrence_rule: recurrenceRule || null, recurrence_end_date: recurrenceEndDate || null, checklist,
       }),
     });
     setSaving(false);
@@ -367,7 +374,15 @@ function NewTaskForm({ venture, members, onDone, onCancel }: {
           <option value="">Nicht zugewiesen</option>
           {members.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
         </select>
+        <select value={recurrenceRule} onChange={e => setRecurrenceRule(e.target.value)}
+          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white flex-1 min-w-[150px]">
+          <option value="">Keine Wiederholung</option><option value="daily">Täglich</option><option value="weekly">Wöchentlich</option>
+          <option value="monthly">Monatlich</option><option value="yearly">Jährlich</option>
+        </select>
+        {recurrenceRule && <input type="date" value={recurrenceEndDate} onChange={e => setRecurrenceEndDate(e.target.value)}
+          title="Wiederholung endet am" className="text-sm border border-gray-200 rounded-md px-2 py-1.5 flex-1 min-w-[130px]" />}
       </div>
+      <ChecklistEditor items={checklist} onChange={setChecklist} />
       <div className="flex gap-2">
         <button onClick={save} disabled={saving || !title.trim()}
           className="text-sm px-3 py-1.5 rounded-md text-white font-medium disabled:opacity-40" style={{ background: "#1B2A5E" }}>

@@ -26,6 +26,9 @@ export interface ListTask {
   entity_company: string | null;
   entity_href: string | null;
   created_at: string;
+  recurrence_rule: "daily" | "weekly" | "monthly" | "yearly" | null;
+  recurrence_end_date: string | null;
+  checklist: { id: string; text: string; done: boolean }[];
 }
 
 interface TeamMember { user_id: string; name: string; }
@@ -191,6 +194,12 @@ function SortableTaskRow({ task, assigneeName, onStatusChange, onEdit, onCopy, o
           </span>
         )}
 
+        {task.checklist?.length > 0 && (
+          <span className="text-xs text-gray-500 shrink-0">
+            ✓ {task.checklist.filter(item => item.done).length}/{task.checklist.length}
+          </span>
+        )}
+        {task.recurrence_rule && <span className="text-xs text-blue-600 shrink-0" title="Wiederkehrende Aufgabe">↻</span>}
         {assigneeName && <span className="text-xs text-gray-500 shrink-0">· {assigneeName}</span>}
       </div>
 
@@ -224,6 +233,9 @@ function TaskEditForm({ task, members, onDone, onCancel }: {
   const [priority, setPriority] = useState<ListTask["priority"]>(task.priority);
   const [dueDate, setDueDate] = useState(task.due_date ?? "");
   const [assignedTo, setAssignedTo] = useState(task.assigned_to ?? "");
+  const [recurrenceRule, setRecurrenceRule] = useState(task.recurrence_rule ?? "");
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState(task.recurrence_end_date ?? "");
+  const [checklist, setChecklist] = useState(task.checklist ?? []);
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -234,6 +246,7 @@ function TaskEditForm({ task, members, onDone, onCancel }: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title, description: description || null, priority, due_date: dueDate || null, assigned_to: assignedTo || null,
+        recurrence_rule: recurrenceRule || null, recurrence_end_date: recurrenceEndDate || null, checklist,
       }),
     });
     setSaving(false);
@@ -264,7 +277,16 @@ function TaskEditForm({ task, members, onDone, onCancel }: {
           <option value="">Nicht zugewiesen</option>
           {members.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
         </select>
+        <select value={recurrenceRule} onChange={e => setRecurrenceRule(e.target.value as typeof recurrenceRule)}
+          className="text-sm border border-gray-200 rounded-md px-2 py-1.5 bg-white flex-1 min-w-[150px]">
+          <option value="">Keine Wiederholung</option>
+          <option value="daily">Täglich</option><option value="weekly">Wöchentlich</option>
+          <option value="monthly">Monatlich</option><option value="yearly">Jährlich</option>
+        </select>
+        {recurrenceRule && <input type="date" value={recurrenceEndDate} onChange={e => setRecurrenceEndDate(e.target.value)}
+          title="Wiederholung endet am" className="text-sm border border-gray-200 rounded-md px-2 py-1.5 flex-1 min-w-[130px]" />}
       </div>
+      <ChecklistEditor items={checklist} onChange={setChecklist} />
       <div className="flex gap-2">
         <button onClick={save} disabled={saving || !title.trim()}
           className="text-sm px-3 py-1.5 rounded-md text-white font-medium disabled:opacity-40" style={{ background: "#1B2A5E" }}>
@@ -274,6 +296,25 @@ function TaskEditForm({ task, members, onDone, onCancel }: {
           Abbrechen
         </button>
       </div>
+    </div>
+  );
+}
+
+export function ChecklistEditor({ items, onChange }: {
+  items: { id: string; text: string; done: boolean }[];
+  onChange: (items: { id: string; text: string; done: boolean }[]) => void;
+}) {
+  function addItem() { onChange([...items, { id: crypto.randomUUID(), text: "", done: false }]); }
+  return (
+    <div className="mb-3 rounded-md border border-gray-100 bg-gray-50 p-2">
+      <div className="flex items-center justify-between mb-1"><span className="text-xs font-medium text-gray-600">Checkliste</span>
+        <button type="button" onClick={addItem} className="text-xs text-blue-600">+ Punkt</button></div>
+      {items.map((item, index) => <div key={item.id} className="flex items-center gap-2 mb-1">
+        <input type="checkbox" checked={item.done} onChange={e => onChange(items.map((x, i) => i === index ? { ...x, done: e.target.checked } : x))} />
+        <input value={item.text} placeholder="Checklistenpunkt" onChange={e => onChange(items.map((x, i) => i === index ? { ...x, text: e.target.value } : x))}
+          className="flex-1 text-xs border border-gray-200 rounded px-2 py-1" />
+        <button type="button" onClick={() => onChange(items.filter((_, i) => i !== index))} className="text-xs text-gray-400">×</button>
+      </div>)}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, type CSSProperties } from "react";
+import { ChecklistEditor } from "@/components/TasksList";
 import { useAuth } from "@/context/AuthContext";
 import { VENTURES } from "@/lib/ventures";
 
@@ -13,6 +14,9 @@ interface Task {
   assigned_to: string | null;
   venture: string;
   created_at: string;
+  recurrence_rule: "daily" | "weekly" | "monthly" | "yearly" | null;
+  recurrence_end_date: string | null;
+  checklist: { id: string; text: string; done: boolean }[];
 }
 
 interface TeamMember {
@@ -223,6 +227,9 @@ function TaskForm({ mode, initial, venture, entityType, entityId, members, onDon
   const [priority, setPriority] = useState<Task["priority"]>(initial?.priority ?? "medium");
   const [dueDate, setDueDate] = useState(initial?.due_date ?? "");
   const [assignedTo, setAssignedTo] = useState(initial?.assigned_to ?? "");
+  const [recurrenceRule, setRecurrenceRule] = useState(initial?.recurrence_rule ?? "");
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState(initial?.recurrence_end_date ?? "");
+  const [checklist, setChecklist] = useState(initial?.checklist ?? []);
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -235,6 +242,7 @@ function TaskForm({ mode, initial, venture, entityType, entityId, members, onDon
         body: JSON.stringify({
           venture, entity_type: entityType, entity_id: entityId,
           title, description: description || null, priority, due_date: dueDate || null, assigned_to: assignedTo || null,
+          recurrence_rule: recurrenceRule || null, recurrence_end_date: recurrenceEndDate || null, checklist,
         }),
       });
     } else if (initial) {
@@ -243,6 +251,7 @@ function TaskForm({ mode, initial, venture, entityType, entityId, members, onDon
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title, description: description || null, priority, due_date: dueDate || null, assigned_to: assignedTo || null,
+          recurrence_rule: recurrenceRule || null, recurrence_end_date: recurrenceEndDate || null, checklist,
         }),
       });
     }
@@ -270,7 +279,13 @@ function TaskForm({ mode, initial, venture, entityType, entityId, members, onDon
           <option value="">Nicht zugewiesen</option>
           {members.map(m => <option key={m.user_id} value={m.user_id}>{m.name}</option>)}
         </select>
+        <select value={recurrenceRule} onChange={e => setRecurrenceRule(e.target.value)} style={{ ...fieldStyle, flex: "1 1 150px" }}>
+          <option value="">Keine Wiederholung</option><option value="daily">Täglich</option><option value="weekly">Wöchentlich</option>
+          <option value="monthly">Monatlich</option><option value="yearly">Jährlich</option>
+        </select>
+        {recurrenceRule && <input type="date" value={recurrenceEndDate} onChange={e => setRecurrenceEndDate(e.target.value)} style={{ ...fieldStyle, flex: "1 1 130px" }} />}
       </div>
+      <ChecklistEditor items={checklist} onChange={setChecklist} />
       <div style={{ display: "flex", gap: "8px" }}>
         <button onClick={save} disabled={saving || !title.trim()}
           style={{ background: "#1B2A5E", color: "#fff", border: "none", borderRadius: "6px", padding: "7px 16px", fontSize: "13px", cursor: "pointer", fontWeight: 500, opacity: (saving || !title.trim()) ? 0.6 : 1 }}>

@@ -9,7 +9,11 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get("status");
   const assigned_to = searchParams.get("assigned_to");
 
-  let query = supabaseAdmin.from("tasks").select("*").order("due_date", { ascending: true, nullsFirst: false });
+  let query = supabaseAdmin
+    .from("tasks")
+    .select("*")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false });
   if (venture) query = query.eq("venture", venture);
   if (entity_type) query = query.eq("entity_type", entity_type);
   if (entity_id) query = query.eq("entity_id", entity_id);
@@ -54,7 +58,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { venture, entity_type, entity_id, title, description, priority, due_date, assigned_to } = body;
+  const { venture, entity_type, entity_id, title, description, priority, due_date, assigned_to, recurrence_rule, recurrence_end_date, checklist } = body;
 
   if (!venture || !entity_type || !entity_id || !title?.trim()) {
     return NextResponse.json({ error: "venture, entity_type, entity_id und title erforderlich" }, { status: 400 });
@@ -63,14 +67,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "entity_type muss lead oder customer sein" }, { status: 400 });
   }
 
-  const { data: maxRow } = await supabaseAdmin
+  const { data: minRow } = await supabaseAdmin
     .from("tasks")
     .select("sort_order")
     .eq("venture", venture)
-    .order("sort_order", { ascending: false })
+    .order("sort_order", { ascending: true })
     .limit(1)
     .maybeSingle();
-  const nextSortOrder = (maxRow?.sort_order ?? -1) + 1;
+  const nextSortOrder = (minRow?.sort_order ?? 0) - 1;
 
   const { data, error } = await supabaseAdmin
     .from("tasks")
@@ -83,6 +87,9 @@ export async function POST(req: NextRequest) {
       priority: priority || "medium",
       due_date: due_date || null,
       assigned_to: assigned_to || null,
+      recurrence_rule: recurrence_rule || null,
+      recurrence_end_date: recurrence_end_date || null,
+      checklist: Array.isArray(checklist) ? checklist : [],
       sort_order: nextSortOrder,
     })
     .select()

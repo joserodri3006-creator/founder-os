@@ -19,14 +19,14 @@ export async function POST(_req: NextRequest, { params }: Params) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { id: _id, created_at, updated_at, completed_at, status, title, created_by, sort_order, ...rest } = original;
 
-  const { data: maxRow } = await supabaseAdmin
+  const { data: minRow } = await supabaseAdmin
     .from("tasks")
     .select("sort_order")
     .eq("venture", original.venture)
-    .order("sort_order", { ascending: false })
+    .order("sort_order", { ascending: true })
     .limit(1)
     .maybeSingle();
-  const nextSortOrder = (maxRow?.sort_order ?? -1) + 1;
+  const nextSortOrder = (minRow?.sort_order ?? 0) - 1;
 
   const { data: inserted, error: insertError } = await supabaseAdmin
     .from("tasks")
