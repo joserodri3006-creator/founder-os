@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function POST(_req: NextRequest, { params }: Params) {
+export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const siteUrl = process.env.ITABA_SITE_URL;
   const secret = process.env.B2B_ORDER_CONFIRM_SECRET;
@@ -18,12 +18,20 @@ export async function POST(_req: NextRequest, { params }: Params) {
   }
   if (order.payment_status === "bezahlt") return NextResponse.json({ success: true, already_paid: true });
 
+  const body = await req.json().catch(() => ({}));
   const res = await fetch(`${siteUrl}/api/bestellung/${id}/complete-pickup`, {
     method: "POST",
     headers: { "x-internal-secret": secret, "Content-Type": "application/json" },
-    body: JSON.stringify({}),
+    body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) return NextResponse.json({ error: data.error ?? "Abschluss bei Itaba fehlgeschlagen" }, { status: res.status });
+  if (res.ok) {
+    await supabaseAdmin.from("order_activities").insert({
+      order_id: id,
+      activity_type: "pickup_completed_offline",
+      description: `Vor-Ort-Kauf offline an der Kasse zugeordnet (${body?.offline_payment_method ?? "sonstige"}${body?.offline_payment_reference ? `, Beleg ${body.offline_payment_reference}` : ""}). Keine Online-Rechnung erzeugt.`,
+    });
+  }
   return NextResponse.json(data);
 }

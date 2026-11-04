@@ -164,6 +164,8 @@ export default function AuftragDetailPage() {
   const [pickupReadyMsg, setPickupReadyMsg] = useState<string | null>(null);
   const [pickupCompleteSaving, setPickupCompleteSaving] = useState(false);
   const [pickupCompleteMsg, setPickupCompleteMsg] = useState<string | null>(null);
+  const [offlinePaymentMethod, setOfflinePaymentMethod] = useState<"bar" | "karte" | "sonstige">("karte");
+  const [offlinePaymentReference, setOfflinePaymentReference] = useState("");
 
   // Itaba: B2B-Bestellung bestätigen (Rechnung erst bei Bestätigung)
   const [b2bConfirmSaving, setB2bConfirmSaving] = useState(false);
@@ -487,22 +489,35 @@ export default function AuftragDetailPage() {
                   <p className="text-xs text-amber-700">
                     Zahlung offen · Reservierung bis {order.reservation_expires_at ? new Date(order.reservation_expires_at).toLocaleDateString("de-DE") : "—"}
                   </p>
+                  <p className="text-xs text-gray-500">Der Verkauf erfolgt offline über die Kasse. Hier wird nur die Zuordnung dokumentiert; es wird keine Online-Rechnung erzeugt.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <select value={offlinePaymentMethod} onChange={e => setOfflinePaymentMethod(e.target.value as "bar" | "karte" | "sonstige")} className="text-sm border border-gray-200 rounded-md px-3 py-1.5 bg-white">
+                      <option value="karte">Karte</option>
+                      <option value="bar">Bar</option>
+                      <option value="sonstige">Sonstige</option>
+                    </select>
+                    <input value={offlinePaymentReference} onChange={e => setOfflinePaymentReference(e.target.value)} placeholder="Kassenbeleg-Nr. (optional)" className="text-sm border border-gray-200 rounded-md px-3 py-1.5" />
+                  </div>
                   {pickupCompleteMsg && <div className="text-xs px-3 py-2 rounded-md bg-blue-50 text-blue-700">{pickupCompleteMsg}</div>}
                   <button
                     onClick={async () => {
-                      if (!confirm("Zahlung erhalten und Abholung abschließen? Die Rechnung wird danach erzeugt und versendet.")) return;
+                      if (!confirm("Offline-Kauf an der Kasse als bezahlt zuordnen und Reservierung abschließen? Es wird keine Online-Rechnung erzeugt.")) return;
                       setPickupCompleteSaving(true);
                       setPickupCompleteMsg(null);
-                      const res = await fetch(`/api/auftraege/${id}/complete-pickup`, { method: "POST" });
+                      const res = await fetch(`/api/auftraege/${id}/complete-pickup`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ offline_payment_method: offlinePaymentMethod, offline_payment_reference: offlinePaymentReference || undefined }),
+                      });
                       const data = await res.json();
-                      setPickupCompleteMsg(res.ok ? (data.already_paid ? "Bereits als bezahlt erfasst." : "Zahlung erfasst, Bestellung abgeschlossen und Rechnung versendet.") : (data.error ?? "Fehler beim Abschluss"));
+                      setPickupCompleteMsg(res.ok ? (data.already_paid ? "Bereits als bezahlt erfasst." : "Offline-Kauf zugeordnet, Reservierung abgeschlossen und Bestand bleibt als abgegangen geführt.") : (data.error ?? "Fehler beim Abschluss"));
                       if (res.ok) await reload();
                       setPickupCompleteSaving(false);
                     }}
                     disabled={pickupCompleteSaving}
                     className="text-sm px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 disabled:opacity-50 transition-colors"
                   >
-                    {pickupCompleteSaving ? "…" : "Zahlung erhalten + Abholung abschließen"}
+                    {pickupCompleteSaving ? "…" : "Offline-Kauf zuordnen + Abholung abschließen"}
                   </button>
                 </div>
               )}
