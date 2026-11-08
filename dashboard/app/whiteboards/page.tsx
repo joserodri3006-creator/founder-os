@@ -191,6 +191,7 @@ export default function WhiteboardsPage() {
   const [fullscreenBoard, setFullscreenBoard] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
   const activeBoardRef = useRef<HTMLElement | null>(null);
+  const snapshotsRef = useRef<Record<string, unknown>>({});
 
   useEffect(() => {
     try {
@@ -302,13 +303,17 @@ export default function WhiteboardsPage() {
   }
 
   async function saveSnapshot(board: Board, content: unknown) {
-    setBoards((current) => current.map((item) => item.boardId === board.boardId ? { ...item, content } : item));
+    snapshotsRef.current[board.boardId] = content;
     if (!board.persisted) return;
-    await fetch(`/api/whiteboards/${board.boardId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
+    try {
+      await fetch(`/api/whiteboards/${board.boardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+    } catch {
+      setStorageNotice("Board geladen, letzte Änderung konnte nicht gespeichert werden.");
+    }
   }
 
   async function saveLinks(board: Board, taskIds: string[]) {
@@ -324,7 +329,8 @@ export default function WhiteboardsPage() {
   }
 
   function exportBoard(board: Board) {
-    const blob = new Blob([JSON.stringify({ format: "founder-os-whiteboard", version: 1, board }, null, 2)], { type: "application/json" });
+    const exportData = { ...board, content: snapshotsRef.current[board.boardId] ?? board.content };
+    const blob = new Blob([JSON.stringify({ format: "founder-os-whiteboard", version: 1, board: exportData }, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
