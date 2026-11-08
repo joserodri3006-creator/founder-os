@@ -99,11 +99,11 @@ export default function EditAuftragModal({ auftragId, onClose, onSaved }: Props)
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       style={{ background: "rgba(20,25,58,0.5)", backdropFilter: "blur(4px)" }}
     >
       <div
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl"
+        className="w-full max-h-[100dvh] overflow-y-auto rounded-t-2xl sm:max-w-lg sm:max-h-[90dvh] sm:rounded-2xl"
         style={{
           background: "#FFFFFF",
           boxShadow: "0 20px 56px rgba(27,42,94,0.24)",
@@ -137,7 +137,7 @@ export default function EditAuftragModal({ auftragId, onClose, onSaved }: Props)
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label style={labelStyle}>Status</label>
               <select
@@ -164,7 +164,7 @@ export default function EditAuftragModal({ auftragId, onClose, onSaved }: Props)
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label style={labelStyle}>Deadline</label>
               <input

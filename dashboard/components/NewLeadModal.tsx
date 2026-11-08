@@ -96,8 +96,8 @@ export default function NewLeadModal({ onClose, onCreated }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-0 sm:items-center sm:p-4">
+      <div className="max-h-[100dvh] w-full overflow-y-auto rounded-t-xl bg-white shadow-xl sm:max-h-[90dvh] sm:max-w-lg sm:rounded-xl">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="font-semibold text-gray-900">Neuer Lead</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
@@ -105,25 +105,25 @@ export default function NewLeadModal({ onClose, onCreated }: Props) {
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           {/* Pflichtfelder */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Vorname *" value={form.first_name} onChange={(v) => set("first_name", v)} />
             <Field label="Nachname *" value={form.last_name} onChange={(v) => set("last_name", v)} />
           </div>
           <Field label="E-Mail *" type="email" value={form.email} onChange={(v) => set("email", v)} />
 
           {/* Optionale Felder */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Telefon" value={form.phone} onChange={(v) => set("phone", v)} />
             <Field label="Firma" value={form.company_name} onChange={(v) => set("company_name", v)} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Website" value={form.website} onChange={(v) => set("website", v)} />
             <Field label="Stadt" value={form.city} onChange={(v) => set("city", v)} />
           </div>
           <Field label="Branche" value={form.industry} onChange={(v) => set("industry", v)} />
 
           {/* Dropdowns */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Quelle</label>
               <select

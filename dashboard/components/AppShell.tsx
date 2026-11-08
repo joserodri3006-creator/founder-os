@@ -3,12 +3,16 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import { useVenture } from "@/context/VentureContext";
+import { getVenture } from "@/lib/ventures";
 
 const SHELL_FREE_PATHS = ["/login", "/invite", "/auth", "/online-first", "/brandary", "/bewerten"];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const { venture } = useVenture();
+  const activeVenture = getVenture(venture);
 
   const isAuthPage = SHELL_FREE_PATHS.some((p) => pathname?.startsWith(p));
 
@@ -17,7 +21,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-[100dvh] min-h-[100dvh] overflow-hidden">
       {/* Backdrop for mobile sidebar */}
       {mobileOpen && (
         <div
@@ -35,7 +39,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Mobile top bar — hidden on md+ */}
         {!isAuthPage && (
           <div
-            className="md:hidden flex items-center gap-3 px-4 shrink-0"
+            className="md:hidden flex items-center gap-3 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] shrink-0"
             style={{
               height: "52px",
               background: "#14193A",
@@ -51,7 +55,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                padding: "4px",
+                padding: "10px",
+                minWidth: "44px",
+                minHeight: "44px",
                 display: "flex",
                 alignItems: "center",
               }}
@@ -75,13 +81,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               FOUNDER OS
             </span>
             <span style={{ color: "#C8A96E", fontSize: "18px", lineHeight: 1 }}>·</span>
+            <span className="ml-auto max-w-[42vw] truncate rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.85)" }}>
+              {activeVenture?.label ?? "Venture"}
+            </span>
           </div>
         )}
 
         {/* Main scrollable content */}
         <main
           className="flex-1 overflow-y-auto"
-          style={{ background: "#F7F8FC" }}
+          style={{ background: "#F7F8FC", paddingBottom: "env(safe-area-inset-bottom)" }}
         >
           {children}
         </main>

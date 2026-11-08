@@ -153,7 +153,7 @@ function WhiteboardCanvas({ board, onSnapshot }: { board: Board; onSnapshot: (co
   }
 
   return (
-    <div className="h-[620px] w-full overflow-hidden rounded-xl border border-[#D1D5E8] bg-white">
+    <div className="h-[min(68dvh,620px)] min-h-[420px] w-full overflow-hidden rounded-xl border border-[#D1D5E8] bg-white sm:h-[620px]">
       <Tldraw
         key={board.boardId}
         persistenceKey={`founder-os-whiteboard-${board.boardId}`}
@@ -172,6 +172,8 @@ export default function WhiteboardsPage() {
   const [storageNotice, setStorageNotice] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [importInputKey, setImportInputKey] = useState(0);
+  const [fullscreenBoard, setFullscreenBoard] = useState(false);
+  const [linksOpen, setLinksOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -390,15 +392,17 @@ export default function WhiteboardsPage() {
         )}
 
         {activeBoard ? (
-          <section className="mb-8 overflow-hidden rounded-2xl border border-[#D1D5E8] bg-white shadow-[0_2px_12px_rgba(27,42,94,0.08)]">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E6E8F0] px-5 py-4 sm:px-6">
+          <section className={`${fullscreenBoard ? "fixed inset-0 z-[60] m-0 flex min-h-0 flex-col rounded-none" : "mb-8"} overflow-hidden border border-[#D1D5E8] bg-white shadow-[0_2px_12px_rgba(27,42,94,0.08)]`}>
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#E6E8F0] px-4 py-3 sm:px-6 sm:py-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: activeBoard.accent }}>{activeBoard.eyebrow}</p>
                 <h2 className="mt-1 text-lg font-semibold text-[#14193A]">{activeBoard.label}</h2>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs text-[#8A90A3]">
                 <span className="rounded-full bg-[#F0F2F8] px-3 py-1.5">{activeBoard.persisted ? "In Supabase gespeichert" : "Lokaler Entwurf"}</span>
-                <button onClick={() => exportBoard(activeBoard)} className="rounded-lg border border-[#D1D5E8] px-3 py-1.5 font-medium text-[#1B2A5E] hover:bg-[#F0F2F8]">Export</button>
+                {fullscreenBoard && <button onClick={() => setFullscreenBoard(false)} className="rounded-lg border border-[#D1D5E8] px-3 py-2 font-medium text-[#1B2A5E] hover:bg-[#F0F2F8]">Schließen</button>}
+                {!fullscreenBoard && <button onClick={() => setFullscreenBoard(true)} className="rounded-lg border border-[#D1D5E8] px-3 py-2 font-medium text-[#1B2A5E] hover:bg-[#F0F2F8]">Vollbild</button>}
+                <button onClick={() => exportBoard(activeBoard)} className="rounded-lg border border-[#D1D5E8] px-3 py-2 font-medium text-[#1B2A5E] hover:bg-[#F0F2F8]">Export</button>
                 <label className="cursor-pointer rounded-lg border border-[#D1D5E8] px-3 py-1.5 font-medium text-[#1B2A5E] hover:bg-[#F0F2F8]">
                   Import
                   <input key={importInputKey} type="file" accept="application/json" onChange={importBoard} className="hidden" />
@@ -406,7 +410,7 @@ export default function WhiteboardsPage() {
                 <button onClick={() => void deleteBoard(activeBoard.boardId)} className="rounded-lg border border-red-200 px-3 py-1.5 font-medium text-red-600 hover:bg-red-50">Board löschen</button>
               </div>
             </div>
-            <div className="bg-[#F8F9FC] p-3 sm:p-5">
+            <div className={`${fullscreenBoard ? "min-h-0 flex-1 p-2 sm:p-4" : "p-3 sm:p-5"} overflow-hidden bg-[#F8F9FC]`}>
               <WhiteboardCanvas board={activeBoard} onSnapshot={(content) => { void saveSnapshot(activeBoard, content); }} />
             </div>
             <div className="border-t border-[#E6E8F0] bg-white px-5 py-4 sm:px-6">
@@ -415,10 +419,12 @@ export default function WhiteboardsPage() {
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#C8A96E]">Founder-OS-Verknüpfungen</p>
                   <p className="mt-1 text-sm text-[#6B7280]">Venture: <span className="font-medium text-[#1B2A5E]">{activeBoard.venture ?? "übergreifend"}</span> · {activeBoard.links.task_ids.length} verknüpfte Aufgabe{activeBoard.links.task_ids.length === 1 ? "" : "n"}</p>
                 </div>
-                <span className="text-xs text-[#8A90A3]">Änderungen werden automatisch gespeichert</span>
+                <button onClick={() => setLinksOpen((open) => !open)} className="rounded-lg border border-[#D1D5E8] px-3 py-2 text-xs font-medium text-[#1B2A5E] hover:bg-[#F8F9FC] sm:hidden">
+                  {linksOpen ? "Aufgaben ausblenden" : "Aufgaben anzeigen"}
+                </button>
               </div>
               {tasks.length > 0 ? (
-                <div className="mt-4 grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
+                <div className={`${linksOpen ? "grid" : "hidden"} mt-4 max-h-48 gap-2 overflow-y-auto sm:grid sm:grid-cols-2`}>
                   {tasks.slice(0, 40).map((task) => {
                     const checked = activeBoard.links.task_ids.includes(task.id);
                     return (
@@ -436,7 +442,7 @@ export default function WhiteboardsPage() {
                   })}
                 </div>
               ) : (
-                <p className="mt-4 rounded-lg border border-dashed border-[#D8DBE7] px-3 py-3 text-xs text-[#8A90A3]">Für dieses Venture wurden keine Aufgaben geladen.</p>
+                <p className={`${linksOpen ? "block" : "hidden"} mt-4 rounded-lg border border-dashed border-[#D8DBE7] px-3 py-3 text-xs text-[#8A90A3] sm:block`}>Für dieses Venture wurden keine Aufgaben geladen.</p>
               )}
             </div>
           </section>

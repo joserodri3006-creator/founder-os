@@ -101,11 +101,11 @@ export default function EditKundeModal({ kundeId, onClose, onSaved }: Props) {
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       style={{ background: "rgba(20,25,58,0.5)", backdropFilter: "blur(4px)" }}
     >
       <div
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl"
+        className="w-full max-h-[100dvh] overflow-y-auto rounded-t-2xl sm:max-w-lg sm:max-h-[90dvh] sm:rounded-2xl"
         style={{
           background: "#FFFFFF",
           boxShadow: "0 20px 56px rgba(27,42,94,0.24)",
@@ -129,7 +129,7 @@ export default function EditKundeModal({ kundeId, onClose, onSaved }: Props) {
         </div>
 
         <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label style={labelStyle}>Vorname</label>
               <input style={inputStyle} value={form.first_name} onChange={(e) => set("first_name", e.target.value)} />
@@ -145,7 +145,7 @@ export default function EditKundeModal({ kundeId, onClose, onSaved }: Props) {
             <input style={inputStyle} value={form.company_name} onChange={(e) => set("company_name", e.target.value)} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label style={labelStyle}>E-Mail</label>
               <input type="email" style={inputStyle} value={form.email} onChange={(e) => set("email", e.target.value)} />
@@ -156,7 +156,7 @@ export default function EditKundeModal({ kundeId, onClose, onSaved }: Props) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label style={labelStyle}>Stadt</label>
               <input style={inputStyle} value={form.city} onChange={(e) => set("city", e.target.value)} />
