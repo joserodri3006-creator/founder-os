@@ -65,6 +65,22 @@ const TEMPLATES: BoardTemplate[] = [
     sections: ["Problem", "Optionen", "Bewertung", "Entscheidung & Owner"],
   },
   {
+    id: "sentinel-ai-agents",
+    label: "Sentinel – KI-Agenten",
+    description: "Grobe Übersicht der geplanten Agenten und der unabhängigen lokalen KI.",
+    eyebrow: "Sentinel-Projekt",
+    accent: "#8B5E83",
+    sections: [
+      "1 · Anlass-Agent\\nGeburtstag · Kundenjubiläum · Hochzeitstag\\nPersönliches Anschreiben über WhatsApp",
+      "2 · Digitaler Assistent\\nUnterstützung im Tagesgeschäft\\nOffene Punkte · Termine · nächste Aktionen",
+      "3 · Postfach-Agent\\nE-Mails und physische Allianz-Post\\nEingang prüfen · sortieren · Aufgaben vorbereiten",
+      "4 · Video-Agent\\nVideos schneiden und transkribieren\\nSpätere Ausarbeitung",
+      "5 · Steuer-Agent\\nBelege erkennen · Kostenübersicht\\nDateien und Daten für die Steuererklärung vorbereiten",
+      "6 · Lokale KI\\nUnabhängig von den Agenten\\nEigene lokale KI-Infrastruktur prüfen",
+      "7 · Vertriebs-Agent\\nPotenzialanalyse · Kundenkonzept\\nUnteragenten für einzelne Versicherungssparten",
+    ],
+  },
+  {
     id: "freeform",
     label: "Freies Whiteboard",
     description: "Eine leere Fläche für Skizzen, Gedanken und spontane Arbeit.",
