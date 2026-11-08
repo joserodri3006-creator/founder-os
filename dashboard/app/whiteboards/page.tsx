@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useVenture } from "@/context/VentureContext";
 import { Editor, Tldraw, createShapeId, toRichText } from "tldraw";
@@ -190,6 +190,7 @@ export default function WhiteboardsPage() {
   const [importInputKey, setImportInputKey] = useState(0);
   const [fullscreenBoard, setFullscreenBoard] = useState(false);
   const [linksOpen, setLinksOpen] = useState(false);
+  const activeBoardRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     try {
@@ -252,6 +253,11 @@ export default function WhiteboardsPage() {
     () => boards.find((board) => board.boardId === activeBoardId) ?? null,
     [activeBoardId, boards],
   );
+
+  useEffect(() => {
+    if (!activeBoardId || !activeBoardRef.current) return;
+    window.requestAnimationFrame(() => activeBoardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }, [activeBoardId]);
 
   async function addBoard() {
     const template = TEMPLATES.find((item) => item.id === selectedTemplate) ?? TEMPLATES[0];
@@ -408,7 +414,7 @@ export default function WhiteboardsPage() {
         )}
 
         {activeBoard ? (
-          <section className={`${fullscreenBoard ? "fixed inset-0 z-[60] m-0 flex min-h-0 flex-col rounded-none" : "mb-8"} overflow-hidden border border-[#D1D5E8] bg-white shadow-[0_2px_12px_rgba(27,42,94,0.08)]`}>
+          <section ref={activeBoardRef} className={`${fullscreenBoard ? "fixed inset-0 z-[60] m-0 flex min-h-0 flex-col rounded-none" : "mb-8"} scroll-mt-3 overflow-hidden border border-[#D1D5E8] bg-white shadow-[0_2px_12px_rgba(27,42,94,0.08)]`}>
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#E6E8F0] px-4 py-3 sm:px-6 sm:py-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: activeBoard.accent }}>{activeBoard.eyebrow}</p>
@@ -484,6 +490,7 @@ export default function WhiteboardsPage() {
                   <span className="text-[10px] font-semibold uppercase tracking-[0.13em]" style={{ color: board.accent }}>{board.eyebrow}</span>
                   <span className="mt-2 block font-semibold text-[#14193A]">{board.label}</span>
                   <span className="mt-1 block text-xs text-[#8A90A3]">{new Date(board.createdAt).toLocaleDateString("de-DE")}</span>
+                  <span className="mt-3 inline-flex rounded-lg bg-[#F0F2F8] px-3 py-2 text-xs font-semibold text-[#1B2A5E]">Öffnen</span>
                 </button>
               ))}
             </div>

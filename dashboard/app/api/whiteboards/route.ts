@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     .is("archived_at", null)
     .order("updated_at", { ascending: false });
 
-  if (venture && validVenture(venture)) query = query.eq("venture", venture);
+  if (venture && validVenture(venture)) query = query.or(`venture.eq.${venture},venture.is.null`);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: "Whiteboards konnten nicht geladen werden." }, { status: 500 });
