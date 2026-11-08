@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import { useVenture } from "@/context/VentureContext";
+import { useAuth } from "@/context/AuthContext";
 import { getVenture } from "@/lib/ventures";
 
 const SHELL_FREE_PATHS = ["/login", "/invite", "/auth", "/online-first", "/brandary", "/bewerten"];
@@ -12,6 +14,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const { venture } = useVenture();
+  const { user } = useAuth();
   const activeVenture = getVenture(venture);
 
   const isAuthPage = SHELL_FREE_PATHS.some((p) => pathname?.startsWith(p));
@@ -84,6 +87,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span className="ml-auto max-w-[42vw] truncate rounded-full px-2.5 py-1 text-xs font-medium" style={{ background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.85)" }}>
               {activeVenture?.label ?? "Venture"}
             </span>
+            {user?.role === "founder" && (
+              <Link
+                href="/whiteboards"
+                aria-label="Whiteboards öffnen"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 text-xs font-semibold"
+                style={{ background: pathname.startsWith("/whiteboards") ? "#C8A96E" : "rgba(255,255,255,0.1)", color: pathname.startsWith("/whiteboards") ? "#14193A" : "#FFFFFF" }}
+              >
+                Board
+              </Link>
+            )}
           </div>
         )}
 
