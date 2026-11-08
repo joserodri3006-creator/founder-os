@@ -32,6 +32,14 @@ export async function PATCH(
   if (typeof input.name === "string" && input.name.trim()) update.name = input.name.trim().slice(0, 160);
   if (input.content && typeof input.content === "object") update.content = input.content;
   if (typeof input.venture === "string") update.venture = input.venture;
+  if (input.links && typeof input.links === "object") {
+    const rawTaskIds = (input.links as Record<string, unknown>).task_ids;
+    update.links = {
+      task_ids: Array.isArray(rawTaskIds)
+        ? rawTaskIds.filter((taskId: unknown): taskId is string => typeof taskId === "string").slice(0, 100)
+        : [],
+    };
+  }
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "Keine änderbaren Daten übergeben." }, { status: 400 });
@@ -44,7 +52,7 @@ export async function PATCH(
     .eq("id", id)
     .eq("user_id", auth.user.id)
     .is("archived_at", null)
-    .select("id, user_id, venture, name, template_id, content, created_at, updated_at")
+    .select("id, user_id, venture, name, template_id, content, links, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ error: "Whiteboard konnte nicht aktualisiert werden." }, { status: 500 });
