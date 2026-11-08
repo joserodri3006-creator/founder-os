@@ -175,7 +175,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
         <button
           onClick={onCloseMobile}
           aria-label="Menü schließen"
-          className="md:hidden flex items-center justify-center rounded p-1 transition-colors"
+          className="md:hidden flex min-h-11 min-w-11 items-center justify-center rounded p-2 transition-colors"
           style={{ color: "rgba(255,255,255,0.45)", background: "none", border: "none", cursor: "pointer" }}
           onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.85)")}
           onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.45)")}
@@ -283,7 +283,7 @@ export default function Sidebar({ mobileOpen = false, onCloseMobile }: SidebarPr
                       key={item.href}
                       href={item.href}
                       onClick={handleLinkClick}
-                      className="flex items-center px-3 py-2 text-sm rounded-md transition-colors"
+                      className="flex min-h-11 items-center px-3 py-2 text-sm rounded-md transition-colors"
                       style={
                         active
                           ? {

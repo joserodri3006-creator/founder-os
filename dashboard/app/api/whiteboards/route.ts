@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   const venture = request.nextUrl.searchParams.get("venture");
   let query = supabase
     .from("whiteboards")
-    .select("id, user_id, venture, name, template_id, content, created_at, updated_at")
+    .select("id, user_id, venture, name, template_id, content, links, created_at, updated_at")
     .eq("user_id", auth.user.id)
     .is("archived_at", null)
     .order("updated_at", { ascending: false });
@@ -55,6 +55,11 @@ export async function POST(request: NextRequest) {
 
   const input = body as Record<string, unknown>;
   const content = input.content && typeof input.content === "object" ? input.content : {};
+  const links = input.links && typeof input.links === "object" ? input.links : { task_ids: [] };
+  const rawTaskIds = (links as Record<string, unknown>).task_ids;
+  const taskIds = Array.isArray(rawTaskIds)
+    ? rawTaskIds.filter((id: unknown): id is string => typeof id === "string").slice(0, 100)
+    : [];
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("whiteboards")
@@ -64,8 +69,9 @@ export async function POST(request: NextRequest) {
       name: safeName(input.name),
       template_id: typeof input.template_id === "string" ? input.template_id.slice(0, 80) : "freeform",
       content,
+      links: { task_ids: taskIds },
     })
-    .select("id, user_id, venture, name, template_id, content, created_at, updated_at")
+    .select("id, user_id, venture, name, template_id, content, links, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ error: "Whiteboard konnte nicht gespeichert werden." }, { status: 500 });

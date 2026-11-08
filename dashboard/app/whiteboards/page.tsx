@@ -20,7 +20,15 @@ type Board = BoardTemplate & {
   createdAt: string;
   venture: string | null;
   content?: unknown;
+  links: { task_ids: string[] };
   persisted?: boolean;
+};
+
+type Task = {
+  id: string;
+  title: string;
+  status?: string;
+  venture?: string;
 };
 
 const TEMPLATES: BoardTemplate[] = [
@@ -74,6 +82,7 @@ function createBoard(template: BoardTemplate, venture: string | null): Board {
     boardId: `${template.id}-${Date.now()}`,
     createdAt: new Date().toISOString(),
     venture,
+    links: { task_ids: [] },
     persisted: false,
   };
 }
@@ -144,7 +153,7 @@ function WhiteboardCanvas({ board, onSnapshot }: { board: Board; onSnapshot: (co
   }
 
   return (
-    <div className="h-[620px] w-full overflow-hidden rounded-xl border border-[#D1D5E8] bg-white">
+    <div className="h-[min(68dvh,620px)] min-h-[420px] w-full overflow-hidden rounded-xl border border-[#D1D5E8] bg-white sm:h-[620px]">
       <Tldraw
         key={board.boardId}
         persistenceKey={`founder-os-whiteboard-${board.boardId}`}
@@ -161,6 +170,10 @@ export default function WhiteboardsPage() {
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [storageNotice, setStorageNotice] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [importInputKey, setImportInputKey] = useState(0);
+  const [fullscreenBoard, setFullscreenBoard] = useState(false);
+  const [linksOpen, setLinksOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -172,6 +185,14 @@ export default function WhiteboardsPage() {
       setHydrated(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    fetch(`/api/tasks?venture=${encodeURIComponent(venture)}`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() as Promise<Task[]> : [])
+      .then((data) => setTasks(Array.isArray(data) ? data : []))
+      .catch(() => setTasks([]));
+  }, [hydrated, venture]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -191,6 +212,7 @@ export default function WhiteboardsPage() {
             createdAt: String(row.created_at),
             venture: typeof row.venture === "string" ? row.venture : null,
             content: row.content,
+            links: row.links && typeof row.links === "object" ? row.links as { task_ids: string[] } : { task_ids: [] },
             persisted: true,
           } satisfies Board;
         });
@@ -231,6 +253,7 @@ export default function WhiteboardsPage() {
           createdAt: String(payload.data.created_at),
           venture,
           content: payload.data.content,
+          links: payload.data.links && typeof payload.data.links === "object" ? payload.data.links as { task_ids: string[] } : { task_ids: [] },
           persisted: true,
         };
         setBoards((current) => [board, ...current]);
@@ -264,6 +287,51 @@ export default function WhiteboardsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content }),
     });
+  }
+
+  async function saveLinks(board: Board, taskIds: string[]) {
+    const links = { task_ids: Array.from(new Set(taskIds)).slice(0, 100) };
+    setBoards((current) => current.map((item) => item.boardId === board.boardId ? { ...item, links } : item));
+    if (board.persisted) {
+      await fetch(`/api/whiteboards/${board.boardId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ links }),
+      });
+    }
+  }
+
+  function exportBoard(board: Board) {
+    const blob = new Blob([JSON.stringify({ format: "founder-os-whiteboard", version: 1, board }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${board.label.toLowerCase().replace(/[^a-z0-9]+/gi, "-")}-${board.boardId}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function importBoard(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    void file.text().then((text) => {
+      const parsed = JSON.parse(text) as { format?: string; board?: Partial<Board> };
+      if (parsed.format !== "founder-os-whiteboard" || !parsed.board?.content) throw new Error("Ungültiges Founder-OS-Whiteboard.");
+      const template = TEMPLATES.find((item) => item.id === parsed.board?.id) ?? TEMPLATES[TEMPLATES.length - 1];
+      const imported: Board = {
+        ...template,
+        ...parsed.board,
+        boardId: `import-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        venture: typeof parsed.board?.venture === "string" ? parsed.board.venture : venture,
+        links: parsed.board?.links ?? { task_ids: [] },
+        persisted: false,
+      };
+      setBoards((current) => [imported, ...current]);
+      setActiveBoardId(imported.boardId);
+      setStorageNotice("Board importiert. Es ist zunächst ein lokaler Entwurf.");
+    }).catch(() => setStorageNotice("Die Datei konnte nicht als Founder-OS-Whiteboard gelesen werden."));
+    setImportInputKey((key) => key + 1);
   }
 
   return (
@@ -324,19 +392,58 @@ export default function WhiteboardsPage() {
         )}
 
         {activeBoard ? (
-          <section className="mb-8 overflow-hidden rounded-2xl border border-[#D1D5E8] bg-white shadow-[0_2px_12px_rgba(27,42,94,0.08)]">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E6E8F0] px-5 py-4 sm:px-6">
+          <section className={`${fullscreenBoard ? "fixed inset-0 z-[60] m-0 flex min-h-0 flex-col rounded-none" : "mb-8"} overflow-hidden border border-[#D1D5E8] bg-white shadow-[0_2px_12px_rgba(27,42,94,0.08)]`}>
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-[#E6E8F0] px-4 py-3 sm:px-6 sm:py-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: activeBoard.accent }}>{activeBoard.eyebrow}</p>
                 <h2 className="mt-1 text-lg font-semibold text-[#14193A]">{activeBoard.label}</h2>
               </div>
-              <div className="flex items-center gap-2 text-xs text-[#8A90A3]">
-                <span className="rounded-full bg-[#F0F2F8] px-3 py-1.5">Lokaler Entwurf</span>
-                <button onClick={() => deleteBoard(activeBoard.boardId)} className="rounded-lg border border-red-200 px-3 py-1.5 font-medium text-red-600 hover:bg-red-50">Board löschen</button>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[#8A90A3]">
+                <span className="rounded-full bg-[#F0F2F8] px-3 py-1.5">{activeBoard.persisted ? "In Supabase gespeichert" : "Lokaler Entwurf"}</span>
+                {fullscreenBoard && <button onClick={() => setFullscreenBoard(false)} className="rounded-lg border border-[#D1D5E8] px-3 py-2 font-medium text-[#1B2A5E] hover:bg-[#F0F2F8]">Schließen</button>}
+                {!fullscreenBoard && <button onClick={() => setFullscreenBoard(true)} className="rounded-lg border border-[#D1D5E8] px-3 py-2 font-medium text-[#1B2A5E] hover:bg-[#F0F2F8]">Vollbild</button>}
+                <button onClick={() => exportBoard(activeBoard)} className="rounded-lg border border-[#D1D5E8] px-3 py-2 font-medium text-[#1B2A5E] hover:bg-[#F0F2F8]">Export</button>
+                <label className="cursor-pointer rounded-lg border border-[#D1D5E8] px-3 py-1.5 font-medium text-[#1B2A5E] hover:bg-[#F0F2F8]">
+                  Import
+                  <input key={importInputKey} type="file" accept="application/json" onChange={importBoard} className="hidden" />
+                </label>
+                <button onClick={() => void deleteBoard(activeBoard.boardId)} className="rounded-lg border border-red-200 px-3 py-1.5 font-medium text-red-600 hover:bg-red-50">Board löschen</button>
               </div>
             </div>
-            <div className="bg-[#F8F9FC] p-3 sm:p-5">
+            <div className={`${fullscreenBoard ? "min-h-0 flex-1 p-2 sm:p-4" : "p-3 sm:p-5"} overflow-hidden bg-[#F8F9FC]`}>
               <WhiteboardCanvas board={activeBoard} onSnapshot={(content) => { void saveSnapshot(activeBoard, content); }} />
+            </div>
+            <div className="border-t border-[#E6E8F0] bg-white px-5 py-4 sm:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#C8A96E]">Founder-OS-Verknüpfungen</p>
+                  <p className="mt-1 text-sm text-[#6B7280]">Venture: <span className="font-medium text-[#1B2A5E]">{activeBoard.venture ?? "übergreifend"}</span> · {activeBoard.links.task_ids.length} verknüpfte Aufgabe{activeBoard.links.task_ids.length === 1 ? "" : "n"}</p>
+                </div>
+                <button onClick={() => setLinksOpen((open) => !open)} className="rounded-lg border border-[#D1D5E8] px-3 py-2 text-xs font-medium text-[#1B2A5E] hover:bg-[#F8F9FC] sm:hidden">
+                  {linksOpen ? "Aufgaben ausblenden" : "Aufgaben anzeigen"}
+                </button>
+              </div>
+              {tasks.length > 0 ? (
+                <div className={`${linksOpen ? "grid" : "hidden"} mt-4 max-h-48 gap-2 overflow-y-auto sm:grid sm:grid-cols-2`}>
+                  {tasks.slice(0, 40).map((task) => {
+                    const checked = activeBoard.links.task_ids.includes(task.id);
+                    return (
+                      <label key={task.id} className="flex cursor-pointer items-start gap-2 rounded-lg border border-[#E6E8F0] px-3 py-2 text-sm hover:bg-[#F8F9FC]">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(event) => void saveLinks(activeBoard, event.target.checked ? [...activeBoard.links.task_ids, task.id] : activeBoard.links.task_ids.filter((id) => id !== task.id))}
+                          className="mt-0.5 accent-[#1B2A5E]"
+                        />
+                        <span className="min-w-0 flex-1 truncate text-[#39415F]">{task.title}</span>
+                        {task.status && <span className="shrink-0 text-xs text-[#9AA0B2]">{task.status}</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className={`${linksOpen ? "block" : "hidden"} mt-4 rounded-lg border border-dashed border-[#D8DBE7] px-3 py-3 text-xs text-[#8A90A3] sm:block`}>Für dieses Venture wurden keine Aufgaben geladen.</p>
+              )}
             </div>
           </section>
         ) : (
