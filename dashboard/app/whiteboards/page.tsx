@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useVenture } from "@/context/VentureContext";
 import { Editor, Tldraw, createShapeId, toRichText } from "tldraw";
 import "tldraw/tldraw.css";
 
@@ -17,6 +18,9 @@ type BoardTemplate = {
 type Board = BoardTemplate & {
   boardId: string;
   createdAt: string;
+  venture: string | null;
+  content?: unknown;
+  persisted?: boolean;
 };
 
 const TEMPLATES: BoardTemplate[] = [
@@ -64,61 +68,79 @@ const TEMPLATES: BoardTemplate[] = [
 
 const STORAGE_KEY = "founder-os:whiteboards:v1";
 
-function createBoard(template: BoardTemplate): Board {
+function createBoard(template: BoardTemplate, venture: string | null): Board {
   return {
     ...template,
     boardId: `${template.id}-${Date.now()}`,
     createdAt: new Date().toISOString(),
+    venture,
+    persisted: false,
   };
 }
 
-function WhiteboardCanvas({ board }: { board: Board }) {
+function hasSnapshot(content: unknown): content is Record<string, unknown> {
+  return Boolean(content && typeof content === "object" && "document" in content);
+}
+
+function WhiteboardCanvas({ board, onSnapshot }: { board: Board; onSnapshot: (content: unknown) => void }) {
   function handleMount(editor: Editor) {
-    if (editor.getCurrentPageShapes().length > 0) return;
+    if (hasSnapshot(board.content)) {
+      editor.loadSnapshot(board.content as never);
+    } else if (editor.getCurrentPageShapes().length === 0) {
+      const shapes = board.sections.length > 0
+        ? board.sections.map((section, index) => ({
+            id: createShapeId(`${board.boardId}-${index}`),
+            type: "geo" as const,
+            x: 80 + (index % 2) * 440,
+            y: 80 + Math.floor(index / 2) * 240,
+            props: {
+              geo: "rectangle" as const,
+              w: 380,
+              h: 180,
+              color: "blue" as const,
+              fill: "solid" as const,
+              dash: "draw" as const,
+              size: "m" as const,
+              font: "draw" as const,
+              align: "start" as const,
+              verticalAlign: "start" as const,
+              richText: toRichText(`${section}\\n\\nNotiz hinzufügen`),
+              url: "",
+              growY: 0,
+              labelColor: "black" as const,
+              scale: 1,
+            },
+          }))
+        : [{
+            id: createShapeId(`${board.boardId}-start`),
+            type: "text" as const,
+            x: 160,
+            y: 160,
+            props: {
+              color: "black" as const,
+              size: "l" as const,
+              font: "draw" as const,
+              align: "middle" as const,
+              w: 500,
+              richText: toRichText("Freies Whiteboard\\n\\nHier kannst du starten."),
+              autoSize: false,
+              scale: 1,
+            },
+          }];
 
-    const shapes = board.sections.length > 0
-      ? board.sections.map((section, index) => ({
-          id: createShapeId(`${board.boardId}-${index}`),
-          type: "geo" as const,
-          x: 80 + (index % 2) * 440,
-          y: 80 + Math.floor(index / 2) * 240,
-          props: {
-            geo: "rectangle" as const,
-            w: 380,
-            h: 180,
-            color: "blue" as const,
-            fill: "solid" as const,
-            dash: "draw" as const,
-            size: "m" as const,
-            font: "draw" as const,
-            align: "start" as const,
-            verticalAlign: "start" as const,
-            richText: toRichText(`${section}\\n\\nNotiz hinzufügen`),
-            url: "",
-            growY: 0,
-            labelColor: "black" as const,
-            scale: 1,
-          },
-        }))
-      : [{
-          id: createShapeId(`${board.boardId}-start`),
-          type: "text" as const,
-          x: 160,
-          y: 160,
-          props: {
-            color: "black" as const,
-            size: "l" as const,
-            font: "draw" as const,
-            align: "middle" as const,
-            w: 500,
-            richText: toRichText("Freies Whiteboard\\n\\nHier kannst du starten."),
-            autoSize: false,
-            scale: 1,
-          },
-        }];
+      editor.createShapes(shapes);
+      editor.zoomToFit({ animation: { duration: 180 } });
+    }
 
-    editor.createShapes(shapes);
-    editor.zoomToFit({ animation: { duration: 180 } });
+    let saveTimer: number | undefined;
+    const dispose = editor.store.listen(() => {
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(() => onSnapshot(editor.getSnapshot()), 800);
+    }, { scope: "document" });
+    return () => {
+      window.clearTimeout(saveTimer);
+      dispose();
+    };
   }
 
   return (
@@ -133,24 +155,59 @@ function WhiteboardCanvas({ board }: { board: Board }) {
 }
 
 export default function WhiteboardsPage() {
+  const { venture } = useVenture();
   const [boards, setBoards] = useState<Board[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0].id);
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [storageNotice, setStorageNotice] = useState<string | null>(null);
 
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) setBoards(JSON.parse(raw) as Board[]);
     } catch {
-      // Lokale Vorschau darf bei beschädigten Browserdaten nicht abstürzen.
+      setStorageNotice("Lokaler Entwurf konnte nicht geladen werden.");
     } finally {
       setHydrated(true);
     }
   }, []);
 
   useEffect(() => {
-    if (hydrated) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(boards));
+    if (!hydrated) return;
+    let cancelled = false;
+    fetch(`/api/whiteboards?venture=${encodeURIComponent(venture)}`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Supabase-Speicherung ist noch nicht aktiviert.");
+        return response.json() as Promise<{ data: Array<Record<string, unknown>> }>;
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        const remoteBoards = payload.data.map((row) => {
+          const template = TEMPLATES.find((item) => item.id === row.template_id) ?? TEMPLATES[TEMPLATES.length - 1];
+          return {
+            ...template,
+            boardId: String(row.id),
+            createdAt: String(row.created_at),
+            venture: typeof row.venture === "string" ? row.venture : null,
+            content: row.content,
+            persisted: true,
+          } satisfies Board;
+        });
+        setBoards((current) => {
+          const localOnly = current.filter((board) => !board.persisted);
+          return [...remoteBoards, ...localOnly];
+        });
+        setStorageNotice(null);
+      })
+      .catch(() => {
+        if (!cancelled) setStorageNotice("Supabase ist noch nicht migriert — lokale Entwürfe bleiben aktiv.");
+      });
+    return () => { cancelled = true; };
+  }, [hydrated, venture]);
+
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(boards.filter((board) => !board.persisted)));
   }, [boards, hydrated]);
 
   const activeBoard = useMemo(
@@ -158,16 +215,55 @@ export default function WhiteboardsPage() {
     [activeBoardId, boards],
   );
 
-  function addBoard() {
+  async function addBoard() {
     const template = TEMPLATES.find((item) => item.id === selectedTemplate) ?? TEMPLATES[0];
-    const board = createBoard(template);
+    try {
+      const response = await fetch("/api/whiteboards", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: template.label, template_id: template.id, venture, content: {} }),
+      });
+      if (response.ok) {
+        const payload = await response.json() as { data: Record<string, unknown> };
+        const board: Board = {
+          ...template,
+          boardId: String(payload.data.id),
+          createdAt: String(payload.data.created_at),
+          venture,
+          content: payload.data.content,
+          persisted: true,
+        };
+        setBoards((current) => [board, ...current]);
+        setActiveBoardId(board.boardId);
+        setStorageNotice(null);
+        return;
+      }
+    } catch {
+      // Fallback auf lokalen Entwurf.
+    }
+    const board = createBoard(template, venture);
     setBoards((current) => [board, ...current]);
     setActiveBoardId(board.boardId);
+    setStorageNotice("Board lokal erstellt. Nach der Supabase-Migration wird es dauerhaft gespeichert.");
   }
 
-  function deleteBoard(boardId: string) {
-    setBoards((current) => current.filter((board) => board.boardId !== boardId));
+  async function deleteBoard(boardId: string) {
+    const board = boards.find((item) => item.boardId === boardId);
+    if (board?.persisted) {
+      await fetch(`/api/whiteboards/${boardId}`, { method: "DELETE" });
+    }
+    setBoards((current) => current.filter((item) => item.boardId !== boardId));
     if (activeBoardId === boardId) setActiveBoardId(null);
+  }
+
+  async function saveSnapshot(board: Board, content: unknown) {
+    setBoards((current) => current.map((item) => item.boardId === board.boardId ? { ...item, content } : item));
+    if (!board.persisted) return;
+    await fetch(`/api/whiteboards/${board.boardId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
   }
 
   return (
@@ -223,6 +319,10 @@ export default function WhiteboardsPage() {
           </div>
         </section>
 
+        {storageNotice && (
+          <div className="mb-4 rounded-lg border border-[#E7D6AA] bg-[#FFF9EA] px-4 py-3 text-sm text-[#806A2C]">{storageNotice}</div>
+        )}
+
         {activeBoard ? (
           <section className="mb-8 overflow-hidden rounded-2xl border border-[#D1D5E8] bg-white shadow-[0_2px_12px_rgba(27,42,94,0.08)]">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E6E8F0] px-5 py-4 sm:px-6">
@@ -236,7 +336,7 @@ export default function WhiteboardsPage() {
               </div>
             </div>
             <div className="bg-[#F8F9FC] p-3 sm:p-5">
-              <WhiteboardCanvas board={activeBoard} />
+              <WhiteboardCanvas board={activeBoard} onSnapshot={(content) => { void saveSnapshot(activeBoard, content); }} />
             </div>
           </section>
         ) : (
