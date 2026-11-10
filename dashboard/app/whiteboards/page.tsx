@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useVenture } from "@/context/VentureContext";
 import { Editor, Tldraw, createShapeId, toRichText } from "tldraw";
@@ -115,7 +115,7 @@ function mergeRemoteBoards(current: Board[], remote: Board[]): Board[] {
 }
 
 function WhiteboardCanvas({ board, onSnapshot }: { board: Board; onSnapshot: (content: unknown) => void }) {
-  function handleMount(editor: Editor) {
+  const handleMount = useCallback((editor: Editor) => {
     if (hasSnapshot(board.content)) {
       editor.loadSnapshot(board.content as never);
     } else if (editor.getCurrentPageShapes().length === 0) {
@@ -173,7 +173,7 @@ function WhiteboardCanvas({ board, onSnapshot }: { board: Board; onSnapshot: (co
       window.clearTimeout(saveTimer);
       dispose();
     };
-  }
+  }, []);
 
   return (
     <div className="h-[min(68dvh,620px)] min-h-[420px] w-full overflow-hidden rounded-xl border border-[#D1D5E8] bg-white sm:h-[620px]">
