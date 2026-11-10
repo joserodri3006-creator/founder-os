@@ -107,6 +107,13 @@ function hasSnapshot(content: unknown): content is Record<string, unknown> {
   return Boolean(content && typeof content === "object" && "document" in content);
 }
 
+function mergeRemoteBoards(current: Board[], remote: Board[]): Board[] {
+  const remoteIds = new Set(remote.map((board) => board.boardId));
+  // A delayed/empty GET must not make a board disappear while it is open or
+  // being saved. The next successful response will replace the preserved row.
+  return [...remote, ...current.filter((board) => !remoteIds.has(board.boardId))];
+}
+
 function WhiteboardCanvas({ board, onSnapshot }: { board: Board; onSnapshot: (content: unknown) => void }) {
   function handleMount(editor: Editor) {
     if (hasSnapshot(board.content)) {
@@ -229,15 +236,12 @@ export default function WhiteboardsPage() {
             boardId: String(row.id),
             createdAt: String(row.created_at),
             venture: typeof row.venture === "string" ? row.venture : null,
-            content: row.content,
+            content: snapshotsRef.current[String(row.id)] ?? row.content,
             links: row.links && typeof row.links === "object" ? row.links as { task_ids: string[] } : { task_ids: [] },
             persisted: true,
           } satisfies Board;
         });
-        setBoards((current) => {
-          const localOnly = current.filter((board) => !board.persisted);
-          return [...remoteBoards, ...localOnly];
-        });
+        setBoards((current) => mergeRemoteBoards(current, remoteBoards));
         setStorageNotice(null);
       })
       .catch(() => {
@@ -306,11 +310,12 @@ export default function WhiteboardsPage() {
     snapshotsRef.current[board.boardId] = content;
     if (!board.persisted) return;
     try {
-      await fetch(`/api/whiteboards/${board.boardId}`, {
+      const response = await fetch(`/api/whiteboards/${board.boardId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
       });
+      if (!response.ok) throw new Error("Whiteboard konnte nicht gespeichert werden.");
     } catch {
       setStorageNotice("Board geladen, letzte Änderung konnte nicht gespeichert werden.");
     }
