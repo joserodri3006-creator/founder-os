@@ -1003,27 +1003,27 @@ const PIPELINE_STEPS: {
     label: "In Bearbeitung",
     dot: "#C8A96E",
     aktion: "KI-Entwurf wurde erstellt. Mail noch nicht gesendet — Entwurf prüfen und freigeben.",
-    hinweis: "Blazed-Outreach-Leads landen oft hier, da der B2B-Agent Drafts vorformuliert.",
+    hinweis: "Gilt für alle Ventures. Ein Entwurf ist noch kein Versand.",
   },
   {
     status: "kontaktiert",
     label: "Kontaktiert",
     dot: "#C8A96E",
-    aktion: "Erstkontakt wurde gesendet (Mail via Hermes/Resend). Automatisch gesetzt nach Mailversand.",
+    aktion: "Erstkontakt wurde gesendet (Mail via Hermes/Resend). Automatisch gesetzt nach erfolgreichem Mailversand; Follow-up-Datum: +5 Tage.",
     automatisch: true,
   },
   {
     status: "follow_up",
     label: "Follow-up",
     dot: "#EA580C",
-    aktion: "Keine Antwort nach 5 Tagen — Follow-up-Mail gesendet. Follow-up-Datum wird automatisch auf +5 Tage gesetzt.",
+    aktion: "Keine Antwort nach 5 Tagen — erste Follow-up-Mail gesendet. Follow-up-Datum wird automatisch auf weitere +5 Tage gesetzt.",
     automatisch: true,
   },
   {
     status: "nachgefasst",
     label: "Nachgefasst",
     dot: "#EA580C",
-    aktion: "Zweite Nachfass-Mail versendet. Letzter aktiver Kontaktversuch vor Entscheidung.",
+    aktion: "Keine Antwort nach weiteren 5 Tagen — zweite Nachfass-Mail versendet. Letzter aktiver Kontaktversuch; Follow-up-Datum wird geleert.",
     automatisch: true,
   },
   {
@@ -1183,13 +1183,14 @@ function PipelineInfoTooltip() {
                 className="mt-5 rounded-xl p-4 text-xs space-y-1.5"
                 style={{ background: "#F7F8FC", border: "1px solid #E5E7F0" }}
               >
-                <p className="font-semibold" style={{ color: "#14193A" }}>📬 Automatische Status-Übergänge nach Mailversand</p>
+                <p className="font-semibold" style={{ color: "#14193A" }}>📬 Automatische Status-Übergänge nach Mailversand (alle Ventures)</p>
                 <div className="space-y-1" style={{ color: "#6B7280" }}>
                   <p>neu / in_bearbeitung → <strong style={{ color: "#14193A" }}>kontaktiert</strong></p>
                   <p>kontaktiert → <strong style={{ color: "#14193A" }}>follow_up</strong> (Follow-up-Datum: +5 Tage)</p>
-                  <p>follow_up → <strong style={{ color: "#14193A" }}>nachgefasst</strong></p>
+                  <p>follow_up → <strong style={{ color: "#14193A" }}>nachgefasst</strong> (nach weiteren 5 Tagen; Follow-up-Datum wird geleert)</p>
+                  <p>Antwort erkannt → kein weiteres automatisches Follow-up; Follow-up-Datum wird geleert</p>
                   <p className="pt-1" style={{ color: "#9CA3AF" }}>
-                    Gilt für Blazed (Hermes SMTP-Queue) und Online First/Itaba (Resend direkt).
+                    Gilt für alle Ventures und Versandwege (Hermes SMTP-Queue oder Resend direkt).
                     follow_up und nachgefasst können nicht manuell per Dropdown gesetzt werden — nur via Mailversand.
                   </p>
                 </div>

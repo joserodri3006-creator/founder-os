@@ -230,7 +230,7 @@ Deno.serve(async (req) => {
 
       case "kontaktiert": {
         if (!lead.automation_enabled) break;
-        const followUpDays = parseInt(await getConfig(supabase, "follow_up_delay_days", "3"));
+        const followUpDays = parseInt(await getConfig(supabase, "follow_up_delay_days", "5"));
         update.follow_up_date = addDays(followUpDays);
         update.last_contacted_at = new Date().toISOString();
         break;
