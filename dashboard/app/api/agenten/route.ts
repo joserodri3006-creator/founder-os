@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   const { supabaseAdmin } = await import("@/lib/supabase-admin");
   let query = supabaseAdmin
     .from("agent_registry")
-    .select("*")
+    .select("*, manager:manager_agent_id(id, name, status)")
     .order("scope_type", { ascending: true })
     .order("name", { ascending: true });
 

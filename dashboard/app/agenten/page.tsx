@@ -23,6 +23,7 @@ interface AgentRecord {
   last_run_at: string | null;
   last_status: string | null;
   last_error: string | null;
+  manager: { id: string; name: string; status: string } | null;
 }
 
 const SCOPE_LABELS: Record<string, string> = {
@@ -144,6 +145,7 @@ export default function AgentenPage() {
                     <div className="flex justify-between gap-3"><dt style={{ color: "#9CA3AF" }}>Bereich</dt><dd className="text-right font-medium" style={{ color: "#374151" }}>{agent.venture || agent.project_id || SCOPE_LABELS[agent.scope_type]}</dd></div>
                     <div className="flex justify-between gap-3"><dt style={{ color: "#9CA3AF" }}>Trigger</dt><dd className="text-right font-medium" style={{ color: "#374151" }}>{agent.trigger_type || "—"}{agent.schedule ? ` · ${agent.schedule}` : ""}</dd></div>
                     <div className="flex justify-between gap-3"><dt style={{ color: "#9CA3AF" }}>Letzter Lauf</dt><dd className="text-right font-medium" style={{ color: "#374151" }}>{formatDate(agent.last_run_at)}</dd></div>
+                    <div className="flex justify-between gap-3"><dt style={{ color: "#9CA3AF" }}>Manager</dt><dd className="text-right font-medium" style={{ color: "#374151" }}>{agent.manager?.name || "—"}</dd></div>
                     {agent.last_error && <div className="rounded-lg px-2 py-1.5" style={{ background: "#FDECEC", color: "#B91C1C" }}>{agent.last_error}</div>}
                   </dl>
                 </article>)}
