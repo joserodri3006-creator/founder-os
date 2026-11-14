@@ -11,6 +11,10 @@ Ein KI-gestütztes Betriebssystem für einen Multi-Venture Founder.
 Ziel: Alle 5 Ventures laufen durch eine zentrale Infrastruktur — automatisiert,
 skalierbar, founder-geführt via Telegram.
 
+**Einordnung:** Founder OS ist selbst kein Venture. Es ist die übergeordnete Betriebs-, Verwaltungs- und Übersichtsschicht für eigene Ventures. Systemweite, portfolioübergreifende, persönliche und gemeinsame Infrastruktur-Prozesse erhalten keinen künstlichen Venture-Bezug zu Online First.
+
+**Agenten-Scope:** Agenten und Automationen werden nach `scope_type` geführt: `founder_os`, `portfolio`, `venture`, `personal`, `shared_service` oder `client_project`. `venture` ist optional. Kundenprojekte wie Sentinel bleiben fachlich und datenbankseitig getrennt; Founder OS darf sie nur als externes Kundenprojekt mit Metadaten referenzieren.
+
 ---
 
 ## Die 5 Ventures
