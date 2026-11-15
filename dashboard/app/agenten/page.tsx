@@ -174,11 +174,11 @@ export default function AgentenPage() {
               <div><p className="text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: isClient ? "#8B5CF6" : "#C8A96E" }}>{SCOPE_LABELS[scopeType] ?? scopeType}</p><h2 className="mt-1 text-xl font-semibold" style={{ color: "#14193A" }}>{AREA_LABELS[scopeId] ?? scopeId}</h2></div>
               <span className="rounded-full px-2.5 py-1 text-xs" style={{ background: isClient ? "#F3E8FF" : "#EEF0F7", color: isClient ? "#7C3AED" : "#6B7280" }}>{items.length} Einträge</span>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {items.map((agent) => <article key={agent.id} className="rounded-2xl border bg-white p-5 shadow-sm" style={{ borderColor: isClient ? "#DDD6FE" : "#D1D5E8" }}>
-                <div className="mb-4 flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "#315B9A" }}>{TYPE_LABELS[agent.agent_type] ?? agent.agent_type}</p><h3 className="mt-1 text-base font-semibold" style={{ color: "#14193A" }}>{agent.name}</h3></div><span className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold" style={statusStyle(agent.status)}>{STATUS_LABELS[agent.status] ?? agent.status}</span></div>
-                <p className="text-sm leading-6" style={{ color: "#4B5563" }}>{agent.purpose || agent.role}</p>
-                <dl className="mt-4 space-y-2 border-t pt-3 text-xs" style={{ borderColor: "#EEF0F7" }}>
+            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+              {items.map((agent) => <article key={agent.id} className="rounded-xl border bg-white p-4 shadow-sm" style={{ borderColor: isClient ? "#DDD6FE" : "#D1D5E8" }}>
+                <div className="mb-3 flex items-start justify-between gap-2"><div className="min-w-0"><p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#315B9A" }}>{TYPE_LABELS[agent.agent_type] ?? agent.agent_type}</p><h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-5" style={{ color: "#14193A" }}>{agent.name}</h3></div><span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={statusStyle(agent.status)}>{STATUS_LABELS[agent.status] ?? agent.status}</span></div>
+                <p className="line-clamp-2 min-h-10 text-xs leading-5" style={{ color: "#4B5563" }}>{agent.purpose || agent.role}</p>
+                <dl className="mt-3 space-y-1.5 border-t pt-3 text-[11px]" style={{ borderColor: "#EEF0F7" }}>
                   <div className="flex justify-between gap-3"><dt style={{ color: "#9CA3AF" }}>Zuständig</dt><dd className="text-right font-medium" style={{ color: "#374151" }}>{agent.manager?.name || (agent.agent_type === "manager_agent" ? "Oberste Ebene" : "Nicht zugeordnet")}</dd></div>
                   <div className="flex justify-between gap-3"><dt style={{ color: "#9CA3AF" }}>Auslöser</dt><dd className="text-right font-medium" style={{ color: "#374151" }}>{agent.trigger_type || "—"}{agent.schedule ? ` · ${agent.schedule}` : ""}</dd></div>
                   <div className="flex justify-between gap-3"><dt style={{ color: "#9CA3AF" }}>Letzter Lauf</dt><dd className="text-right font-medium" style={{ color: "#374151" }}>{formatDate(agent.last_run_at)}</dd></div>
