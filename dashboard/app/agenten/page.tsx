@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 
 interface AgentRecord {
   id: string;
@@ -23,6 +24,19 @@ interface AgentRecord {
   last_run_at: string | null;
   last_status: string | null;
   last_error: string | null;
+  manager: { id: string; name: string; status: string } | null;
+}
+
+interface DispatchCard {
+  id: string;
+  request_text: string;
+  status: string;
+  action_mode: string;
+  inferred_scope_type: string | null;
+  inferred_scope_id: string | null;
+  scope_confidence: string;
+  next_action: string | null;
+  created_at: string;
   manager: { id: string; name: string; status: string } | null;
 }
 
@@ -87,6 +101,12 @@ export default function AgentenPage() {
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [showClientProjects, setShowClientProjects] = useState(false);
+  const [dispatchText, setDispatchText] = useState("");
+  const [dispatchScope, setDispatchScope] = useState("");
+  const [dispatchMode, setDispatchMode] = useState("analysis");
+  const [dispatchCards, setDispatchCards] = useState<DispatchCard[]>([]);
+  const [dispatching, setDispatching] = useState(false);
+  const [dispatchError, setDispatchError] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -119,6 +139,33 @@ export default function AgentenPage() {
     attention: visibleAgents.filter((item) => ["error", "blocked", "conflict"].includes(item.last_status ?? "") || item.status === "draft").length,
   }), [visibleAgents]);
 
+  useEffect(() => {
+    fetch("/api/agenten/dispatch")
+      .then((response) => response.json())
+      .then((data) => setDispatchCards(Array.isArray(data) ? data : []));
+  }, []);
+
+  async function submitDispatch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!dispatchText.trim()) return;
+    setDispatching(true);
+    setDispatchError("");
+    const [scopeType, scopeId] = dispatchScope ? dispatchScope.split(":") : ["", ""];
+    const response = await fetch("/api/agenten/dispatch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ request_text: dispatchText, scope_type: scopeType, scope_id: scopeId, action_mode: dispatchMode }),
+    });
+    const data = await response.json();
+    if (!response.ok) setDispatchError(data.error || "Der Auftrag konnte nicht angelegt werden.");
+    else {
+      setDispatchCards((current) => [data, ...current]);
+      setDispatchText("");
+      setDispatchScope("");
+    }
+    setDispatching(false);
+  }
+
   return (
     <main className="mx-auto max-w-7xl px-4 py-6 sm:px-8 sm:py-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -146,6 +193,47 @@ export default function AgentenPage() {
           </label>
         </div>
       </section>
+
+      <section className="mb-6 rounded-2xl border bg-white p-5 shadow-sm" style={{ borderColor: "#D1D5E8" }}>
+        <div className="mb-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: "#315B9A" }}>Dispatcher</p>
+          <h2 className="mt-1 text-lg font-semibold" style={{ color: "#14193A" }}>Was soll Hermes für dich prüfen?</h2>
+          <p className="mt-1 text-sm" style={{ color: "#6B7280" }}>Scope optional auswählen oder einfach natürlich formulieren. Der Auftrag wird als Task Card angelegt; ein Agentenlauf wird nicht vorgetäuscht.</p>
+        </div>
+        <form onSubmit={submitDispatch} className="space-y-3">
+          <textarea value={dispatchText} onChange={(event) => setDispatchText(event.target.value)} rows={2} placeholder="z. B. Prüfe, was bei Blazed heute die wichtigste Maßnahme ist …" className="w-full resize-y rounded-xl border px-3 py-2.5 text-sm outline-none" style={{ borderColor: "#D1D5E8" }} />
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={dispatchScope} onChange={(event) => setDispatchScope(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "#D1D5E8" }}>
+              <option value="">Scope automatisch erkennen</option>
+              <option value="portfolio:portfolio">Portfolio</option>
+              <option value="personal:personal">Persönlich</option>
+              <option value="shared_service:shared_infrastructure">Gemeinsame Services</option>
+              <option value="venture:online_first">Online First</option>
+              <option value="venture:blazed_outfitters">Blazed Outfitters</option>
+              <option value="venture:brandary">Brandary</option>
+            </select>
+            <select value={dispatchMode} onChange={(event) => setDispatchMode(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "#D1D5E8" }}>
+              <option value="analysis">Nur analysieren</option>
+              <option value="draft">Entwurf erstellen</option>
+              <option value="prepare">Aktion vorbereiten</option>
+              <option value="execute">Ausführung anfordern</option>
+            </select>
+            <button type="submit" disabled={dispatching || !dispatchText.trim()} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" style={{ background: "#315B9A" }}>{dispatching ? "Wird angelegt…" : "Aufgabe starten"}</button>
+          </div>
+          {dispatchError && <p className="rounded-lg px-3 py-2 text-sm" style={{ background: "#FDECEC", color: "#B91C1C" }}>{dispatchError}</p>}
+        </form>
+      </section>
+
+      {dispatchCards.length > 0 && <section className="mb-7">
+        <div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[0.12em]" style={{ color: "#C8A96E" }}>Aktuelle Aufträge</p><h2 className="mt-1 text-xl font-semibold" style={{ color: "#14193A" }}>Task Cards</h2></div><span className="text-xs" style={{ color: "#6B7280" }}>{dispatchCards.length} offen oder zuletzt angelegt</span></div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {dispatchCards.map((card) => <article key={card.id} className="rounded-xl border bg-white p-4 shadow-sm" style={{ borderColor: "#D1D5E8" }}>
+            <div className="mb-2 flex items-start justify-between gap-2"><span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={statusStyle(card.status)}>{card.status === "waiting_user" ? "Rückfrage / Manager prüfen" : card.status}</span><span className="text-[11px]" style={{ color: "#9CA3AF" }}>{formatDate(card.created_at)}</span></div>
+            <p className="text-sm font-medium leading-5" style={{ color: "#14193A" }}>{card.request_text}</p>
+            <div className="mt-3 space-y-1.5 border-t pt-3 text-xs" style={{ borderColor: "#EEF0F7" }}><p><strong>Bereich:</strong> {AREA_LABELS[card.inferred_scope_id || ""] || card.inferred_scope_id || "Noch offen"}</p><p><strong>Manager:</strong> {card.manager?.name || "Noch nicht zugeordnet"}</p><p><strong>Nächster Schritt:</strong> {card.next_action || "Wird bestimmt"}</p></div>
+          </article>)}
+        </div>
+      </section>}
 
       <section className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[
