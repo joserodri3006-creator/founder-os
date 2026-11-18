@@ -7,6 +7,8 @@ import { verifyAccessToken } from "@/lib/mcp-oauth";
 
 const ventures = ["online_first", "blazed_outfitters", "brandary", "droplane", "worknest"] as const;
 const statuses = ["neu", "in_bearbeitung", "kontaktiert", "follow_up", "nachgefasst", "erstgespraech", "qualifiziert", "sales_gespraech", "angebot_gesendet", "gewonnen", "verloren", "nachfassen_zukunft"] as const;
+const taskStatuses = ["open", "in_progress", "done"] as const;
+const taskPriorities = ["low", "medium", "high"] as const;
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -21,7 +23,7 @@ function json(data: unknown) {
 function createFounderServer(userId: string) {
   const server = new McpServer(
     { name: "founder-os", version: "1.0.0" },
-    { instructions: "Founder OS CRM. Nutze batch_create_leads für recherchierte Lead-Listen statt Excel." },
+    { instructions: "Founder OS CRM. Nutze batch_create_leads für recherchierte Lead-Listen. Aufgaben können direkt gelesen, angelegt, geändert und gelöscht werden; diese Task-Tools haben sofortige Schreibwirkung." },
   );
 
   server.registerTool("list_leads", {
@@ -89,6 +91,100 @@ function createFounderServer(userId: string) {
     const byStatus: Record<string, number> = {}; const bySource: Record<string, number> = {};
     for (const row of data ?? []) { byStatus[row.status] = (byStatus[row.status] ?? 0) + 1; bySource[row.source] = (bySource[row.source] ?? 0) + 1; }
     return { content: [{ type: "text", text: json({ total: data?.length ?? 0, by_status: byStatus, by_source: bySource, user_id: userId }) }] };
+  });
+
+  server.registerTool("list_tasks", {
+    description: "Aufgaben des Founder OS auflisten. Optional nach Venture, Lead/Kunde, Status oder Verantwortlichem filtern.",
+    inputSchema: {
+      venture: z.enum(ventures).optional(),
+      entity_type: z.enum(["lead", "customer"]).optional(),
+      entity_id: z.string().uuid().optional(),
+      status: z.enum(taskStatuses).optional(),
+      assigned_to: z.string().uuid().optional(),
+      limit: z.number().int().min(1).max(500).optional(),
+    },
+  }, async ({ venture, entity_type, entity_id, status, assigned_to, limit }) => {
+    let query = supabaseAdmin.from("tasks").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false }).limit(limit ?? 100);
+    if (venture) query = query.eq("venture", venture);
+    if (entity_type) query = query.eq("entity_type", entity_type);
+    if (entity_id) query = query.eq("entity_id", entity_id);
+    if (status) query = query.eq("status", status);
+    if (assigned_to) query = query.eq("assigned_to", assigned_to);
+    const { data, error } = await query;
+    return { content: [{ type: "text", text: json(error ? { error: error.message } : { tasks: data ?? [], count: data?.length ?? 0 }) }] };
+  });
+
+  server.registerTool("create_task", {
+    description: "Aufgabe sofort im Founder OS anlegen. Schreibzugriff wird direkt ausgeführt, ohne zusätzliche Bestätigung.",
+    inputSchema: {
+      venture: z.enum(ventures),
+      entity_type: z.enum(["lead", "customer"]),
+      entity_id: z.string().uuid(),
+      title: z.string().min(1),
+      description: z.string().optional(),
+      status: z.enum(taskStatuses).optional(),
+      priority: z.enum(taskPriorities).optional(),
+      due_date: z.string().optional(),
+      assigned_to: z.string().uuid().optional(),
+      recurrence_rule: z.enum(["daily", "weekly", "monthly", "yearly"]).optional(),
+      recurrence_end_date: z.string().optional(),
+      checklist: z.array(z.unknown()).optional(),
+    },
+  }, async ({ venture, entity_type, entity_id, title, description, status, priority, due_date, assigned_to, recurrence_rule, recurrence_end_date, checklist }) => {
+    const { data, error } = await supabaseAdmin.from("tasks").insert({
+      venture,
+      entity_type,
+      entity_id,
+      title: title.trim(),
+      description: description ?? null,
+      status: status ?? "open",
+      priority: priority ?? "medium",
+      due_date: due_date ?? null,
+      assigned_to: assigned_to ?? null,
+      created_by: userId,
+      recurrence_rule: recurrence_rule ?? null,
+      recurrence_end_date: recurrence_end_date ?? null,
+      checklist: checklist ?? [],
+    }).select().single();
+    return { content: [{ type: "text", text: json(error ? { error: error.message } : { success: true, task: data }) }] };
+  });
+
+  server.registerTool("update_task", {
+    description: "Aufgabe sofort aktualisieren. Nur übergebene Felder werden geändert; Status done setzt completed_at.",
+    inputSchema: {
+      id: z.string().uuid(),
+      title: z.string().min(1).optional(),
+      description: z.string().nullable().optional(),
+      status: z.enum(taskStatuses).optional(),
+      priority: z.enum(taskPriorities).optional(),
+      due_date: z.string().nullable().optional(),
+      assigned_to: z.string().uuid().nullable().optional(),
+      recurrence_rule: z.enum(["daily", "weekly", "monthly", "yearly"]).nullable().optional(),
+      recurrence_end_date: z.string().nullable().optional(),
+      checklist: z.array(z.unknown()).optional(),
+    },
+  }, async ({ id, title, description, status, priority, due_date, assigned_to, recurrence_rule, recurrence_end_date, checklist }) => {
+    const updates: Record<string, unknown> = {};
+    if (title !== undefined) updates.title = title.trim();
+    if (description !== undefined) updates.description = description;
+    if (status !== undefined) { updates.status = status; updates.completed_at = status === "done" ? new Date().toISOString() : null; }
+    if (priority !== undefined) updates.priority = priority;
+    if (due_date !== undefined) updates.due_date = due_date;
+    if (assigned_to !== undefined) updates.assigned_to = assigned_to;
+    if (recurrence_rule !== undefined) updates.recurrence_rule = recurrence_rule;
+    if (recurrence_end_date !== undefined) updates.recurrence_end_date = recurrence_end_date;
+    if (checklist !== undefined) updates.checklist = checklist;
+    if (Object.keys(updates).length === 0) return { content: [{ type: "text", text: json({ error: "Mindestens ein Änderungsfeld erforderlich" }) }] };
+    const { data, error } = await supabaseAdmin.from("tasks").update(updates).eq("id", id).select().single();
+    return { content: [{ type: "text", text: json(error ? { error: error.message } : { success: true, task: data }) }] };
+  });
+
+  server.registerTool("delete_task", {
+    description: "Aufgabe sofort und dauerhaft löschen. Diese Aktion hat direkte Schreibwirkung.",
+    inputSchema: { id: z.string().uuid() },
+  }, async ({ id }) => {
+    const { error } = await supabaseAdmin.from("tasks").delete().eq("id", id);
+    return { content: [{ type: "text", text: json(error ? { error: error.message } : { success: true, id }) }] };
   });
 
   return server;

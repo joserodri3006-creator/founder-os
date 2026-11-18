@@ -50,9 +50,10 @@ role `founder` can authorize access.
 
 Available MCP tools:
 
-- `list_leads`
-- `create_lead`
-- `batch_create_leads`
+- `list_tasks` — Aufgaben lesen und nach Venture, Status, Lead/Kunde oder Verantwortlichem filtern
+- `create_task` — Aufgaben sofort anlegen
+- `update_task` — Aufgaben sofort bearbeiten und Status ändern
+- `delete_task` — Aufgaben sofort löschen
 - `get_lead`
 - `update_lead`
 - `pipeline_stats`
