@@ -73,6 +73,9 @@ export default function ProdukteListPage() {
   const { venture } = useVenture();
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -89,20 +92,39 @@ export default function ProdukteListPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  async function load() {
+  async function load(signal?: AbortSignal) {
     setLoading(true);
-    const params = new URLSearchParams({ venture });
+    const params = new URLSearchParams({ venture, page: String(page), page_size: String(pageSize) });
     if (statusFilter) params.set("status", statusFilter);
     if (sourceFilter) params.set("source_type", sourceFilter);
     if (typeFilter) params.set("type_id", typeFilter);
     if (categoryFilter) params.set("category_id", categoryFilter);
     if (debouncedSearch) params.set("search", debouncedSearch);
-    const data = await fetch(`/api/produkte?${params}`).then((r) => r.json());
-    setProducts(Array.isArray(data) ? data : []);
-    setLoading(false);
+    try {
+      const response = await fetch(`/api/produkte?${params}`, { signal });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error ?? "Produkte konnten nicht geladen werden");
+      setProducts(Array.isArray(result) ? result : (result.data ?? []));
+      setTotalProducts(Array.isArray(result) ? result.length : (result.total ?? 0));
+    } catch (error) {
+      if ((error as Error).name !== "AbortError") {
+        setProducts([]);
+        setTotalProducts(0);
+      }
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
   }
 
-  useEffect(() => { load(); }, [venture, statusFilter, sourceFilter, typeFilter, categoryFilter, debouncedSearch]);
+  useEffect(() => {
+    const controller = new AbortController();
+    load(controller.signal);
+    return () => controller.abort();
+  }, [venture, statusFilter, sourceFilter, typeFilter, categoryFilter, debouncedSearch, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [venture, statusFilter, sourceFilter, typeFilter, categoryFilter, debouncedSearch]);
 
   useEffect(() => {
     setTypeFilter("");
@@ -270,7 +292,7 @@ export default function ProdukteListPage() {
           <Link href="/produkte/sync-log" className="text-xs text-gray-500 hover:text-[#1B2A5E] flex items-center gap-1">
             🔄 Sync-Log
           </Link>
-          <span className="text-xs" style={{ color: "#6B7280" }}>{products.length} Produkte</span>
+          <span className="text-xs" style={{ color: "#6B7280" }}>{totalProducts} Produkte</span>
         </div>
       </div>
 
@@ -467,6 +489,32 @@ export default function ProdukteListPage() {
               ))}
             </tbody>
           </table>
+          </div>
+        </div>
+      )}
+
+      {totalProducts > pageSize && (
+        <div className="flex items-center justify-between mt-4 text-sm" style={{ color: "#6B7280" }}>
+          <span>Seite {page} von {Math.ceil(totalProducts / pageSize)}</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={page === 1 || loading}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              className="px-3 py-1.5 rounded-lg border disabled:opacity-40"
+              style={{ borderColor: "#D1D5E8" }}
+            >
+              ← Zurück
+            </button>
+            <button
+              type="button"
+              disabled={page >= Math.ceil(totalProducts / pageSize) || loading}
+              onClick={() => setPage((current) => Math.min(Math.ceil(totalProducts / pageSize), current + 1))}
+              className="px-3 py-1.5 rounded-lg border disabled:opacity-40"
+              style={{ borderColor: "#D1D5E8" }}
+            >
+              Weiter →
+            </button>
           </div>
         </div>
       )}
