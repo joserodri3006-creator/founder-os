@@ -214,7 +214,7 @@ export default function AufgabenPage() {
     .sort(compareManualOrder);
 
   return (
-    <div className="px-4 py-5 sm:p-8 max-w-4xl mx-auto">
+    <div className="px-4 py-5 pb-20 sm:p-8 md:pb-8 max-w-4xl mx-auto">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-gray-900">Aufgaben</h1>
@@ -316,6 +316,18 @@ export default function AufgabenPage() {
           canMoveBetweenVentures={isFounder}
           onMoveToVenture={(task, targetVenture) => moveTaskToVenture(task as Task, targetVenture)}
         />
+      )}
+      {!showNewForm && (
+        <div className="fixed bottom-3 left-3 right-3 z-30 md:hidden">
+          <button
+            type="button"
+            onClick={() => setShowNewForm(true)}
+            className="w-full rounded-xl px-4 py-3 text-left text-sm font-semibold text-white shadow-lg"
+            style={{ background: "#1B2A5E" }}
+          >
+            <span className="mr-2 text-lg leading-none">＋</span> Aufgabe hinzufügen
+          </button>
+        </div>
       )}
     </div>
   );
