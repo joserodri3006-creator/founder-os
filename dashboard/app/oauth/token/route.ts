@@ -8,12 +8,15 @@ function normalizeRedirectUri(value: string) { return value.replace(/\/+$/, "");
 
 export async function POST(req: NextRequest) {
   const { supabaseAdmin } = await import("@/lib/supabase-admin");
-  const form = await req.formData();
-  const grantType = String(form.get("grant_type") ?? "");
-  const code = String(form.get("code") ?? "");
-  const clientId = String(form.get("client_id") ?? "");
-  const redirectUri = String(form.get("redirect_uri") ?? "");
-  const verifier = String(form.get("code_verifier") ?? "");
+  const contentType = req.headers.get("content-type") ?? "";
+  const body = contentType.includes("application/json")
+    ? await req.json().catch(() => ({})) as Record<string, unknown>
+    : Object.fromEntries((await req.formData()).entries());
+  const grantType = String(body.grant_type ?? "");
+  const code = String(body.code ?? "");
+  const clientId = String(body.client_id ?? "");
+  const redirectUri = String(body.redirect_uri ?? "");
+  const verifier = String(body.code_verifier ?? "");
   if (grantType !== "authorization_code" || !code || !clientId || !redirectUri || !verifier) return formError("invalid_request", "OAuth code, client_id, redirect_uri and code_verifier are required");
 
   const { data: row } = await supabaseAdmin.from("mcp_oauth_codes").select("*").eq("code_hash", hashValue(code)).eq("client_id", clientId).is("used_at", null).single();
