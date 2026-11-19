@@ -245,9 +245,18 @@ async function handle(req: Request) {
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);
   const response = await transport.handleRequest(req);
+  let responseBody: BodyInit | null = response.body as BodyInit;
+  if (publicAccess && response.headers.get("content-type")?.includes("application/json")) {
+    const payload = await response.clone().json().catch(() => null) as { result?: { tools?: Array<{ name: string }> } } | null;
+    if (payload?.result?.tools) {
+      const publicTools = new Set(["list_tasks", "create_task", "update_task", "delete_task"]);
+      payload.result.tools = payload.result.tools.filter((tool) => publicTools.has(tool.name));
+      responseBody = JSON.stringify(payload);
+    }
+  }
   const headers = new Headers(response.headers);
   Object.entries(cors).forEach(([key, value]) => headers.set(key, value));
-  return new Response(response.body, { status: response.status, headers });
+  return new Response(responseBody, { status: response.status, headers });
 }
 
 export async function OPTIONS() { return new Response(null, { status: 204, headers: cors }); }
