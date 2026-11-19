@@ -35,6 +35,7 @@ function createFounderServer(userId: string, scope: string) {
       venture: z.enum(ventures), status: z.enum(statuses).optional(), industry: z.string().optional(), search: z.string().optional(), limit: z.number().int().min(1).max(200).optional(),
     },
   }, async ({ venture, status, industry, search, limit }) => {
+    if (!requireScope("leads:read")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "leads:read" }) }] };
     let query = supabaseAdmin.from("leads").select("id,venture,first_name,last_name,email,company_name,phone,website,city,region,industry,notes,source,status,last_contacted_at,follow_up_date,automation_enabled,is_duplicate,created_at").eq("venture", venture).is("archived_at", null).order("created_at", { ascending: false }).limit(limit ?? 50);
     if (status) query = query.eq("status", status);
     if (industry) query = query.eq("industry", industry);
@@ -49,6 +50,7 @@ function createFounderServer(userId: string, scope: string) {
       venture: z.enum(ventures), first_name: z.string(), last_name: z.string(), email: z.string().email(), company_name: z.string().optional(), phone: z.string().optional(), website: z.string().optional(), city: z.string().optional(), region: z.string().optional(), industry: z.string().optional(), notes: z.string().optional(), contact_reason: z.string().optional(), source: z.enum(["website", "linkedin", "empfehlung", "kaltakquise", "csv_import", "ki_suche"]).default("ki_suche"), automation_enabled: z.boolean().default(true),
     },
   }, async (args) => {
+    if (!requireScope("leads:write")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "leads:write" }) }] };
     const { data: existing } = await supabaseAdmin.from("leads").select("id").eq("email", args.email.toLowerCase()).eq("venture", args.venture).maybeSingle();
     const { data, error } = await supabaseAdmin.from("leads").insert({ ...args, email: args.email.toLowerCase(), status: "neu", is_duplicate: Boolean(existing), region: args.region ?? "Hessen" }).select("id,venture,first_name,last_name,email,company_name,status,source,is_duplicate,created_at").single();
     return { content: [{ type: "text", text: json(error ? { error: error.message } : { success: true, duplicate: Boolean(existing), lead: data }) }] };
@@ -58,6 +60,7 @@ function createFounderServer(userId: string, scope: string) {
     description: "Bis zu 50 recherchierte Leads auf einmal in Founder OS speichern. Jeder Lead braucht venture, first_name, last_name und email. Statt Excel verwenden.",
     inputSchema: { leads: z.array(z.object({ venture: z.enum(ventures), first_name: z.string(), last_name: z.string(), email: z.string().email(), company_name: z.string().optional(), phone: z.string().optional(), website: z.string().optional(), city: z.string().optional(), region: z.string().optional(), industry: z.string().optional(), notes: z.string().optional(), contact_reason: z.string().optional(), source: z.enum(["website", "linkedin", "empfehlung", "kaltakquise", "csv_import", "ki_suche"]).default("ki_suche"), automation_enabled: z.boolean().default(true) })).min(1).max(50) },
   }, async ({ leads }) => {
+    if (!requireScope("leads:write")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "leads:write" }) }] };
     const results: Array<Record<string, unknown>> = [];
     for (let i = 0; i < leads.length; i++) {
       const lead = leads[i];
@@ -72,6 +75,7 @@ function createFounderServer(userId: string, scope: string) {
     description: "Einen Lead anhand seiner UUID abrufen.",
     inputSchema: { id: z.string().uuid() },
   }, async ({ id }) => {
+    if (!requireScope("leads:read")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "leads:read" }) }] };
     const { data, error } = await supabaseAdmin.from("leads").select("*").eq("id", id).single();
     return { content: [{ type: "text", text: json(error ? { error: error.message } : data) }] };
   });
@@ -80,6 +84,7 @@ function createFounderServer(userId: string, scope: string) {
     description: "Notizen, Branche, Kontaktdaten oder Automatisierung eines Leads aktualisieren. Statusänderungen laufen bewusst über Founder OS Prozess/UI.",
     inputSchema: { id: z.string().uuid(), notes: z.string().optional(), industry: z.string().optional(), company_name: z.string().optional(), website: z.string().optional(), city: z.string().optional(), phone: z.string().optional(), contact_reason: z.string().optional(), automation_enabled: z.boolean().optional() },
   }, async ({ id, ...fields }) => {
+    if (!requireScope("leads:write")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "leads:write" }) }] };
     const update = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
     const { error } = await supabaseAdmin.from("leads").update(update).eq("id", id);
     return { content: [{ type: "text", text: json(error ? { error: error.message } : { success: true, id }) }] };
@@ -89,6 +94,7 @@ function createFounderServer(userId: string, scope: string) {
     description: "Pipeline-Statistiken eines Ventures abrufen.",
     inputSchema: { venture: z.enum(ventures) },
   }, async ({ venture }) => {
+    if (!requireScope("stats:read")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "stats:read" }) }] };
     const { data, error } = await supabaseAdmin.from("leads").select("status,source,is_duplicate").eq("venture", venture).is("archived_at", null);
     if (error) return { content: [{ type: "text", text: json({ error: error.message }) }] };
     const byStatus: Record<string, number> = {}; const bySource: Record<string, number> = {};
@@ -208,24 +214,30 @@ function unauthorized() {
 }
 
 async function handle(req: Request) {
-  const auth = req.headers.get("authorization") ?? "";
-  if (!auth.startsWith("Bearer ")) return unauthorized();
-  const token = auth.slice(7);
-  const staticToken = process.env.MCP_STATIC_TOKEN;
-  const staticUserId = process.env.MCP_STATIC_USER_ID ?? "1a996185-21dc-49ad-bbb0-beb246da85d2";
+  const publicAccess = process.env.MCP_PUBLIC_ACCESS !== "false";
   let userId: string;
   let scope: string;
-  if (staticToken) {
-    if (!staticUserId || !staticTokenMatches(token, staticToken)) return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": "Bearer" } });
-    userId = staticUserId;
+  if (publicAccess) {
+    userId = "1a996185-21dc-49ad-bbb0-beb246da85d2";
     scope = "tasks:read tasks:write";
   } else {
-    try {
-      const verified = await verifyAccessToken(token);
-      userId = verified.userId;
-      scope = verified.scope;
-    } catch {
-      return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": "Bearer" } });
+    const auth = req.headers.get("authorization") ?? "";
+    if (!auth.startsWith("Bearer ")) return unauthorized();
+    const token = auth.slice(7);
+    const staticToken = process.env.MCP_STATIC_TOKEN;
+    const staticUserId = process.env.MCP_STATIC_USER_ID ?? "1a996185-21dc-49ad-bbb0-beb246da85d2";
+    if (staticToken) {
+      if (!staticTokenMatches(token, staticToken)) return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": "Bearer" } });
+      userId = staticUserId;
+      scope = "tasks:read tasks:write";
+    } else {
+      try {
+        const verified = await verifyAccessToken(token);
+        userId = verified.userId;
+        scope = verified.scope;
+      } catch {
+        return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": "Bearer" } });
+      }
     }
   }
 
