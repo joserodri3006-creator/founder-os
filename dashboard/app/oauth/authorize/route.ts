@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hashValue, isFounder, randomCode, DEFAULT_SCOPE } from "@/lib/mcp-oauth";
+import { createClient } from "@/lib/supabase-server";
 
 
 function esc(value: string) {
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
 
   const hidden = ["client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state", "scope"]
     .map(k => `<input type="hidden" name="${k}" value="${esc(p.get(k) ?? (k === "code_challenge_method" ? "S256" : k === "scope" ? scope : ""))}">`).join("");
-  return page("Founder OS verbinden", `<p>ChatGPT möchte auf deinen Founder-OS-Leadbereich zugreifen.</p><form method="post">${hidden}<label>E-Mail</label><input type="email" name="email" autocomplete="username" required><label>Passwort</label><input type="password" name="password" autocomplete="current-password" required><button type="submit">Founder OS autorisieren</button></form>`);
+  return page("Founder OS verbinden", `<p>ChatGPT möchte auf deinen Founder-OS-Leadbereich zugreifen.</p><form method="post">${hidden}<label>E-Mail</label><input type="email" name="email" autocomplete="username"><label>Passwort</label><input type="password" name="password" autocomplete="current-password"><button type="submit" name="mode" value="password">Mit E-Mail/Passwort autorisieren</button><button type="submit" name="mode" value="session" style="background:#fff;color:#1b2a5e;border:1px solid #1b2a5e">Mit aktiver Google-Sitzung autorisieren</button></form>`);
 }
 
 export async function POST(req: NextRequest) {
@@ -42,27 +43,38 @@ export async function POST(req: NextRequest) {
   const codeChallenge = String(form.get("code_challenge") ?? "");
   const state = String(form.get("state") ?? "");
   const scope = String(form.get("scope") ?? DEFAULT_SCOPE);
+  const mode = String(form.get("mode") ?? "password");
   const email = String(form.get("email") ?? "");
   const password = String(form.get("password") ?? "");
 
   const { data: client } = await supabaseAdmin.from("mcp_oauth_clients").select("redirect_uris").eq("client_id", clientId).single();
   if (!Array.isArray(client?.redirect_uris) || !client.redirect_uris.includes(redirectUri)) return invalid("Client oder redirect_uri nicht registriert.");
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !anonKey) return invalid("Supabase Auth ist nicht konfiguriert.");
+  let userId: string | null = null;
+  if (mode === "session") {
+    const sessionClient = await createClient();
+    const { data: { user } } = await sessionClient.auth.getUser();
+    userId = user?.id ?? null;
+    if (!userId) return invalid("Keine aktive Founder-OS-Sitzung gefunden. Bitte zuerst mit Google in Founder OS anmelden.");
+  } else {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !anonKey) return invalid("Supabase Auth ist nicht konfiguriert.");
 
-  const authRes = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
-    method: "POST", headers: { apikey: anonKey, "Content-Type": "application/json" }, body: JSON.stringify({ email, password }),
-  });
-  if (!authRes.ok) return invalid("Anmeldung fehlgeschlagen.");
-  const auth = await authRes.json();
-  if (!(await isFounder(auth.user?.id))) return invalid("Nur Founder dürfen den externen MCP-Zugriff autorisieren.");
+    const authRes = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+      method: "POST", headers: { apikey: anonKey, "Content-Type": "application/json" }, body: JSON.stringify({ email, password }),
+    });
+    if (!authRes.ok) return invalid("Anmeldung fehlgeschlagen.");
+    const auth = await authRes.json();
+    userId = auth.user?.id ?? null;
+  }
+
+  if (!userId || !(await isFounder(userId))) return invalid("Nur Founder dürfen den externen MCP-Zugriff autorisieren.");
 
   const code = randomCode();
   const { error } = await supabaseAdmin.from("mcp_oauth_codes").insert({
     code_hash: hashValue(code), client_id: clientId, redirect_uri: redirectUri,
-    code_challenge: codeChallenge, user_id: auth.user.id,
+    code_challenge: codeChallenge, user_id: userId,
     scope, expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
   });
   if (error) return invalid("OAuth-Code konnte nicht erstellt werden.");
