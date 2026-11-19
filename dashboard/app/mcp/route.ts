@@ -5,7 +5,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { verifyAccessToken } from "@/lib/mcp-oauth";
 
-const ventures = ["online_first", "blazed_outfitters", "brandary", "droplane", "worknest"] as const;
+const ventures = ["online_first", "blazed_outfitters", "brandary", "droplane", "worknest", "sentinel"] as const;
 const statuses = ["neu", "in_bearbeitung", "kontaktiert", "follow_up", "nachgefasst", "erstgespraech", "qualifiziert", "sales_gespraech", "angebot_gesendet", "gewonnen", "verloren", "nachfassen_zukunft"] as const;
 const taskStatuses = ["open", "in_progress", "done"] as const;
 const taskPriorities = ["low", "medium", "high"] as const;

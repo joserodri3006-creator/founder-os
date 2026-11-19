@@ -5,6 +5,7 @@ export const VENTURES = [
   { id: "brandary", label: "Brandary", phase: "Phase 3", color: "bg-green-100 text-green-700" },
   { id: "worknest", label: "Worknest", phase: "Phase 3", color: "bg-teal-100 text-teal-700" },
   { id: "itaba", label: "Itaba", phase: "B2B", color: "bg-rose-100 text-rose-700" },
+  { id: "sentinel", label: "Sentinel", phase: "Kundenprojekt", color: "bg-slate-100 text-slate-700" },
 ] as const;
 
 export type VentureId = (typeof VENTURES)[number]["id"];
