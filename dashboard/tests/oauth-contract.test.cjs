@@ -27,7 +27,7 @@ test('authorization enforces S256 and binds resource and exact redirect URI', ()
 test('token exchange requires exact redirect, resource, PKCE, and logs safe events', () => {
   const source = read('app/oauth/token/route.ts');
   assert.match(source, /resource/);
-  assert.match(source, /row\.redirect_uri === redirectUri/);
+  assert.match(source, /row\.redirect_uri === effectiveRedirectUri/);
   assert.match(source, /oauthLog/);
   assert.doesNotMatch(source, /normalizeRedirectUri/);
 });
