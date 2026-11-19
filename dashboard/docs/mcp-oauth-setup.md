@@ -45,8 +45,13 @@ Select OAuth. Claude (claude.ai) funktioniert mit derselben URL. ChatGPT discove
 /oauth/token
 ```
 
-The authorization page requires the Founder OS founder account. Only users with
-role `founder` can authorize access.
+The server advertises task access for the intended integration:
+
+```text
+tasks:read tasks:write
+```
+
+Lead/CRM scopes remain supported for separately authorized clients, but are not part of the default task-management grant. The authorization and token requests must carry the exact resource `https://<founder-os-domain>/mcp`, the registered redirect URI byte-for-byte, and PKCE `S256`. The token endpoint accepts `application/x-www-form-urlencoded` and JSON bodies, plus public-client `none` and Basic client-id variants.
 
 Available MCP tools:
 
@@ -66,5 +71,6 @@ ChatGPT should use `batch_create_leads` for researched lead lists instead of Exc
 - Die Client-Registrierung (`/oauth/register`) ist ohne Anmeldung möglich und akzeptiert deshalb nur https-Redirects auf `chatgpt.com`, `chat.openai.com`, `platform.openai.com`, `claude.ai` und `claude.com`. Weitere Clients: Liste `ALLOWED_HOSTS` in `app/oauth/register/route.ts` erweitern.
 - Der Zugriff gilt für das ganze Founder-OS-Lead-CRM aller Ventures. Widerruf: Tabelle `mcp_oauth_clients` leeren oder `MCP_OAUTH_SECRET` ändern (macht alle Tokens ungültig).
 - `NEXT_PUBLIC_SITE_URL` wird ohne abschließenden Schrägstrich normalisiert.
-- Getestet (Okt 2026): Discovery, Registrierung (gut und böse), PKCE-Ablauf, falsches Passwort, Code-Wiederverwendung, alle 6 Tools, ungültiger Token.
-- Offen: Ein Refresh-Token gibt es nicht, nach 1 Stunde ist eine neue Anmeldung nötig. Tools decken nur Leads ab (Aufträge, Kunden, Bewertungen, Aufgaben fehlen).
+- OAuth-Discovery, Registrierung, PKCE-S256, Resource-Bindung, exakte Redirect-URI-Prüfung und Code-Wiederverwendung sind durch Regressionstests abgedeckt.
+- Die vier Task-Tools prüfen zusätzlich die Claims `tasks:read` bzw. `tasks:write`; ein Token mit zu engem Scope kann keine Schreiboperation ausführen.
+- Offen: Ein Refresh-Token gibt es nicht, nach 1 Stunde ist eine neue Anmeldung nötig.

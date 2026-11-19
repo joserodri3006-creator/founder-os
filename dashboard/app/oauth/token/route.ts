@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hashValue, issueAccessToken } from "@/lib/mcp-oauth";
+import { hashValue, issueAccessToken, RESOURCE, oauthLog } from "@/lib/mcp-oauth";
 import { createHash } from "node:crypto";
 
 function b64url(buffer: Buffer) { return buffer.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
-function formError(error: string, description: string) { return NextResponse.json({ error, error_description: description }, { status: 400 }); }
-function normalizeRedirectUri(value: string) { return value.replace(/\/+$/, ""); }
+function formError(error: string, description: string, client = "") {
+  oauthLog("token_error", { error, client: client.slice(0, 18) });
+  return NextResponse.json({ error, error_description: description }, { status: 400 });
+}
 function basicClientId(req: NextRequest) {
   const header = req.headers.get("authorization") ?? "";
   if (!header.toLowerCase().startsWith("basic ")) return "";
@@ -24,20 +26,21 @@ export async function POST(req: NextRequest) {
   const code = String(body.code ?? "");
   const clientId = String(body.client_id ?? basicClientId(req));
   const redirectUri = String(body.redirect_uri ?? "");
+  const resource = String(body.resource ?? "");
   const verifier = String(body.code_verifier ?? "");
-  if (grantType !== "authorization_code" || !code || !clientId || !verifier) return formError("invalid_request", "OAuth code, client_id and code_verifier are required");
+  if (grantType !== "authorization_code" || !code || !clientId || !redirectUri || !verifier || resource !== RESOURCE) return formError("invalid_request", "OAuth code, client_id, redirect_uri, resource and code_verifier are required", clientId);
 
   const { data: row } = await supabaseAdmin.from("mcp_oauth_codes").select("*").eq("code_hash", hashValue(code)).eq("client_id", clientId).is("used_at", null).single();
   const { data: client } = await supabaseAdmin.from("mcp_oauth_clients").select("redirect_uris").eq("client_id", clientId).single();
-  const effectiveRedirectUri = redirectUri || String(row?.redirect_uri ?? "");
   const registeredRedirects = Array.isArray(client?.redirect_uris) ? client.redirect_uris.map(String) : [];
-  const redirectMatches = row && registeredRedirects.some((uri) => normalizeRedirectUri(uri) === normalizeRedirectUri(effectiveRedirectUri));
-  if (!row || new Date(row.expires_at).getTime() < Date.now() || !redirectMatches) return formError("invalid_grant", "Authorization code is invalid, expired or already used");
+  const redirectMatches = Boolean(row && row.redirect_uri === redirectUri && row.resource === resource && registeredRedirects.includes(redirectUri));
+  if (!row || new Date(row.expires_at).getTime() < Date.now() || !redirectMatches) return formError("invalid_grant", "Authorization code is invalid, expired or already used", clientId);
 
   const challenge = b64url(createHash("sha256").update(verifier).digest());
-  if (challenge !== row.code_challenge) return formError("invalid_grant", "PKCE verification failed");
+  if (challenge !== row.code_challenge || row.code_challenge_method !== "S256") return formError("invalid_grant", "PKCE verification failed", clientId);
 
-  await supabaseAdmin.from("mcp_oauth_codes").update({ used_at: new Date().toISOString() }).eq("code_hash", row.code_hash);
-  const accessToken = await issueAccessToken(row.user_id, clientId, row.scope);
+  await supabaseAdmin.from("mcp_oauth_codes").update({ used_at: new Date().toISOString() }).eq("code_hash", row.code_hash).is("used_at", null);
+  const accessToken = await issueAccessToken(row.user_id, clientId, row.scope, row.resource);
+  oauthLog("token_success", { client: clientId.slice(0, 18), scope: row.scope, resource: row.resource });
   return NextResponse.json({ access_token: accessToken, token_type: "Bearer", expires_in: 3600, scope: row.scope });
 }

@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-
-const ISSUER = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os-theta.vercel.app").trim().replace(/\/+$/, "");
+import { RESOURCE, SUPPORTED_SCOPES, ISSUER } from "@/lib/mcp-oauth";
 
 export async function GET() {
   return NextResponse.json({
-    resource: `${ISSUER}/mcp`,
+    resource: RESOURCE,
     authorization_servers: [ISSUER],
-    scopes_supported: ["leads:read", "leads:write", "stats:read"],
+    scopes_supported: SUPPORTED_SCOPES,
     bearer_methods_supported: ["header"],
   });
 }

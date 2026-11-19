@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hashValue, isFounder, randomCode, DEFAULT_SCOPE } from "@/lib/mcp-oauth";
+import { hashValue, isFounder, randomCode, DEFAULT_SCOPE, RESOURCE, parseScope, oauthLog } from "@/lib/mcp-oauth";
 import { createClient } from "@/lib/supabase-server";
 
 
@@ -22,16 +22,19 @@ export async function GET(req: NextRequest) {
   const redirectUri = p.get("redirect_uri") ?? "";
   const responseType = p.get("response_type") ?? "";
   const codeChallenge = p.get("code_challenge") ?? "";
+  const codeChallengeMethod = p.get("code_challenge_method") ?? "";
   const state = p.get("state") ?? "";
-  const scope = p.get("scope") || DEFAULT_SCOPE;
+  const resource = p.get("resource") ?? RESOURCE;
+  const requestedScope = p.get("scope") || DEFAULT_SCOPE;
+  const scope = parseScope(requestedScope);
 
-  if (responseType !== "code" || !clientId || !redirectUri || !codeChallenge) return invalid("OAuth-Parameter fehlen.");
+  if (responseType !== "code" || !clientId || !redirectUri || !codeChallenge || codeChallengeMethod !== "S256" || resource !== RESOURCE || !scope) return invalid("OAuth-Parameter fehlen oder sind nicht zulässig.");
   const { data: client } = await supabaseAdmin.from("mcp_oauth_clients").select("redirect_uris").eq("client_id", clientId).single();
   const allowed = Array.isArray(client?.redirect_uris) && client.redirect_uris.includes(redirectUri);
   if (!allowed) return invalid("Client oder redirect_uri nicht registriert.");
 
-  const hidden = ["client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state", "scope"]
-    .map(k => `<input type="hidden" name="${k}" value="${esc(p.get(k) ?? (k === "code_challenge_method" ? "S256" : k === "scope" ? scope : ""))}">`).join("");
+  const hidden = ["client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state", "scope", "resource"]
+    .map(k => `<input type="hidden" name="${k}" value="${esc(p.get(k) ?? (k === "scope" ? scope : k === "resource" ? RESOURCE : ""))}">`).join("");
   return page("Founder OS verbinden", `<p>ChatGPT möchte auf deinen Founder-OS-Leadbereich zugreifen.</p><form method="post">${hidden}<label>E-Mail</label><input type="email" name="email" autocomplete="username"><label>Passwort</label><input type="password" name="password" autocomplete="current-password"><button type="submit" name="mode" value="password">Mit E-Mail/Passwort autorisieren</button><button type="submit" name="mode" value="session" style="background:#fff;color:#1b2a5e;border:1px solid #1b2a5e">Mit aktiver Google-Sitzung autorisieren</button></form>`);
 }
 
@@ -41,8 +44,12 @@ export async function POST(req: NextRequest) {
   const clientId = String(form.get("client_id") ?? "");
   const redirectUri = String(form.get("redirect_uri") ?? "");
   const codeChallenge = String(form.get("code_challenge") ?? "");
+  const codeChallengeMethod = String(form.get("code_challenge_method") ?? "");
   const state = String(form.get("state") ?? "");
-  const scope = String(form.get("scope") ?? DEFAULT_SCOPE);
+  const resource = String(form.get("resource") ?? "");
+  const requestedScope = String(form.get("scope") ?? DEFAULT_SCOPE);
+  const scope = parseScope(requestedScope);
+  if (!clientId || !redirectUri || !codeChallenge || codeChallengeMethod !== "S256" || resource !== RESOURCE || !scope) return invalid("OAuth-Parameter fehlen oder sind nicht zulässig.");
   const mode = String(form.get("mode") ?? "password");
   const email = String(form.get("email") ?? "");
   const password = String(form.get("password") ?? "");
@@ -74,10 +81,11 @@ export async function POST(req: NextRequest) {
   const code = randomCode();
   const { error } = await supabaseAdmin.from("mcp_oauth_codes").insert({
     code_hash: hashValue(code), client_id: clientId, redirect_uri: redirectUri,
-    code_challenge: codeChallenge, user_id: userId,
+    code_challenge: codeChallenge, code_challenge_method: codeChallengeMethod, resource, user_id: userId,
     scope, expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
   });
   if (error) return invalid("OAuth-Code konnte nicht erstellt werden.");
+  oauthLog("authorization", { client: clientId.slice(0, 18), scope, resource, redirect: hashValue(redirectUri).slice(0, 12) });
 
   const target = new URL(redirectUri);
   target.searchParams.set("code", code);

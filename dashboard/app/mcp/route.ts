@@ -20,7 +20,9 @@ function json(data: unknown) {
   return JSON.stringify(data, null, 2);
 }
 
-function createFounderServer(userId: string) {
+function createFounderServer(userId: string, scope: string) {
+  const scopes = new Set(scope.split(/\s+/));
+  const requireScope = (required: string) => scopes.has(required);
   const server = new McpServer(
     { name: "founder-os", version: "1.0.0" },
     { instructions: "Founder OS CRM. Nutze batch_create_leads für recherchierte Lead-Listen. Aufgaben können direkt gelesen, angelegt, geändert und gelöscht werden; diese Task-Tools haben sofortige Schreibwirkung." },
@@ -104,6 +106,7 @@ function createFounderServer(userId: string) {
       limit: z.number().int().min(1).max(500).optional(),
     },
   }, async ({ venture, entity_type, entity_id, status, assigned_to, limit }) => {
+    if (!requireScope("tasks:read")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "tasks:read" }) }] };
     let query = supabaseAdmin.from("tasks").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false }).limit(limit ?? 100);
     if (venture) query = query.eq("venture", venture);
     if (entity_type) query = query.eq("entity_type", entity_type);
@@ -131,6 +134,7 @@ function createFounderServer(userId: string) {
       checklist: z.array(z.unknown()).optional(),
     },
   }, async ({ venture, entity_type, entity_id, title, description, status, priority, due_date, assigned_to, recurrence_rule, recurrence_end_date, checklist }) => {
+    if (!requireScope("tasks:write")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "tasks:write" }) }] };
     const { data, error } = await supabaseAdmin.from("tasks").insert({
       venture,
       entity_type,
@@ -164,6 +168,7 @@ function createFounderServer(userId: string) {
       checklist: z.array(z.unknown()).optional(),
     },
   }, async ({ id, title, description, status, priority, due_date, assigned_to, recurrence_rule, recurrence_end_date, checklist }) => {
+    if (!requireScope("tasks:write")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "tasks:write" }) }] };
     const updates: Record<string, unknown> = {};
     if (title !== undefined) updates.title = title.trim();
     if (description !== undefined) updates.description = description;
@@ -183,6 +188,7 @@ function createFounderServer(userId: string) {
     description: "Aufgabe sofort und dauerhaft löschen. Diese Aktion hat direkte Schreibwirkung.",
     inputSchema: { id: z.string().uuid() },
   }, async ({ id }) => {
+    if (!requireScope("tasks:write")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "tasks:write" }) }] };
     const { error } = await supabaseAdmin.from("tasks").delete().eq("id", id);
     return { content: [{ type: "text", text: json(error ? { error: error.message } : { success: true, id }) }] };
   });
@@ -201,7 +207,7 @@ async function handle(req: Request) {
 
   const token = auth.slice(7);
   const verified = await verifyAccessToken(token);
-  const server = createFounderServer(verified.userId);
+  const server = createFounderServer(verified.userId, verified.scope);
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);
   const response = await transport.handleRequest(req);
