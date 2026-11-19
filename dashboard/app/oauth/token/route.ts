@@ -26,14 +26,15 @@ export async function POST(req: NextRequest) {
   const code = String(body.code ?? "");
   const clientId = String(body.client_id ?? basicClientId(req));
   const redirectUri = String(body.redirect_uri ?? "");
-  const resource = String(body.resource ?? "");
+  const resource = body.resource === undefined || body.resource === "" ? "" : String(body.resource);
   const verifier = String(body.code_verifier ?? "");
-  if (grantType !== "authorization_code" || !code || !clientId || !redirectUri || !verifier || resource !== RESOURCE) return formError("invalid_request", "OAuth code, client_id, redirect_uri, resource and code_verifier are required", clientId);
+  if (grantType !== "authorization_code" || !code || !clientId || !redirectUri || !verifier || (resource && resource !== RESOURCE)) return formError("invalid_request", "OAuth code, client_id, redirect_uri and code_verifier are required", clientId);
 
   const { data: row } = await supabaseAdmin.from("mcp_oauth_codes").select("*").eq("code_hash", hashValue(code)).eq("client_id", clientId).is("used_at", null).single();
   const { data: client } = await supabaseAdmin.from("mcp_oauth_clients").select("redirect_uris").eq("client_id", clientId).single();
   const registeredRedirects = Array.isArray(client?.redirect_uris) ? client.redirect_uris.map(String) : [];
-  const redirectMatches = Boolean(row && row.redirect_uri === redirectUri && row.resource === resource && registeredRedirects.includes(redirectUri));
+  const effectiveResource = resource || String(row?.resource ?? RESOURCE);
+  const redirectMatches = Boolean(row && row.redirect_uri === redirectUri && row.resource === effectiveResource && registeredRedirects.includes(redirectUri));
   if (!row || new Date(row.expires_at).getTime() < Date.now() || !redirectMatches) return formError("invalid_grant", "Authorization code is invalid, expired or already used", clientId);
 
   const challenge = b64url(createHash("sha256").update(verifier).digest());
