@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 // /mcp, /oauth und /.well-known sind öffentlich erreichbar, weil externe MCP-Clients (ChatGPT, Claude) dort ohne
 // Founder-OS-Session ankommen. /mcp schützt sich per OAuth-Bearer-Token, /oauth/authorize per Founder-Passwort.
 const PUBLIC_PAGE_PREFIXES = ["/login", "/auth", "/invite", "/online-first", "/brandary", "/bewerten", "/mcp", "/oauth", "/.well-known"];
-const PUBLIC_API_PREFIXES = ["/api/invite", "/api/public"];
+const PUBLIC_API_PREFIXES = ["/api/health", "/api/invite", "/api/public"];
 
 type PermissionLevel = "edit" | "view" | "none";
 type Section = "leads" | "customers" | "orders" | "products" | "drafts" | "invoices" | "reviews" | "settings";
