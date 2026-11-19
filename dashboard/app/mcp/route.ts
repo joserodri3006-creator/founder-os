@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { timingSafeEqual } from "node:crypto";
 import { verifyAccessToken } from "@/lib/mcp-oauth";
 
 const ventures = ["online_first", "blazed_outfitters", "brandary", "droplane", "worknest", "sentinel"] as const;
@@ -196,18 +197,39 @@ function createFounderServer(userId: string, scope: string) {
   return server;
 }
 
+function staticTokenMatches(value: string, expected: string) {
+  const actual = Buffer.from(value);
+  const target = Buffer.from(expected);
+  return actual.length === target.length && timingSafeEqual(actual, target);
+}
+
+function unauthorized() {
+  return new Response(JSON.stringify({ error: "Unauthorized", error_description: "Bearer token required" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": "Bearer" } });
+}
+
 async function handle(req: Request) {
   const auth = req.headers.get("authorization") ?? "";
-  if (!auth.startsWith("Bearer ")) return new Response(JSON.stringify({ error: "Unauthorized", error_description: "Bearer token required" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": `Bearer resource_metadata="${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os-theta.vercel.app").trim().replace(/\/+$/, "")}/.well-known/oauth-protected-resource/mcp"` } });
-  try {
-    await verifyAccessToken(auth.slice(7));
-  } catch {
-    return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": `Bearer resource_metadata="${(process.env.NEXT_PUBLIC_SITE_URL ?? "https://founder-os-theta.vercel.app").trim().replace(/\/+$/, "")}/.well-known/oauth-protected-resource/mcp"` } });
+  if (!auth.startsWith("Bearer ")) return unauthorized();
+  const token = auth.slice(7);
+  const staticToken = process.env.MCP_STATIC_TOKEN;
+  const staticUserId = process.env.MCP_STATIC_USER_ID ?? "1a996185-21dc-49ad-bbb0-beb246da85d2";
+  let userId: string;
+  let scope: string;
+  if (staticToken) {
+    if (!staticUserId || !staticTokenMatches(token, staticToken)) return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": "Bearer" } });
+    userId = staticUserId;
+    scope = "tasks:read tasks:write";
+  } else {
+    try {
+      const verified = await verifyAccessToken(token);
+      userId = verified.userId;
+      scope = verified.scope;
+    } catch {
+      return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": "Bearer" } });
+    }
   }
 
-  const token = auth.slice(7);
-  const verified = await verifyAccessToken(token);
-  const server = createFounderServer(verified.userId, verified.scope);
+  const server = createFounderServer(userId, scope);
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);
   const response = await transport.handleRequest(req);
