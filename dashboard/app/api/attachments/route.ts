@@ -27,6 +27,9 @@ export async function POST(req: NextRequest) {
   if (!file || !entity_type || !entity_id) {
     return NextResponse.json({ error: "Fehlende Parameter" }, { status: 400 });
   }
+  if (!["order", "customer", "product", "task"].includes(entity_type)) {
+    return NextResponse.json({ error: "entity_type nicht unterstützt" }, { status: 400 });
+  }
 
   const storage_path = `${entity_type}/${entity_id}/${Date.now()}-${file.name}`;
   const buffer = await file.arrayBuffer();

@@ -2,6 +2,7 @@
 
 import { useState, type ComponentProps } from "react";
 import Link from "next/link";
+import AttachmentsPanel from "@/components/AttachmentsPanel";
 import { VENTURES } from "@/lib/ventures";
 import {
   DndContext, PointerSensor, TouchSensor, KeyboardSensor,
@@ -283,10 +284,14 @@ function TaskEditForm({ task, members, onDone, onCancel }: {
           <option value="daily">Täglich</option><option value="weekly">Wöchentlich</option>
           <option value="monthly">Monatlich</option><option value="yearly">Jährlich</option>
         </select>
-        {recurrenceRule && <input type="date" value={recurrenceEndDate} onChange={e => setRecurrenceEndDate(e.target.value)}
-          title="Wiederholung endet am" className="text-sm border border-gray-200 rounded-md px-2 py-1.5 flex-1 min-w-[130px]" />}
+        {recurrenceRule && <>
+          <input type="date" value={recurrenceEndDate} onChange={e => setRecurrenceEndDate(e.target.value)}
+            title="Wiederholung endet am" className="text-sm border border-gray-200 rounded-md px-2 py-1.5 flex-1 min-w-[130px]" />
+          {!recurrenceEndDate && <span className="text-xs text-blue-600 self-center">Daueraufgabe</span>}
+        </>}
       </div>
       <ChecklistEditor items={checklist} onChange={setChecklist} />
+      <AttachmentsPanel entityType="task" entityId={task.id} venture={task.venture} />
       <div className="flex gap-2">
         <button onClick={save} disabled={saving || !title.trim()}
           className="text-sm px-3 py-1.5 rounded-md text-white font-medium disabled:opacity-40" style={{ background: "#1B2A5E" }}>

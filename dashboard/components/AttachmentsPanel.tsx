@@ -11,7 +11,7 @@ interface Attachment {
 }
 
 interface Props {
-  entityType: 'order' | 'customer' | 'product';
+  entityType: 'order' | 'customer' | 'product' | 'task';
   entityId: string;
   venture?: string;
 }

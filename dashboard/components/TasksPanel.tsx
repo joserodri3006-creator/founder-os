@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, type CSSProperties } from "react";
 import { ChecklistEditor } from "@/components/TasksList";
+import AttachmentsPanel from "@/components/AttachmentsPanel";
 import { useAuth } from "@/context/AuthContext";
 import { VENTURES } from "@/lib/ventures";
 
@@ -283,9 +284,15 @@ function TaskForm({ mode, initial, venture, entityType, entityId, members, onDon
           <option value="">Keine Wiederholung</option><option value="daily">Täglich</option><option value="weekly">Wöchentlich</option>
           <option value="monthly">Monatlich</option><option value="yearly">Jährlich</option>
         </select>
-        {recurrenceRule && <input type="date" value={recurrenceEndDate} onChange={e => setRecurrenceEndDate(e.target.value)} style={{ ...fieldStyle, flex: "1 1 130px" }} />}
+        {recurrenceRule && <>
+          <input type="date" value={recurrenceEndDate} onChange={e => setRecurrenceEndDate(e.target.value)} style={{ ...fieldStyle, flex: "1 1 130px" }} />
+          {!recurrenceEndDate && <span style={{ fontSize: "12px", color: "#2563EB", alignSelf: "center" }}>Daueraufgabe</span>}
+        </>}
       </div>
       <ChecklistEditor items={checklist} onChange={setChecklist} />
+      {mode === "edit" && initial && (
+        <AttachmentsPanel entityType="task" entityId={initial.id} venture={venture} />
+      )}
       <div style={{ display: "flex", gap: "8px" }}>
         <button onClick={save} disabled={saving || !title.trim()}
           style={{ background: "#1B2A5E", color: "#fff", border: "none", borderRadius: "6px", padding: "7px 16px", fontSize: "13px", cursor: "pointer", fontWeight: 500, opacity: (saving || !title.trim()) ? 0.6 : 1 }}>
