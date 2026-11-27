@@ -38,3 +38,27 @@ test('MCP tools enforce task scopes from the access token', () => {
   assert.match(source, /tasks:write/);
   assert.match(source, /scope/);
 });
+
+test('MCP rejects anonymous access and has no hard-coded user identity', () => {
+  const source = read('app/mcp/route.ts');
+  assert.doesNotMatch(source, /MCP_PUBLIC_ACCESS/);
+  assert.doesNotMatch(source, /1a996185-21dc-49ad-bbb0-beb246da85d2/);
+  assert.match(source, /if \(!auth\.startsWith\("Bearer "\)\) return unauthorized\(\)/);
+});
+
+test('MCP resolves venture roles and checks section permissions before data access', () => {
+  const source = read('app/mcp/route.ts');
+  const access = read('lib/mcp-access.ts');
+  assert.match(source, /getMcpAccess\(userId\)/);
+  assert.match(source, /canUseSection\(access, venture, "leads", "view"\)/);
+  assert.match(source, /loadTaskAccess\(id, "edit"\)/);
+  assert.match(access, /user_venture_roles/);
+  assert.match(access, /row\.venture === venture/);
+});
+
+test('OAuth authorization accepts assigned app users instead of founder-only access', () => {
+  const source = read('app/oauth/authorize/route.ts');
+  assert.match(source, /getMcpAccess\(userId\)/);
+  assert.doesNotMatch(source, /isFounder/);
+  assert.doesNotMatch(source, /Nur Founder/);
+});
