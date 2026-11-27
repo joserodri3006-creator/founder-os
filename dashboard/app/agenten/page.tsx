@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import { useVenture } from "@/context/VentureContext";
+import { getVenture } from "@/lib/ventures";
 
 interface AgentRecord {
   id: string;
@@ -94,9 +96,12 @@ function statusStyle(status: string) {
 }
 
 export default function AgentenPage() {
+  const { venture } = useVenture();
   const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [scope, setScope] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [scope, setScope] = useState("active_venture");
   const [type, setType] = useState("");
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
@@ -110,16 +115,29 @@ export default function AgentenPage() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    if (scope) params.set("scope_type", scope);
+    if (scope === "active_venture") {
+      params.set("scope_type", "venture");
+      params.set("scope_id", venture);
+    } else if (scope) {
+      const [scopeType, scopeId] = scope.split(":");
+      params.set("scope_type", scopeType);
+      if (scopeId) params.set("scope_id", scopeId);
+    }
     if (type) params.set("agent_type", type);
     if (status) params.set("status", status);
     if (search) params.set("search", search);
     setLoading(true);
+    setLoadError("");
     fetch(`/api/agenten?${params}`)
-      .then((response) => response.json())
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error ?? "Agenten konnten nicht geladen werden.");
+        return body;
+      })
       .then((data) => setAgents(Array.isArray(data) ? data : []))
+      .catch((reason) => { setAgents([]); setLoadError(reason.message); })
       .finally(() => setLoading(false));
-  }, [scope, type, status, search]);
+  }, [scope, type, status, search, venture, reloadKey]);
 
   const visibleAgents = useMemo(
     () => agents.filter((agent) => showClientProjects || agent.scope_type !== "client_project"),
@@ -173,7 +191,7 @@ export default function AgentenPage() {
           <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: "#C8A96E" }}>Founder OS · Steuerung</p>
           <h1 style={{ fontFamily: "var(--font-serif)", fontSize: 32, fontWeight: 300, color: "#14193A" }}>Agenten & Automationen</h1>
           <p className="mt-1 max-w-3xl text-sm leading-6" style={{ color: "#6B7280" }}>
-            Hier siehst du, welche KI-Agenten, Manager, Scripts und Worker in deinem Founder OS existieren, wofür sie zuständig sind und welchem Bereich sie untergeordnet sind.
+            Standardmäßig siehst du die KI-Agenten, Manager, Scripts und Worker des aktuell ausgewählten Ventures. Für eine übergreifende Prüfung kannst du den Bereichsfilter öffnen.
           </p>
         </div>
         <span className="rounded-full px-3 py-1.5 text-sm" style={{ background: "#EEF0F7", color: "#1B2A5E" }}>{stats.total} Einträge sichtbar</span>
@@ -246,12 +264,16 @@ export default function AgentenPage() {
 
       <div className="mb-6 flex flex-wrap gap-2 rounded-2xl border bg-white p-3 shadow-sm" style={{ borderColor: "#D1D5E8" }}>
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Name, Rolle oder Zweck suchen…" className="min-w-[230px] flex-1 rounded-lg border px-3 py-2 text-sm outline-none" style={{ borderColor: "#D1D5E8" }} />
-        <select value={scope} onChange={(event) => setScope(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "#D1D5E8" }}><option value="">Alle Bereiche</option>{Object.entries(SCOPE_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
+        <select value={scope} onChange={(event) => setScope(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "#D1D5E8" }}>
+          <option value="active_venture">Aktuelles Venture · {getVenture(venture)?.label ?? venture}</option>
+          <option value="">Alle Bereiche</option>
+          {Object.entries(SCOPE_LABELS).filter(([id]) => id !== "venture").map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+        </select>
         <select value={type} onChange={(event) => setType(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "#D1D5E8" }}><option value="">Alle Typen</option>{Object.entries(TYPE_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
         <select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: "#D1D5E8" }}><option value="">Alle Status</option>{Object.entries(STATUS_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select>
       </div>
 
-      {loading ? <p className="py-12 text-center text-sm" style={{ color: "#6B7280" }}>Agentenübersicht wird geladen…</p> : visibleAgents.length === 0 ? (
+      {loadError ? <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center"><p className="text-sm text-red-700">{loadError}</p><button type="button" onClick={() => setReloadKey((current) => current + 1)} className="mt-3 text-sm font-semibold text-red-700 underline">Wiederholen</button></div> : loading ? <p className="py-12 text-center text-sm" style={{ color: "#6B7280" }}>Agentenübersicht wird geladen…</p> : visibleAgents.length === 0 ? (
         <div className="rounded-2xl border bg-white p-10 text-center" style={{ borderColor: "#D1D5E8" }}><p className="text-base font-semibold" style={{ color: "#14193A" }}>Keine Einträge für diese Auswahl</p><p className="mt-2 text-sm" style={{ color: "#6B7280" }}>Passe die Filter an oder aktiviere die Kundenprojekte.</p></div>
       ) : <div className="space-y-7">
         {Object.entries(grouped).map(([key, items]) => {
