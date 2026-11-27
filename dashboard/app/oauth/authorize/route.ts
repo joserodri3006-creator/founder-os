@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hashValue, isFounder, randomCode, DEFAULT_SCOPE, RESOURCE, parseScope, oauthLog } from "@/lib/mcp-oauth";
+import { hashValue, randomCode, DEFAULT_SCOPE, RESOURCE, parseScope, oauthLog } from "@/lib/mcp-oauth";
 import { createClient } from "@/lib/supabase-server";
+import { getMcpAccess } from "@/lib/mcp-access";
 
 
 function esc(value: string) {
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
 
   const hidden = ["client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state", "scope", "resource"]
     .map(k => `<input type="hidden" name="${k}" value="${esc(p.get(k) ?? (k === "scope" ? scope : k === "resource" ? RESOURCE : ""))}">`).join("");
-  return page("Founder OS verbinden", `<p>ChatGPT möchte auf deinen Founder-OS-Leadbereich zugreifen.</p><form method="post">${hidden}<label>E-Mail</label><input type="email" name="email" autocomplete="username"><label>Passwort</label><input type="password" name="password" autocomplete="current-password"><button type="submit" name="mode" value="password">Mit E-Mail/Passwort autorisieren</button><button type="submit" name="mode" value="session" style="background:#fff;color:#1b2a5e;border:1px solid #1b2a5e">Mit aktiver Google-Sitzung autorisieren</button></form>`);
+  return page("Founder OS verbinden", `<p>ChatGPT möchte auf die Founder-OS-Bereiche zugreifen, die deinem Benutzer zugewiesen sind.</p><form method="post">${hidden}<label>E-Mail</label><input type="email" name="email" autocomplete="username"><label>Passwort</label><input type="password" name="password" autocomplete="current-password"><button type="submit" name="mode" value="password">Mit E-Mail/Passwort autorisieren</button><button type="submit" name="mode" value="session" style="background:#fff;color:#1b2a5e;border:1px solid #1b2a5e">Mit aktiver Google-Sitzung autorisieren</button></form>`);
 }
 
 export async function POST(req: NextRequest) {
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
     userId = auth.user?.id ?? null;
   }
 
-  if (!userId || !(await isFounder(userId))) return invalid("Nur Founder dürfen den externen MCP-Zugriff autorisieren.");
+  if (!userId || !(await getMcpAccess(userId))) return invalid("Für diesen Benutzer ist kein Founder-OS-Zugriff eingerichtet.");
 
   const code = randomCode();
   const { error } = await supabaseAdmin.from("mcp_oauth_codes").insert({
