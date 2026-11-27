@@ -2,7 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import type { PermissionLevel, Section } from "@/lib/permissions";
 
 type VentureRole = {
-  role: "founder" | "manager" | "employee";
+  role: string;
   venture: string | null;
   permissions: Partial<Record<Section, PermissionLevel>> | null;
 };
