@@ -1,110 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase-admin";
+import { createClient } from "@/lib/supabase-server";
+
+const PERIODS = new Set(["week", "month", "quarter", "year"]);
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const venture = searchParams.get("venture");
+  const params = new URL(req.url).searchParams;
+  const venture = params.get("venture");
+  const period = params.get("period") ?? "month";
+  const asOf = params.get("as_of") ?? new Date().toISOString().slice(0, 10);
 
-  if (!venture) {
-    return NextResponse.json({ error: "venture parameter required" }, { status: 400 });
+  if (!venture) return NextResponse.json({ error: "venture parameter required" }, { status: 400 });
+  if (!PERIODS.has(period)) return NextResponse.json({ error: "invalid period" }, { status: 400 });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) return NextResponse.json({ error: "invalid as_of date" }, { status: 400 });
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Nicht angemeldet" }, { status: 401 });
+
+  const { data, error } = await supabase.rpc("dashboard_venture_summary", {
+    p_venture: venture,
+    p_period: period,
+    p_as_of: asOf,
+  });
+
+  if (error) {
+    console.error("dashboard_venture_summary:", error.message);
+    const status = /permission|zugriff|auth/i.test(error.message) ? 403 : 500;
+    return NextResponse.json({ error: status === 403 ? "Kein Zugriff auf dieses Venture" : "Dashboard konnte nicht geladen werden" }, { status });
   }
 
-  const now = new Date();
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const today = now.toISOString().split("T")[0];
-
-  const [
-    { data: leadsWeek },
-    { data: openDrafts },
-    { data: activeOrders },
-    { data: newCustomers },
-    { data: recentLeads },
-    { count: followUpsFaellig },
-    { count: fitChecks },
-    { count: checkoutStarts },
-    { data: paidCheckouts },
-  ] = await Promise.all([
-    supabaseAdmin
-      .from("leads")
-      .select("id")
-      .eq("venture", venture)
-      .gte("created_at", weekAgo)
-      .is("archived_at", null),
-
-    supabaseAdmin
-      .from("leads")
-      .select("id")
-      .eq("venture", venture)
-      .eq("ai_draft_approved", false)
-      .not("ai_draft_subject", "is", null)
-      .is("archived_at", null),
-
-    supabaseAdmin
-      .from("orders")
-      .select("id")
-      .eq("venture", venture)
-      .neq("status", "abgeschlossen"),
-
-    supabaseAdmin
-      .from("customers")
-      .select("id")
-      .eq("venture", venture)
-      .gte("created_at", monthStart),
-
-    supabaseAdmin
-      .from("leads")
-      .select("id,first_name,last_name,email,company_name,status,source,created_at,venture")
-      .eq("venture", venture)
-      .is("archived_at", null)
-      .order("created_at", { ascending: false })
-      .limit(10),
-
-    supabaseAdmin
-      .from("leads")
-      .select("*", { count: "exact", head: true })
-      .eq("venture", venture)
-      .lte("follow_up_date", today)
-      .not("follow_up_date", "is", null)
-      .is("archived_at", null),
-
-    supabaseAdmin
-      .from("sales_submissions")
-      .select("id", { count: "exact", head: true })
-      .eq("venture", venture)
-      .gte("created_at", monthStart),
-
-    supabaseAdmin
-      .from("sales_checkout_sessions")
-      .select("id,sales_submissions!inner(venture)", { count: "exact", head: true })
-      .eq("sales_submissions.venture", venture)
-      .gte("created_at", monthStart),
-
-    supabaseAdmin
-      .from("sales_checkout_sessions")
-      .select("amount_net_cents,sales_submissions!inner(venture)")
-      .eq("sales_submissions.venture", venture)
-      .eq("status", "paid")
-      .gte("paid_at", monthStart),
-  ]);
-
-  return NextResponse.json({
-    kpi: {
-      leadsWeek:     (leadsWeek ?? []).length,
-      openDrafts:    (openDrafts ?? []).length,
-      activeOrders:  (activeOrders ?? []).length,
-      newCustomers:  (newCustomers ?? []).length,
-    },
-    followUpsFaellig: followUpsFaellig ?? 0,
-    recentLeads:      recentLeads ?? [],
-    salesFunnel: {
-      fitChecks: fitChecks ?? 0,
-      checkoutStarts: checkoutStarts ?? 0,
-      depositsPaid: (paidCheckouts ?? []).length,
-      depositRevenueNetCents: (paidCheckouts ?? []).reduce(
-        (sum, checkout) => sum + (checkout.amount_net_cents ?? 0),
-        0
-      ),
-    },
-  });
+  return NextResponse.json(data);
 }
