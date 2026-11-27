@@ -5,7 +5,10 @@ import { cookies } from "next/headers";
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = new URL(req.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/dashboard";
+  const requestedNext = searchParams.get("next");
+  const next = requestedNext?.startsWith("/") && !requestedNext.startsWith("//")
+    ? requestedNext
+    : "/dashboard";
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=auth`);

@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [healthIssues, setHealthIssues] = useState<string[]>([]);
   const [showDebug, setShowDebug] = useState(false);
   const [oauthUrl, setOauthUrl] = useState("");
+  const [nextPath, setNextPath] = useState("");
 
   const supabase = createClient();
 
@@ -26,6 +27,10 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     const urlError = params.get("error");
     const urlMsg = params.get("msg");
+    const requestedNext = params.get("next");
+    if (requestedNext?.startsWith("/") && !requestedNext.startsWith("//")) {
+      setNextPath(requestedNext);
+    }
 
     if (urlError === "auth" && urlMsg) {
       setError(`Anmeldung fehlgeschlagen: ${decodeURIComponent(urlMsg)}`);
@@ -79,7 +84,7 @@ export default function LoginPage() {
       }
       return;
     }
-    router.push(email.trim().toLowerCase() === "info@itaba.de" ? "/auftraege" : "/dashboard");
+    router.push(nextPath || (email.trim().toLowerCase() === "info@itaba.de" ? "/auftraege" : "/dashboard"));
     router.refresh();
   }
 
@@ -89,7 +94,7 @@ export default function LoginPage() {
     const { error: authError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback${nextPath ? `?next=${encodeURIComponent(nextPath)}` : ""}`,
       },
     });
     if (authError) {

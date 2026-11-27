@@ -25,3 +25,8 @@ verify_jwt = false
 
 [functions.jarvis-autonomous-check]
 verify_jwt = false
+
+[functions.blazed-ai]
+# OAuth discovery reaches this function before a user token exists. The
+# function validates OAuth tokens itself with Supabase's official middleware.
+verify_jwt = false
