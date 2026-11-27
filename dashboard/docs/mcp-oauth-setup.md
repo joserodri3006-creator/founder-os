@@ -45,13 +45,14 @@ Select OAuth. Claude (claude.ai) funktioniert mit derselben URL. ChatGPT discove
 /oauth/token
 ```
 
-The server advertises task access for the intended integration:
+The server advertises all currently supported CRM scopes by default. Venture
+and section permissions still decide which tools may actually access data:
 
 ```text
-tasks:read tasks:write
+tasks:read tasks:write leads:read leads:write stats:read
 ```
 
-Lead/CRM scopes remain supported for separately authorized clients, but are not part of the default task-management grant. The authorization and token requests must carry the exact resource `https://<founder-os-domain>/mcp`, the registered redirect URI byte-for-byte, and PKCE `S256`. The token endpoint accepts `application/x-www-form-urlencoded` and JSON bodies, plus public-client `none` and Basic client-id variants.
+The authorization and token requests must carry the exact resource `https://<founder-os-domain>/mcp`, the registered redirect URI byte-for-byte, and PKCE `S256`. The token endpoint accepts `application/x-www-form-urlencoded` and JSON bodies, plus public-client `none` and Basic client-id variants.
 
 Available MCP tools:
 

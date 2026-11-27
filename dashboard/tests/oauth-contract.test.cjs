@@ -12,6 +12,7 @@ test('OAuth contract publishes task scopes and resource metadata', () => {
   const protectedResource = read('app/.well-known/oauth-protected-resource/mcp/route.ts');
   assert.match(oauth, /tasks:read/);
   assert.match(oauth, /tasks:write/);
+  assert.match(oauth, /DEFAULT_SCOPE = "tasks:read tasks:write leads:read leads:write stats:read"/);
   assert.match(authorization, /SUPPORTED_SCOPES/);
   assert.match(protectedResource, /SUPPORTED_SCOPES/);
 });
