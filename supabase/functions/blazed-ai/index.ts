@@ -1,6 +1,6 @@
 import { createMcpHandler, McpServer } from "npm:@modelcontextprotocol/server@2.0.0";
 import { pipeline } from "npm:@supabase/middleware@1.0.0";
-import { withOAuthProtectedResource, withSupabase } from "npm:@supabase/server@1.0.0";
+import { withOAuthProtectedResource, withSupabase } from "npm:@supabase/server@1.9.2";
 import { createClient } from "npm:@supabase/supabase-js@2.100.1";
 import { z } from "npm:zod@4.3.6";
 
