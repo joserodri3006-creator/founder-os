@@ -51,15 +51,3 @@ export async function verifyAccessToken(token: string) {
     scope: String(result.payload.scope ?? ""),
   };
 }
-
-export async function isFounder(userId: string) {
-  const { supabaseAdmin } = await import("@/lib/supabase-admin");
-  const { data } = await supabaseAdmin
-    .from("user_venture_roles")
-    .select("role")
-    .eq("user_id", userId)
-    .eq("role", "founder")
-    .limit(1)
-    .maybeSingle();
-  return Boolean(data);
-}
