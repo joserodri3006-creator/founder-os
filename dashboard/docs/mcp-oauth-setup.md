@@ -69,7 +69,9 @@ ChatGPT should use `batch_create_leads` for researched lead lists instead of Exc
 
 - `/mcp`, `/oauth/*` und `/.well-known/*` sind im Login-Schutz (`proxy.ts`) bewusst öffentlich, weil externe Clients ohne Founder-OS-Session ankommen. `/mcp` verlangt einen gültigen Bearer-Token (JWT, 1 Stunde), `/oauth/authorize` das Founder-Passwort. Ohne Token kommt ein 401 mit `resource_metadata`.
 - Die Client-Registrierung (`/oauth/register`) ist ohne Anmeldung möglich und akzeptiert deshalb nur https-Redirects auf `chatgpt.com`, `chat.openai.com`, `platform.openai.com`, `claude.ai` und `claude.com`. Weitere Clients: Liste `ALLOWED_HOSTS` in `app/oauth/register/route.ts` erweitern.
-- Der Zugriff gilt für das ganze Founder-OS-Lead-CRM aller Ventures. Widerruf: Tabelle `mcp_oauth_clients` leeren oder `MCP_OAUTH_SECRET` ändern (macht alle Tokens ungültig).
+- Jeder Benutzer autorisiert sich mit seinem eigenen Founder-OS-Login. Der Server liest bei jeder MCP-Anfrage die aktuellen Einträge aus `user_venture_roles` und erlaubt nur die dort zugewiesenen Ventures und Bereiche. Founder behalten ventureübergreifenden Zugriff.
+- Anonymer MCP-Zugriff ist grundsätzlich deaktiviert. Ein optionaler statischer Token funktioniert nur zusammen mit einer expliziten `MCP_STATIC_USER_ID`; auch dann gelten deren aktuelle Venture- und Bereichsrechte.
+- Widerruf: Benutzerrolle in `user_venture_roles` entfernen. Für einen globalen Widerruf `MCP_OAUTH_SECRET` ändern (macht alle OAuth-Tokens ungültig) und optional `mcp_oauth_clients` leeren.
 - `NEXT_PUBLIC_SITE_URL` wird ohne abschließenden Schrägstrich normalisiert.
 - OAuth-Discovery, Registrierung, PKCE-S256, Resource-Bindung, exakte Redirect-URI-Prüfung und Code-Wiederverwendung sind durch Regressionstests abgedeckt.
 - Die vier Task-Tools prüfen zusätzlich die Claims `tasks:read` bzw. `tasks:write`; ein Token mit zu engem Scope kann keine Schreiboperation ausführen.

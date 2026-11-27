@@ -5,8 +5,14 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { timingSafeEqual } from "node:crypto";
 import { verifyAccessToken } from "@/lib/mcp-oauth";
+import {
+  allowedVentures,
+  canUseSection,
+  getMcpAccess,
+  type McpAccess,
+} from "@/lib/mcp-access";
 
-const ventures = ["online_first", "blazed_outfitters", "brandary", "droplane", "worknest", "sentinel"] as const;
+const ventures = ["online_first", "blazed_outfitters", "brandary", "droplane", "itaba", "sentinel"] as const;
 const statuses = ["neu", "in_bearbeitung", "kontaktiert", "follow_up", "nachgefasst", "erstgespraech", "qualifiziert", "sales_gespraech", "angebot_gesendet", "gewonnen", "verloren", "nachfassen_zukunft"] as const;
 const taskStatuses = ["open", "in_progress", "done"] as const;
 const taskPriorities = ["low", "medium", "high"] as const;
@@ -21,9 +27,26 @@ function json(data: unknown) {
   return JSON.stringify(data, null, 2);
 }
 
-function createFounderServer(userId: string, scope: string) {
+function createFounderServer(userId: string, scope: string, access: McpAccess) {
   const scopes = new Set(scope.split(/\s+/));
   const requireScope = (required: string) => scopes.has(required);
+  const forbidden = (message = "Kein Zugriff auf dieses Venture oder diesen Bereich") => ({
+    content: [{ type: "text" as const, text: json({ error: "forbidden", message }) }],
+    isError: true,
+  });
+  const sectionForEntity = (entityType: string) => entityType === "lead" ? "leads" as const : "customers" as const;
+
+  async function entityBelongsToVenture(entityType: "lead" | "customer", entityId: string, venture: string) {
+    const table = entityType === "lead" ? "leads" : "customers";
+    const { data } = await supabaseAdmin.from(table).select("id").eq("id", entityId).eq("venture", venture).maybeSingle();
+    return Boolean(data);
+  }
+
+  async function loadTaskAccess(id: string, required: "view" | "edit") {
+    const { data } = await supabaseAdmin.from("tasks").select("id,venture,entity_type").eq("id", id).maybeSingle();
+    if (!data) return null;
+    return canUseSection(access, data.venture, sectionForEntity(data.entity_type), required) ? data : null;
+  }
   const server = new McpServer(
     { name: "founder-os", version: "1.0.0" },
     { instructions: "Founder OS CRM. Nutze batch_create_leads für recherchierte Lead-Listen. Aufgaben können direkt gelesen, angelegt, geändert und gelöscht werden; diese Task-Tools haben sofortige Schreibwirkung." },
@@ -36,6 +59,7 @@ function createFounderServer(userId: string, scope: string) {
     },
   }, async ({ venture, status, industry, search, limit }) => {
     if (!requireScope("leads:read")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "leads:read" }) }] };
+    if (!canUseSection(access, venture, "leads", "view")) return forbidden();
     let query = supabaseAdmin.from("leads").select("id,venture,first_name,last_name,email,company_name,phone,website,city,region,industry,notes,source,status,last_contacted_at,follow_up_date,automation_enabled,is_duplicate,created_at").eq("venture", venture).is("archived_at", null).order("created_at", { ascending: false }).limit(limit ?? 50);
     if (status) query = query.eq("status", status);
     if (industry) query = query.eq("industry", industry);
@@ -51,6 +75,7 @@ function createFounderServer(userId: string, scope: string) {
     },
   }, async (args) => {
     if (!requireScope("leads:write")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "leads:write" }) }] };
+    if (!canUseSection(access, args.venture, "leads", "edit")) return forbidden();
     const { data: existing } = await supabaseAdmin.from("leads").select("id").eq("email", args.email.toLowerCase()).eq("venture", args.venture).maybeSingle();
     const { data, error } = await supabaseAdmin.from("leads").insert({ ...args, email: args.email.toLowerCase(), status: "neu", is_duplicate: Boolean(existing), region: args.region ?? "Hessen" }).select("id,venture,first_name,last_name,email,company_name,status,source,is_duplicate,created_at").single();
     return { content: [{ type: "text", text: json(error ? { error: error.message } : { success: true, duplicate: Boolean(existing), lead: data }) }] };
@@ -61,6 +86,9 @@ function createFounderServer(userId: string, scope: string) {
     inputSchema: { leads: z.array(z.object({ venture: z.enum(ventures), first_name: z.string(), last_name: z.string(), email: z.string().email(), company_name: z.string().optional(), phone: z.string().optional(), website: z.string().optional(), city: z.string().optional(), region: z.string().optional(), industry: z.string().optional(), notes: z.string().optional(), contact_reason: z.string().optional(), source: z.enum(["website", "linkedin", "empfehlung", "kaltakquise", "csv_import", "ki_suche"]).default("ki_suche"), automation_enabled: z.boolean().default(true) })).min(1).max(50) },
   }, async ({ leads }) => {
     if (!requireScope("leads:write")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "leads:write" }) }] };
+    const deniedVenture = [...new Set(leads.map((lead) => lead.venture))]
+      .find((venture) => !canUseSection(access, venture, "leads", "edit"));
+    if (deniedVenture) return forbidden(`Kein Schreibzugriff auf ${deniedVenture}`);
     const results: Array<Record<string, unknown>> = [];
     for (let i = 0; i < leads.length; i++) {
       const lead = leads[i];
@@ -76,7 +104,9 @@ function createFounderServer(userId: string, scope: string) {
     inputSchema: { id: z.string().uuid() },
   }, async ({ id }) => {
     if (!requireScope("leads:read")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "leads:read" }) }] };
-    const { data, error } = await supabaseAdmin.from("leads").select("*").eq("id", id).single();
+    const { data: lead } = await supabaseAdmin.from("leads").select("venture").eq("id", id).maybeSingle();
+    if (!lead || !canUseSection(access, lead.venture, "leads", "view")) return forbidden();
+    const { data, error } = await supabaseAdmin.from("leads").select("*").eq("id", id).eq("venture", lead.venture).single();
     return { content: [{ type: "text", text: json(error ? { error: error.message } : data) }] };
   });
 
@@ -85,8 +115,10 @@ function createFounderServer(userId: string, scope: string) {
     inputSchema: { id: z.string().uuid(), notes: z.string().optional(), industry: z.string().optional(), company_name: z.string().optional(), website: z.string().optional(), city: z.string().optional(), phone: z.string().optional(), contact_reason: z.string().optional(), automation_enabled: z.boolean().optional() },
   }, async ({ id, ...fields }) => {
     if (!requireScope("leads:write")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "leads:write" }) }] };
+    const { data: lead } = await supabaseAdmin.from("leads").select("venture").eq("id", id).maybeSingle();
+    if (!lead || !canUseSection(access, lead.venture, "leads", "edit")) return forbidden();
     const update = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
-    const { error } = await supabaseAdmin.from("leads").update(update).eq("id", id);
+    const { error } = await supabaseAdmin.from("leads").update(update).eq("id", id).eq("venture", lead.venture);
     return { content: [{ type: "text", text: json(error ? { error: error.message } : { success: true, id }) }] };
   });
 
@@ -95,6 +127,7 @@ function createFounderServer(userId: string, scope: string) {
     inputSchema: { venture: z.enum(ventures) },
   }, async ({ venture }) => {
     if (!requireScope("stats:read")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "stats:read" }) }] };
+    if (!canUseSection(access, venture, "leads", "view")) return forbidden();
     const { data, error } = await supabaseAdmin.from("leads").select("status,source,is_duplicate").eq("venture", venture).is("archived_at", null);
     if (error) return { content: [{ type: "text", text: json({ error: error.message }) }] };
     const byStatus: Record<string, number> = {}; const bySource: Record<string, number> = {};
@@ -114,14 +147,25 @@ function createFounderServer(userId: string, scope: string) {
     },
   }, async ({ venture, entity_type, entity_id, status, assigned_to, limit }) => {
     if (!requireScope("tasks:read")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "tasks:read" }) }] };
+    if (venture) {
+      const requestedSection = entity_type ? sectionForEntity(entity_type) : null;
+      const permitted = requestedSection
+        ? canUseSection(access, venture, requestedSection, "view")
+        : canUseSection(access, venture, "leads", "view") || canUseSection(access, venture, "customers", "view");
+      if (!permitted) return forbidden();
+    }
     let query = supabaseAdmin.from("tasks").select("*").order("sort_order", { ascending: true }).order("created_at", { ascending: false }).limit(limit ?? 100);
     if (venture) query = query.eq("venture", venture);
+    else if (!access.isFounder) query = query.in("venture", allowedVentures(access));
     if (entity_type) query = query.eq("entity_type", entity_type);
     if (entity_id) query = query.eq("entity_id", entity_id);
     if (status) query = query.eq("status", status);
     if (assigned_to) query = query.eq("assigned_to", assigned_to);
     const { data, error } = await query;
-    return { content: [{ type: "text", text: json(error ? { error: error.message } : { tasks: data ?? [], count: data?.length ?? 0 }) }] };
+    const visible = (data ?? []).filter((task) =>
+      canUseSection(access, task.venture, sectionForEntity(task.entity_type), "view")
+    );
+    return { content: [{ type: "text", text: json(error ? { error: error.message } : { tasks: visible, count: visible.length }) }] };
   });
 
   server.registerTool("create_task", {
@@ -142,6 +186,10 @@ function createFounderServer(userId: string, scope: string) {
     },
   }, async ({ venture, entity_type, entity_id, title, description, status, priority, due_date, assigned_to, recurrence_rule, recurrence_end_date, checklist }) => {
     if (!requireScope("tasks:write")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "tasks:write" }) }] };
+    if (!canUseSection(access, venture, sectionForEntity(entity_type), "edit")) return forbidden();
+    if (!(await entityBelongsToVenture(entity_type, entity_id, venture))) {
+      return forbidden("Die verknüpfte Entität gehört nicht zu diesem Venture");
+    }
     const { data, error } = await supabaseAdmin.from("tasks").insert({
       venture,
       entity_type,
@@ -176,6 +224,8 @@ function createFounderServer(userId: string, scope: string) {
     },
   }, async ({ id, title, description, status, priority, due_date, assigned_to, recurrence_rule, recurrence_end_date, checklist }) => {
     if (!requireScope("tasks:write")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "tasks:write" }) }] };
+    const task = await loadTaskAccess(id, "edit");
+    if (!task) return forbidden();
     const updates: Record<string, unknown> = {};
     if (title !== undefined) updates.title = title.trim();
     if (description !== undefined) updates.description = description;
@@ -187,7 +237,7 @@ function createFounderServer(userId: string, scope: string) {
     if (recurrence_end_date !== undefined) updates.recurrence_end_date = recurrence_end_date;
     if (checklist !== undefined) updates.checklist = checklist;
     if (Object.keys(updates).length === 0) return { content: [{ type: "text", text: json({ error: "Mindestens ein Änderungsfeld erforderlich" }) }] };
-    const { data, error } = await supabaseAdmin.from("tasks").update(updates).eq("id", id).select().single();
+    const { data, error } = await supabaseAdmin.from("tasks").update(updates).eq("id", id).eq("venture", task.venture).select().single();
     return { content: [{ type: "text", text: json(error ? { error: error.message } : { success: true, task: data }) }] };
   });
 
@@ -196,7 +246,9 @@ function createFounderServer(userId: string, scope: string) {
     inputSchema: { id: z.string().uuid() },
   }, async ({ id }) => {
     if (!requireScope("tasks:write")) return { content: [{ type: "text", text: json({ error: "insufficient_scope", required_scope: "tasks:write" }) }] };
-    const { error } = await supabaseAdmin.from("tasks").delete().eq("id", id);
+    const task = await loadTaskAccess(id, "edit");
+    if (!task) return forbidden();
+    const { error } = await supabaseAdmin.from("tasks").delete().eq("id", id).eq("venture", task.venture);
     return { content: [{ type: "text", text: json(error ? { error: error.message } : { success: true, id }) }] };
   });
 
@@ -214,49 +266,42 @@ function unauthorized() {
 }
 
 async function handle(req: Request) {
-  const publicAccess = process.env.MCP_PUBLIC_ACCESS !== "false";
   let userId: string;
   let scope: string;
-  if (publicAccess) {
-    userId = "1a996185-21dc-49ad-bbb0-beb246da85d2";
+  const auth = req.headers.get("authorization") ?? "";
+  if (!auth.startsWith("Bearer ")) return unauthorized();
+  const token = auth.slice(7);
+  const staticToken = process.env.MCP_STATIC_TOKEN;
+  const staticUserId = process.env.MCP_STATIC_USER_ID;
+  if (staticToken && staticUserId) {
+    if (!staticTokenMatches(token, staticToken)) return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": "Bearer" } });
+    userId = staticUserId;
     scope = "tasks:read tasks:write";
   } else {
-    const auth = req.headers.get("authorization") ?? "";
-    if (!auth.startsWith("Bearer ")) return unauthorized();
-    const token = auth.slice(7);
-    const staticToken = process.env.MCP_STATIC_TOKEN;
-    const staticUserId = process.env.MCP_STATIC_USER_ID ?? "1a996185-21dc-49ad-bbb0-beb246da85d2";
-    if (staticToken) {
-      if (!staticTokenMatches(token, staticToken)) return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": "Bearer" } });
-      userId = staticUserId;
-      scope = "tasks:read tasks:write";
-    } else {
-      try {
-        const verified = await verifyAccessToken(token);
-        userId = verified.userId;
-        scope = verified.scope;
-      } catch {
-        return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": "Bearer" } });
-      }
+    try {
+      const verified = await verifyAccessToken(token);
+      userId = verified.userId;
+      scope = verified.scope;
+    } catch {
+      return new Response(JSON.stringify({ error: "invalid_token" }), { status: 401, headers: { ...cors, "Content-Type": "application/json", "WWW-Authenticate": "Bearer" } });
     }
   }
 
-  const server = createFounderServer(userId, scope);
+  let access: McpAccess | null = null;
+  try {
+    access = await getMcpAccess(userId);
+  } catch {
+    return new Response(JSON.stringify({ error: "access_lookup_failed" }), { status: 503, headers: { ...cors, "Content-Type": "application/json" } });
+  }
+  if (!access) return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
+
+  const server = createFounderServer(userId, scope, access);
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);
   const response = await transport.handleRequest(req);
-  let responseBody: BodyInit | null = response.body as BodyInit;
-  if (publicAccess && response.headers.get("content-type")?.includes("application/json")) {
-    const payload = await response.clone().json().catch(() => null) as { result?: { tools?: Array<{ name: string }> } } | null;
-    if (payload?.result?.tools) {
-      const publicTools = new Set(["list_tasks", "create_task", "update_task", "delete_task"]);
-      payload.result.tools = payload.result.tools.filter((tool) => publicTools.has(tool.name));
-      responseBody = JSON.stringify(payload);
-    }
-  }
   const headers = new Headers(response.headers);
   Object.entries(cors).forEach(([key, value]) => headers.set(key, value));
-  return new Response(responseBody, { status: response.status, headers });
+  return new Response(response.body as BodyInit, { status: response.status, headers });
 }
 
 export async function OPTIONS() { return new Response(null, { status: 204, headers: cors }); }
